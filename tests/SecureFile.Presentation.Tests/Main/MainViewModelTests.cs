@@ -501,6 +501,67 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public async Task GuidanceLine_FollowsWhatIsTyped_WhenEncrypting()
+    {
+        MainViewModel viewModel = CreateViewModel();
+        _dialogs.OpenResult = InputPath;
+        await viewModel.BrowseCommand.ExecuteAsync(null);
+        Assert.Equal("Enter a password of at least 8 characters.", viewModel.StatusMessage);
+
+        viewModel.Password = "short";
+        Assert.StartsWith("The password is too short", viewModel.StatusMessage, StringComparison.Ordinal);
+
+        viewModel.Password = "blue river coffee lamp";
+        Assert.Equal("Type the password again to confirm it.", viewModel.StatusMessage);
+
+        viewModel.ConfirmPassword = "blue river";
+        Assert.Equal("The two passwords are not the same yet.", viewModel.StatusMessage); // typed, but not acceptable: not "enter the password"
+
+        viewModel.ConfirmPassword = "blue river coffee lamp";
+        Assert.Equal("Ready. Choose Encrypt file.", viewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task GuidanceLine_WhenDecrypting_AsksForTheOldPasswordThenSaysReady()
+    {
+        MainViewModel viewModel = CreateViewModel();
+        _dialogs.OpenResult = Path.Combine(Path.GetTempPath(), "report.pdf.enc");
+        await viewModel.BrowseCommand.ExecuteAsync(null);
+        Assert.Equal("Enter the password that was used to encrypt this file.", viewModel.StatusMessage);
+
+        viewModel.Password = "old";
+
+        Assert.Equal("Ready. Choose Decrypt file.", viewModel.StatusMessage); // no length rule when decrypting
+    }
+
+    [Fact]
+    public async Task Typing_AfterAFailure_ClearsTheOldErrorAndShowsTheNextStep()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        _dialogs.SaveResult = InputPath; // refused: the result can't replace the chosen file
+        await viewModel.EncryptCommand.ExecuteAsync(null);
+        Assert.True(viewModel.IsFailed);
+
+        viewModel.ConfirmPassword = "x";
+
+        Assert.False(viewModel.IsFailed);
+        Assert.Equal("The two passwords are not the same yet.", viewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task Typing_AfterASuccess_KeepsTheResultMessage()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        _dialogs.SaveResult = InputPath + ".enc";
+        await viewModel.EncryptCommand.ExecuteAsync(null);
+
+        viewModel.Password = "something typed after";
+
+        Assert.True(viewModel.IsSucceeded);
+        Assert.StartsWith("Encrypted copy saved as", viewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void PasswordMatchText_PromptsForTheConfirmationAndOnlyMismatchIsFlagged()
     {
         MainViewModel viewModel = CreateViewModel();

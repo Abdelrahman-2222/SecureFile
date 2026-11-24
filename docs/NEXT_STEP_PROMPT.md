@@ -1,27 +1,22 @@
 # Next step — copy-paste prompt for a new chat
 
-Last finished (2026-11-24): Steps 4.2–4.4 as far as a machine can take them. Branch `feature/stage-4-testing`
-(cut from `main` after PR #2). Stages 1–3 are merged.
+Last finished (2026-11-24): Stage 4 code and docs as far as a machine can take them, a review pass (backlog in
+`docs/REVIEW_BACKLOG.md`), and the first friends build (`pwsh scripts/publish-beta.ps1`, output in `artifacts/beta/`).
+Branch `feature/stage-4-testing`.
 
-**Model and effort for the next chat:** Sonnet 5.5, effort **medium**. Start a NEW chat: the previous one was long.
+**Model and effort for the next chat:** Sonnet 5.5, effort **medium**. Start a NEW chat: the previous one was very long.
 
 ```text
-Branch feature/stage-4-testing (do not create another). Follow CLAUDE.md. Stage 4 remaining work needs the user:
-1. T-27 4.5 GiB run: Kaspersky killed SecureFile.Integration.Tests.exe both times (see LEARNING_LOG, Stage 4). Only
-   the 1 GiB case is measured (96/100 MB/s, 46 MB peak). Ask whether the user has excluded the test bin folder and
-   TestFolder in Kaspersky (or has another machine); if yes, run
-   pwsh scripts/large-file-check.ps1 -WorkFolder "D:\Abelrahman\Abdelrahman Current\TestFolder" in the background,
-   fill in the 4.5 GiB row in LEARNING_LOG (append a short note, do not read the file), mark plan row 4.2 done.
-2. Step 4.3: the user runs docs/TESTPLAN.md by hand and reports failures; fix each bug (test first where possible).
-3. Step 4.4: the user runs docs/USABILITY.md with 3-5 people and reports findings; fix or record them.
-4. Then the Stage 4 reviewer + LEARNING_LOG wrap-up, PR to main. REPLACE THIS FILE at the end of each step.
+Branch feature/stage-4-testing (do not create another). Follow CLAUDE.md. Waiting on the user for:
+1. docs/TESTPLAN.md run by hand (sections A-I): fix each bug found (test first where possible).
+2. The friends beta (artifacts/beta/SecureFile-0.1.0-beta1-win-x64.zip + SHA-256): collect feedback into
+   docs/USABILITY.md (Step 4.4) and fix or record each finding.
+3. T-27 4.5 GiB run: Kaspersky kills the test exe (see LEARNING_LOG, Stage 4); only 1 GiB is measured. Ask whether the
+   user has excluded the test bin folder and TestFolder, then run scripts/large-file-check.ps1 in the background.
+Then: Stage 4 reviewer + LEARNING_LOG wrap-up, PR to main, then Stage 5. REPLACE THIS FILE at the end of each step.
 Do not raise the 400 MB memory limit to make a test pass; report real findings.
 ```
 
-**Open items for the final hardening stage**
-- Two flaky Core tests, both temp-file cleanup timing on Windows (see the project notes):
-  `FileDecryptionTests.DecryptAsync_CancelledFromTheProgressReport_ThrowsAndLeavesNothing(length: 3145728)` and
-  `FileDecryptionTests.DecryptAsync_WrongPasswordWithOverwriteAllowed_KeepsTheExistingFile`.
-- Deferred review items: Unix errno values in `ErrorMessageProvider`, `IsSameFile` case rule on Linux, `FileErrorLog`
-  tests, `DateTime` vs `Stopwatch` for the repeat-error window, About dialog width at large text scaling.
-- T-23 (disk full) cannot be made with real files here; consider a fake-stream unit test.
+**Open items for the final hardening stage:** see `docs/REVIEW_BACKLOG.md` (deferred review items), the two flaky Core
+tests (temp-file cleanup timing: `FileDecryptionTests.DecryptAsync_CancelledFromTheProgressReport_ThrowsAndLeavesNothing`
+and `DecryptAsync_WrongPasswordWithOverwriteAllowed_KeepsTheExistingFile`), T-23 (disk full) as a fake-stream test.

@@ -758,10 +758,10 @@ What does a mutation score tell us that coverage does not?
 
 | Step | Goal | Done when | Status |
 |---|---|---|---|
-| 6.1 | Publish profiles: `win-x64`, `win-arm64`, self-contained, single-file, ReadyToRun. | One `.exe` per architecture. | ⬜ |
+| 6.1 | Publish profiles: `win-x64`, `win-arm64`, self-contained, single-file, ReadyToRun. | One `.exe` per architecture. | 🟡 `win-x64` self-contained single-file beta zip via `scripts/publish-beta.ps1` (2026-11-24); `win-arm64`, installer and signing not done |
 | 6.2 | Test in **Windows Sandbox** (clean Windows, nothing installed) with a `.wsb` config. | Full flow works on first run. | ⬜ |
 | 6.3 | Decide on installer (Velopack/MSIX) and code signing (Azure Artifact Signing). | Decision recorded (ADR). | ⬜ |
-| 6.4 | `README.md` "Try it in 60 seconds" with screenshots/GIF; SHA-256 checksums; release zip. | A non-technical person can follow it. | ⬜ |
+| 6.4 | `README.md` "Try it in 60 seconds" with screenshots/GIF; SHA-256 checksums; release zip. | A non-technical person can follow it. | 🟡 `docs/BETA_README.md` for friends done; the project README "Try it in 60 seconds" and screenshots still open |
 
 ### Stage 7 — Bonus: cross-platform (Phase 5, presented in Phase 6) · ~1 day after the required track
 

@@ -264,9 +264,95 @@ public sealed partial class MainViewModel : ObservableObject
         StatusMessage = "Reading the file details…";
         SelectedFile = await Task.Run(() => _fileDetailsReader.Read(path)).ConfigureAwait(true);
         State = MainViewState.FileSelected;
-        StatusMessage = SelectedFile.IsEncrypted || !HasEncryptedName(SelectedFile)
-            ? "Enter the password to continue."
-            : "This file ends in .enc but is not a valid SecureFile file: it may be damaged or made by another program. You can still try Decrypt to see what is wrong.";
+        StatusMessage = GuidanceMessage();
+    }
+
+    /// <summary>
+    /// Tells the user the next step for the chosen file, from what is typed so far: the line under the buttons while
+    /// nothing is running or finished.
+    /// </summary>
+    /// <returns>The sentence to show.</returns>
+    /// <remarks>
+    /// It follows the password and confirmation, so it never says "enter the password" when one is already typed but
+    /// not yet acceptable (too short, not confirmed, not the same).
+    /// </remarks>
+    private string GuidanceMessage()
+    {
+        if (SelectedFile is null)
+        {
+            return "Choose a file to encrypt or decrypt.";
+        }
+
+        if (!SelectedFile.IsEncrypted && HasEncryptedName(SelectedFile))
+        {
+            return "This file ends in .enc but is not a valid SecureFile file: it may be damaged or made by another program. You can still try Decrypt to see what is wrong.";
+        }
+
+        return SelectedFile.IsEncrypted ? DecryptGuidance() : EncryptGuidance();
+    }
+
+    /// <summary>The next step when an encrypted file is chosen.</summary>
+    /// <returns>The sentence to show.</returns>
+    private string DecryptGuidance()
+    {
+        return Password.Length == 0
+            ? "Enter the password that was used to encrypt this file."
+            : "Ready. Choose Decrypt file.";
+    }
+
+    /// <summary>The next step when a normal file is chosen: a password, its length, its confirmation, then go.</summary>
+    /// <returns>The sentence to show.</returns>
+    private string EncryptGuidance()
+    {
+        if (Password.Length == 0)
+        {
+            return string.Create(CultureInfo.CurrentCulture, $"Enter a password of at least {PasswordStrengthEvaluator.MinimumLength} characters.");
+        }
+
+        if (Password.Length < PasswordStrengthEvaluator.MinimumLength)
+        {
+            return string.Create(CultureInfo.CurrentCulture, $"The password is too short: use at least {PasswordStrengthEvaluator.MinimumLength} characters.");
+        }
+
+        if (ConfirmPassword.Length == 0)
+        {
+            return "Type the password again to confirm it.";
+        }
+
+        return PasswordsMatch ? "Ready. Choose Encrypt file." : "The two passwords are not the same yet.";
+    }
+
+    /// <summary>Keeps the guidance line in step with the typed password.</summary>
+    /// <param name="value">The new password (unused: the properties are read).</param>
+    partial void OnPasswordChanged(string value)
+    {
+        RefreshGuidance();
+    }
+
+    /// <summary>Keeps the guidance line in step with the typed confirmation.</summary>
+    /// <param name="value">The new confirmation (unused: the properties are read).</param>
+    partial void OnConfirmPasswordChanged(string value)
+    {
+        RefreshGuidance();
+    }
+
+    /// <summary>
+    /// While a file is chosen and nothing is running, rewrites the guidance line; typing also clears an old error, which
+    /// the user is now fixing.
+    /// </summary>
+    /// <remarks>
+    /// Not while working, and not after a success (the result stays until a new file is chosen, and the program clears
+    /// the passwords itself then).
+    /// </remarks>
+    private void RefreshGuidance()
+    {
+        if (SelectedFile is null || State is not (MainViewState.FileSelected or MainViewState.Failed))
+        {
+            return;
+        }
+
+        State = MainViewState.FileSelected;
+        StatusMessage = GuidanceMessage();
     }
 
     /// <summary>Tells whether the file's name ends in <c>.enc</c>, whatever its content.</summary>
@@ -347,9 +433,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         ClearProgress();
         State = SelectedFile is null ? MainViewState.NoFile : MainViewState.FileSelected;
-        StatusMessage = SelectedFile is null
-            ? "Choose a file to encrypt or decrypt."
-            : "Enter the password to continue.";
+        StatusMessage = GuidanceMessage();
     }
 
     /// <summary>

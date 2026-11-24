@@ -185,7 +185,7 @@ public sealed class SecureFileAppTests : IDisposable
         window.SetForeground();
         Keyboard.TypeSimultaneously(VirtualKeyShort.CONTROL, VirtualKeyShort.KEY_O);
         TypeInDialog(window, path);
-        WaitForStatus(window, "Enter the password");
+        WaitForStatus(window, "Enter ");
     }
 
     private static void EnterPassword(Window window, string password)
