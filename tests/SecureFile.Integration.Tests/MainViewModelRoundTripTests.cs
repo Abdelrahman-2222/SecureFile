@@ -28,6 +28,7 @@ public sealed class MainViewModelRoundTripTests : IDisposable
         Assert.Equal(MainViewState.Succeeded, viewModel.State);
 
         await _scenario.BrowseAsync(viewModel, encrypted);
+        viewModel.Password = "correct horse"; // cleared after the success above, as the app does
         await _scenario.RunAsync(viewModel.DecryptCommand, restored);
 
         Assert.Equal(MainViewState.Succeeded, viewModel.State);

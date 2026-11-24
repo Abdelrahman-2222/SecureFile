@@ -107,10 +107,13 @@ public sealed class FileSystemScenarioTests : IDisposable
 
         await _scenario.RunAsync(viewModel.EncryptCommand, once);
         await _scenario.BrowseAsync(viewModel, once);
+        viewModel.Password = Password; // cleared after each success, as the app does
         await _scenario.RunAsync(viewModel.EncryptCommand, twice);
         await _scenario.BrowseAsync(viewModel, twice);
+        viewModel.Password = Password; // cleared after each success, as the app does
         await _scenario.RunAsync(viewModel.DecryptCommand, backOnce);
         await _scenario.BrowseAsync(viewModel, backOnce);
+        viewModel.Password = Password; // cleared after each success, as the app does
         await _scenario.RunAsync(viewModel.DecryptCommand, backTwice);
 
         Assert.Equal(MainViewState.Succeeded, viewModel.State);
