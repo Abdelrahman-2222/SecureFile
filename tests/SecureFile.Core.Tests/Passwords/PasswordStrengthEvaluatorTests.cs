@@ -67,7 +67,7 @@ public sealed class PasswordStrengthEvaluatorTests
     }
 
     [Theory]
-    [InlineData("Passw0rd-Tx9q")]       // not caught: look-alike letters are not decoded (documented limit)
+    [InlineData("Passw0rd-Tx9q")]       // the look-alike reading gives "passwordtxq": other letters were added, so it is not the common word
     [InlineData("correct horse battery staple")]
     [InlineData("blue river coffee lamp")]
     public void Evaluate_ReasonablePassphrases_AreNotPunished(string password)

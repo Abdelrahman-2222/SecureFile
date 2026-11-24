@@ -18,6 +18,7 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 
 - **20** Cancelling the Save dialog left an old red message (test `Encrypt_SaveDialogCancelledAfterAFailure_ClearsTheOldErrorMessage`).
 - **12 (part)** A bad drop or Browse no longer clears the previous good selection (tests `OpenFile_BadDropAfterAGoodFile_KeepsThePreviousSelection`, `Browse_FileChosenAfterAFailure_...`).
+- **C3 (part)** Look-alike characters (`@ 4 3 1 0 $ 5 7`) are read as letters in the common-word check (tests `IsPredictable_LookAlikeCharactersReadAsLetters_IsRecognised`, `..._DisguisedWordWithOtherLettersAdded_IsNotRecognised`).
 - **22 (part)** Remaining time over one hour reads "2 h 5 min" instead of "125 min 5 s" (tests `Format_MoreThanOneHourLeft_...`, `Format_ExactlyOneHourLeft_...`, culture and 99 % cases).
 - **B5, part** VM tests added: progress cleared after a failure, a bad drop keeping the old selection, Esc/Cancel with no operation, a file chosen after a failure, passwords surviving a file change; the misnamed `RunPrimary_...` test renamed.
 
@@ -75,16 +76,16 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 
 | # | Item | Why it matters |
 |---|---|---|
-| C1 | Windows app is 134 MB (self-contained, not trimmable) | Try `EnableCompressionInSingleFile`, or offer a framework-dependent build (small, needs the .NET 10 Desktop Runtime); plan §8.2 asks for the published size per architecture |
+| C1 | **MEASURED (Step 5.2), decision open:** Windows app is 134 MB self-contained; `EnableCompressionInSingleFile` gives 65 MB but about 0.2 s slower start (707 to 908 ms median) | Release defaults unchanged; the user decides size versus start time; a framework-dependent build (small, needs the .NET 10 Desktop Runtime) is the other option |
 | C2 | Linux and macOS command-line binaries were built but **never run** on those systems; the interactive password prompt (`Console.ReadKey`, Ctrl+C as input) is untested on every OS, and Backspace removes one UTF-16 unit | Real keyboards and Unix terminals behave differently; first user feedback may find bugs |
-| C3 | Strength check limits: look-alike letters (`P@ssw0rd`) not decoded; about 80 English words only (no Arabic list); few keyboard rows; the 50 % run rule is a guess | Advice only, but it is the first thing a reviewer will try |
+| C3 | **PARTLY FIXED (Step 5.6):** look-alike letters (`P@ssw0rd`, `l3tmein`) are now read as letters. Open: about 80 English words and no Arabic list; few keyboard rows; the 50 % run rule is a guess; a word with other letters added is not caught | Advice only; a larger list is a data task (see `docs/SUGGESTIONS.md`) |
 | C4 | Kaspersky creates backup copies of temp files in test folders (`.~OUTPUT.*.SECUREFILE-TMP.tmp`, upper case), so about 1 full test run in 4 fails here with a different "…LeavesNothing" test | Exclude `%TEMP%\SecureFile*` in the antivirus, or run the gate where it is not installed; the delete retry in `AtomicFileWriter.TryDeleteFile` did not remove it |
 | C5 | The 4.5 GiB large-file run (T-27) is blocked: the antivirus kills the test program | Only 1 GiB is measured (96 / 100 MB/s, 46 MB peak) |
 | C6 | `docs/TESTPLAN.md` (A to J) has not been run by a person on the current build; the usability check with friends (`docs/USABILITY.md`) has not happened | Plan Steps 4.3 and 4.4 |
 | C7 | Programs are not code-signed or notarized | SmartScreen and Gatekeeper warnings; plan Step 6.3 |
 | C8 | macOS and Linux have no desktop window | Plan Steps 7.1 and 7.2 (Avalonia); releases for them are held back until then |
 | C9 | GitHub branch and tag protection is unavailable on a private free repository | The release branch can be deleted on the website; make the repository public or upgrade the plan (see `docs/RELEASING.md`) |
-| C10 | 2.5 coverage target (Presentation ≥ 85 %) has not been measured | Plan row 2.5 |
+| C10 | **DONE (Step 5.3):** Presentation coverage measured: 95.8 % lines, about 91 % branches (target >= 85 %) | See `docs/QUALITY_REPORT.md` |
 | C11 | CLI: `tar.gz` archives built on Windows may not carry the executable bit (README tells users `chmod +x`); no `--quiet`/`--json` mode; no folder or multi-file support | CLI polish |
 | C12 | Original findings that stay as documented limits: no secure delete (SSDs cannot guarantee it); AES-CBC+HMAC format v1 only | See `docs/SUGGESTIONS.md` |
 | C14 | On Linux/macOS a directory symlink or case alias of the input can pass the same-file check and the rename replaces the input (Windows is safe) | Security review R2; needs a file-identity comparison (platform code) |
