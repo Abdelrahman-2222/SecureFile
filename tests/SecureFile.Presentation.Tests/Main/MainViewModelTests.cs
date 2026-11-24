@@ -109,6 +109,16 @@ public sealed class MainViewModelTests
         Assert.False(viewModel.EncryptCommand.CanExecute(null));   // a new file and password are needed
     }
 
+    [Theory]
+    [InlineData("report.pdf", "If you forget this password")]
+    [InlineData("report.pdf.enc", "Enter the password that was used")]
+    public async Task PasswordHint_WarnsWhenChoosingAPasswordAndRemindsWhenDecrypting(string name, string expectedStart)
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(Path.Combine(Path.GetTempPath(), name));
+
+        Assert.StartsWith(expectedStart, viewModel.PasswordHint, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task Encrypt_OnFailure_KeepsFileAndPasswordAndMarksTheMessageAsFailed()
     {

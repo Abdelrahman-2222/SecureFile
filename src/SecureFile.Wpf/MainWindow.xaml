@@ -77,8 +77,8 @@
             <CheckBox x:Name="ShowPasswordCheck" AutomationProperties.AutomationId="ShowPasswordCheck"
                       Content="_Show password" Margin="0,8,0,0"
                       Checked="OnShowPasswordChanged" Unchecked="OnShowPasswordChanged" />
-            <TextBlock Text="If you forget this password, the file cannot be recovered. Nobody can reset it."
-                       TextWrapping="Wrap" Margin="0,8,0,0" />
+            <TextBlock x:Name="PasswordHintText" AutomationProperties.AutomationId="PasswordHint"
+                       Text="{Binding PasswordHint}" TextWrapping="Wrap" Margin="0,8,0,0" />
 
             <!-- 6. Primary actions -->
             <StackPanel Orientation="Horizontal" Margin="0,16,0,0">

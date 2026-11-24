@@ -79,9 +79,18 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Gets the details of the chosen file, or <see langword="null"/> when no file is chosen.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(FileSummary))]
+    [NotifyPropertyChangedFor(nameof(FileSummary), nameof(PasswordHint))]
     [NotifyCanExecuteChangedFor(nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand))]
     public partial FileDetails? SelectedFile { get; private set; }
+
+    /// <summary>Gets the note under the password box: a warning when a password is being chosen, a reminder when decrypting.</summary>
+    /// <remarks>
+    /// "If you forget this password…" matters when the user creates a password (encrypting). For a file that already
+    /// ends in <c>.enc</c> the user is entering an old password, so the note says which one instead.
+    /// </remarks>
+    public string PasswordHint => IsEncryptedFileSelected()
+        ? "Enter the password that was used to encrypt this file."
+        : "If you forget this password, the file cannot be recovered. Nobody can reset it.";
 
     /// <summary>Gets or sets the password typed by the user. Spaces count as characters and are never trimmed.</summary>
     /// <remarks>
@@ -169,8 +178,15 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanRunFileOperation))]
     private Task RunPrimaryAsync()
     {
-        bool decrypt = SelectedFile!.Name.EndsWith(EncryptedFileFormat.FileExtension, StringComparison.OrdinalIgnoreCase);
-        return decrypt ? DecryptAsync() : EncryptAsync();
+        return IsEncryptedFileSelected() ? DecryptAsync() : EncryptAsync();
+    }
+
+    /// <summary>Tells whether the chosen file's name ends in <c>.enc</c>, which means it is decrypted rather than encrypted.</summary>
+    /// <returns><see langword="true"/> when a file is chosen and it ends in <c>.enc</c>.</returns>
+    private bool IsEncryptedFileSelected()
+    {
+        return SelectedFile is not null
+            && SelectedFile.Name.EndsWith(EncryptedFileFormat.FileExtension, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Reads a chosen file's details off the UI thread and selects it.</summary>
