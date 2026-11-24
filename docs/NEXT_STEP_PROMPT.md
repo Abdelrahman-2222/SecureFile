@@ -2,6 +2,10 @@
 
 Last finished (2026-11-24): Step 1.7, Steps 2.1–2.3 (slice form). Branch `feature/stage-1-core`.
 
+**Model and effort for the next chat:** Sonnet 5.5, effort **medium** (the design below is fixed; this is coding to a
+spec). Switch to Opus 5.5 only if Step 3.1's safety nets or the smoke test get stuck. The reviewer agent at the end
+runs on Sonnet.
+
 ```text
 Branch feature/stage-1-core (don't create a branch). Follow CLAUDE.md. Finish the vertical slice: Steps 2.6, 3.1,
 then the slice wrap-up. Design is decided — don't re-explore.
