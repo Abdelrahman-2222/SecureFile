@@ -722,7 +722,7 @@ Why `FixedTimeEquals` instead of `==`? Why HKDF instead of 64 bytes from PBKDF2?
 | Step | Goal | Done when | Status |
 |---|---|---|---|
 | 3.1 | `App.xaml` + pure-DI composition in `OnStartup` (ADR-09) + **global exception safety nets and local log** (ADR-13 Layer 3). | App starts; a forced test exception shows the friendly dialog, is logged, and the app keeps running. | ✅ |
-| 3.2 | Main window layout per §11 (drop zone, file card, password, output, actions, progress, status). | Matches the UX spec screenshot. | ⬜ |
+| 3.2 | Main window layout per §11 (drop zone, file card, password, output, actions, progress, status). | Matches the UX spec screenshot. | ✅ |
 | 3.3 | Fluent theme, light/dark following Windows, consistent spacing and sizes. | Looks right at 100%, 150%, 200% scaling. | ⬜ |
 | 3.4 | Drag-and-drop, native Open/Save dialogs, keyboard shortcuts, `AutomationProperties.Name` on all controls. | Full flow possible with keyboard only. | ⬜ |
 | 3.5 | Progress (%, MB/s, time left), Cancel, success panel (Open folder), friendly errors. | Manual flow test passes. | ⬜ |
