@@ -17,6 +17,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
   time left; Cancel (Esc) that leaves no output file; "Open folder" after success; inputs locked while working.
 - App icon (padlock) for the executable and both windows, and an About dialog (button or F1) that shows the version
   read from the assembly (`0.1.0`).
+- The pre-push hook now also refuses pushes straight to main, branch deletions and force-pushes (a local stand-in for
+  branch protection, which GitHub does not enforce on private repositories without a paid plan).
 - UI tests with FlaUI (`tests/SecureFile.Wpf.UiTests`): the real app encrypts and decrypts a file, shows the friendly
   wrong-password message, every control has an accessible name, and the About dialog opens with F1. They run only
   with `SECUREFILE_UI_TESTS=1`. Accessibility Insights automated checks on the window: 0 failures.
