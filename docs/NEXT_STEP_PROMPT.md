@@ -1,15 +1,21 @@
 # Next step — copy-paste prompt for a new chat
 
-Last finished (2026-11-24): the vertical slice (Steps 2.1–2.6, 3.1). Branch `feature/stage-1-core`.
+Last finished (2026-11-24): Steps 3.2–3.5 (layout, Fluent theme, drag-and-drop/keyboard, progress/cancel/open folder).
+Branch `feature/stage-1-core` (see the branch note below).
 
-**Model and effort for the next chat:** Sonnet 5.5, effort **medium** for Step 3.2 (layout from the §11 spec). Use Opus 5.5
-only if the theme/accessibility steps (3.3, 3.7) need design judgement.
+**Model and effort for the next chat:** Sonnet 5.5, effort **medium** (small WPF work: icon, About, window size).
 
 ```text
-Branch feature/stage-1-core (don't create a branch). Follow CLAUDE.md. Step 3.2: main window layout per PROJECT_PLAN §11
-(grep "^## 11" or "§11" and read only that range): drop zone, file card, password, output, actions, progress, status.
-Keep AutomationIds from src/SecureFile.Wpf/MainWindow.xaml and the code-behind PasswordChanged. Known deferred items from
-the slice review (docs/LEARNING_LOG.md, "Vertical slice" table): progress bar indeterminate while browsing; Cancel
-(Step 3.5); IsSameFile case rule on Linux; FileErrorLog tests.
-Per step: build + tests, one commit, then smoke checklist (UI Automation). Replace this file at the end.
+Branch feature/stage-1-core unless the user names another. Follow CLAUDE.md. Step 3.6: app icon, window title, About
+dialog showing the app version (read it from the assembly, not hard-coded), and confirm the minimum window size
+(640 x 480 already set in MainWindow.xaml). grep "^| 3.6" docs/PROJECT_PLAN.md for the row. Keep AutomationIds.
+Per step: build + tests, manual smoke (UI Automation scripts worked well), one commit, mark the plan row, add a
+CHANGELOG line, and REPLACE THIS FILE at the end of the step.
 ```
+
+**Open items before or during 3.6**
+- Decide the branch strategy (one branch holds stages 1–3 now; consider a PR, then one branch per stage/step).
+- One unexplained flaky test failure in the pre-push run after Step 3.5 (passed on re-run; name not captured).
+- Deferred review items: Unix errno values in `ErrorMessageProvider`, `IsSameFile` case rule on Linux, `FileErrorLog`
+  tests, `DateTime` vs `Stopwatch` for the repeat-error window.
+- Not yet verified by hand: dark mode, 150%/200% scaling, a real drag-and-drop from Explorer, the Open folder click.

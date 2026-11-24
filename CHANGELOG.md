@@ -12,6 +12,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
   encrypts and decrypts a real file; `ErrorMessageProvider` turns each expected error into a fixed plain message
   (ADR-13 Layer 2); `MainViewModel` logs and shows them; the WPF app adds a local error log
   (`%LOCALAPPDATA%\SecureFile\logs\securefile.log`) and global safety nets (ADR-13 Layer 3).
+- Main window (Steps 3.2–3.5): layout following the UX flow; Fluent theme that follows Windows light/dark; drop a
+  file on the window; Ctrl+O to browse and Enter in the password box to encrypt or decrypt; progress with speed and
+  time left; Cancel (Esc) that leaves no output file; "Open folder" after success; inputs locked while working.
+- The wrong-password message now suggests checking Caps Lock, the keyboard language and spaces.
 - First integration test: the ViewModel with the real encryption service encrypts then decrypts a file; bytes equal.
 - File details for the selected file: name, extension, size in bytes, full path and last change time (UTC)
   (`FileDetails`, `IFileDetailsReader`, `FileDetailsReader`).
