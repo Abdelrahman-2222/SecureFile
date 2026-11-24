@@ -6,6 +6,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <!-- Golden files (T-28): encrypted samples committed to Git; the test decrypts them from the output folder. -->
+    <Content Include="GoldenFiles\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\SecureFile.Core\SecureFile.Core.csproj" />
     <ProjectReference Include="..\..\src\SecureFile.Presentation\SecureFile.Presentation.csproj" />
   </ItemGroup>

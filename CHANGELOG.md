@@ -17,6 +17,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
   time left; Cancel (Esc) that leaves no output file; "Open folder" after success; inputs locked while working.
 - App icon (padlock) for the executable and both windows, and an About dialog (button or F1) that shows the version
   read from the assembly (`0.1.0`).
+- Integration tests on real files (Step 4.1): overwrite replaces atomically, locked source, source deleted after
+  selection, wrong password, plain text given to Decrypt, double encryption, and a committed golden `.enc` file that
+  must always decrypt (protects the file format).
 - The pre-push hook now also refuses pushes straight to main, branch deletions and force-pushes (a local stand-in for
   branch protection, which GitHub does not enforce on private repositories without a paid plan).
 - UI tests with FlaUI (`tests/SecureFile.Wpf.UiTests`): the real app encrypts and decrypts a file, shows the friendly

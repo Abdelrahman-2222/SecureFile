@@ -1,8 +1,4 @@
 using System.Security.Cryptography;
-using SecureFile.Core.Cryptography;
-using SecureFile.Core.Files;
-using SecureFile.Presentation.Dialogs;
-using SecureFile.Presentation.Errors;
 using SecureFile.Presentation.Main;
 
 namespace SecureFile.Integration.Tests;
@@ -13,37 +9,26 @@ namespace SecureFile.Integration.Tests;
 /// </summary>
 public sealed class MainViewModelRoundTripTests : IDisposable
 {
-    private readonly string _folder = Path.Combine(Path.GetTempPath(), "SecureFile-" + Guid.NewGuid().ToString("N"));
-
-    public MainViewModelRoundTripTests()
-    {
-        Directory.CreateDirectory(_folder);
-    }
+    private readonly TempFolderScenario _scenario = new();
 
     [Fact]
     public async Task EncryptThenDecrypt_ThroughTheViewModel_RestoresTheOriginalBytes()
     {
-        string original = Path.Combine(_folder, "report.bin");
+        string original = _scenario.PathOf("report.bin");
         string encrypted = original + ".enc";
-        string restored = Path.Combine(_folder, "restored.bin");
+        string restored = _scenario.PathOf("restored.bin");
         byte[] content = new byte[100_000];
         RandomNumberGenerator.Fill(content);
         await File.WriteAllBytesAsync(original, content, TestContext.Current.CancellationToken);
+        MainViewModel viewModel = _scenario.CreateViewModel();
 
-        var dialogs = new ScriptedDialogs();
-        var viewModel = new MainViewModel(new FileEncryptionService(), new FileDetailsReader(), dialogs, new IgnoringErrorLog(), new NoFolderOpener());
-
-        dialogs.Open = original;
-        await viewModel.BrowseCommand.ExecuteAsync(null);
+        await _scenario.BrowseAsync(viewModel, original);
         viewModel.Password = "correct horse";
-        dialogs.Save = encrypted;
-        await viewModel.EncryptCommand.ExecuteAsync(null);
+        await _scenario.RunAsync(viewModel.EncryptCommand, encrypted);
         Assert.Equal(MainViewState.Succeeded, viewModel.State);
 
-        dialogs.Open = encrypted;
-        await viewModel.BrowseCommand.ExecuteAsync(null);
-        dialogs.Save = restored;
-        await viewModel.DecryptCommand.ExecuteAsync(null);
+        await _scenario.BrowseAsync(viewModel, encrypted);
+        await _scenario.RunAsync(viewModel.DecryptCommand, restored);
 
         Assert.Equal(MainViewState.Succeeded, viewModel.State);
         Assert.Equal(content, await File.ReadAllBytesAsync(restored, TestContext.Current.CancellationToken));
@@ -51,38 +36,6 @@ public sealed class MainViewModelRoundTripTests : IDisposable
 
     public void Dispose()
     {
-        Directory.Delete(_folder, recursive: true);
-    }
-
-    private sealed class ScriptedDialogs : IFileDialogService
-    {
-        public string? Open { get; set; }
-
-        public string? Save { get; set; }
-
-        public string? ShowOpenFileDialog()
-        {
-            return Open;
-        }
-
-        public string? ShowSaveFileDialog(string suggestedFilePath)
-        {
-            return Save;
-        }
-    }
-
-    private sealed class NoFolderOpener : IFolderOpener
-    {
-        public bool OpenContainingFolder(string filePath)
-        {
-            return true;
-        }
-    }
-
-    private sealed class IgnoringErrorLog : IErrorLog
-    {
-        public void Write(Exception exception)
-        {
-        }
+        _scenario.Dispose();
     }
 }
