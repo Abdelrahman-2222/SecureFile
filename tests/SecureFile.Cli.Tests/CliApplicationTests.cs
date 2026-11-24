@@ -136,6 +136,21 @@ public sealed class CliApplicationTests : IDisposable
     }
 
     [Fact]
+    public async Task Encrypt_OutputIsAFolderOrInvalidName_IsReportedWithoutACrash()
+    {
+        string original = Write("a.txt", "x");
+        string folder = Path.GetDirectoryName(original)!;
+
+        RunResult toFolder = await RunAsync(["encrypt", original, "-o", folder, "--force", "--password-stdin"], stdin: Phrase + "\n");
+        RunResult badName = await RunAsync(["encrypt", original, "-o", Path.Combine(folder, "bad|name"), "--password-stdin"], stdin: Phrase + "\n");
+
+        Assert.Equal(ExitCodes.Failure, toFolder.Code);
+        Assert.Contains("--output", toFolder.Err, StringComparison.Ordinal);
+        Assert.Equal(ExitCodes.Failure, badName.Code);
+        Assert.Contains("not a valid file name", badName.Err, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Encrypt_MissingFileOrFolder_IsReported()
     {
         RunResult missing = await RunAsync(["encrypt", Path.Combine(_folder, "nope.txt"), "--password-stdin"], stdin: Phrase + "\n");
