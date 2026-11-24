@@ -1,6 +1,7 @@
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SecureFile.Core.Cryptography;
 using SecureFile.Core.Files;
 using SecureFile.Presentation.Dialogs;
 
@@ -23,18 +24,25 @@ namespace SecureFile.Presentation.Main;
 /// </remarks>
 public sealed partial class MainViewModel : ObservableObject
 {
+    /// <summary>The ending added to a decrypted file's name when the encrypted file does not end in <c>.enc</c>.</summary>
+    private const string DecryptedFileExtension = ".decrypted";
+
+    private readonly IFileEncryptionService _encryptionService;
     private readonly IFileDetailsReader _fileDetailsReader;
     private readonly IFileDialogService _fileDialogs;
 
     /// <summary>Creates the ViewModel with the services it uses (pure dependency injection, ADR-09).</summary>
+    /// <param name="encryptionService">Encrypts and decrypts files.</param>
     /// <param name="fileDetailsReader">Reads the name and size of the chosen file.</param>
     /// <param name="fileDialogs">Shows the Open and Save dialogs.</param>
     /// <exception cref="ArgumentNullException">A service is <see langword="null"/>.</exception>
-    public MainViewModel(IFileDetailsReader fileDetailsReader, IFileDialogService fileDialogs)
+    public MainViewModel(IFileEncryptionService encryptionService, IFileDetailsReader fileDetailsReader, IFileDialogService fileDialogs)
     {
+        ArgumentNullException.ThrowIfNull(encryptionService);
         ArgumentNullException.ThrowIfNull(fileDetailsReader);
         ArgumentNullException.ThrowIfNull(fileDialogs);
 
+        _encryptionService = encryptionService;
         _fileDetailsReader = fileDetailsReader;
         _fileDialogs = fileDialogs;
     }
@@ -42,13 +50,28 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Gets the current state; it decides which commands can run (see <see cref="MainViewState"/>).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsBusy))]
-    [NotifyCanExecuteChangedFor(nameof(BrowseCommand))]
+    [NotifyCanExecuteChangedFor(nameof(BrowseCommand), nameof(EncryptCommand), nameof(DecryptCommand))]
     public partial MainViewState State { get; private set; } = MainViewState.NoFile;
 
     /// <summary>Gets the details of the chosen file, or <see langword="null"/> when no file is chosen.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(FileSummary))]
+    [NotifyCanExecuteChangedFor(nameof(EncryptCommand), nameof(DecryptCommand))]
     public partial FileDetails? SelectedFile { get; private set; }
+
+    /// <summary>Gets or sets the password typed by the user. Spaces count as characters and are never trimmed.</summary>
+    /// <remarks>
+    /// A plain <see cref="string"/>: WPF's <c>PasswordBox</c> hands its text over as a string anyway, and the Core API
+    /// takes one (PROJECT_PLAN §5.2 lists the copies we cannot wipe). The window sets it from code-behind, because
+    /// <c>PasswordBox.Password</c> cannot be data-bound on purpose.
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(EncryptCommand), nameof(DecryptCommand))]
+    public partial string Password { get; set; } = string.Empty;
+
+    /// <summary>Gets how much of the running operation is done, 0–100.</summary>
+    [ObservableProperty]
+    public partial int ProgressPercentage { get; private set; }
 
     /// <summary>Gets the message that tells the user what happened and what to do next.</summary>
     [ObservableProperty]
@@ -86,11 +109,136 @@ public sealed partial class MainViewModel : ObservableObject
         StatusMessage = "Enter the password, then choose Encrypt or Decrypt.";
     }
 
+    /// <summary>Encrypts the chosen file to a location the user picks (suggested: same folder, name + <c>.enc</c>).</summary>
+    /// <returns>A task that completes when the encrypted file is in place.</returns>
+    [RelayCommand(CanExecute = nameof(CanRunFileOperation))]
+    private Task EncryptAsync()
+    {
+        return RunFileOperationAsync(encrypt: true);
+    }
+
+    /// <summary>Decrypts the chosen file to a location the user picks (suggested: same folder, name without <c>.enc</c>).</summary>
+    /// <returns>A task that completes when the decrypted file is in place.</returns>
+    [RelayCommand(CanExecute = nameof(CanRunFileOperation))]
+    private Task DecryptAsync()
+    {
+        return RunFileOperationAsync(encrypt: false);
+    }
+
+    /// <summary>The shared flow of Encrypt and Decrypt: ask where to save, run the operation, report the result.</summary>
+    /// <param name="encrypt"><see langword="true"/> to encrypt, <see langword="false"/> to decrypt.</param>
+    /// <returns>A task that completes when the operation has ended.</returns>
+    /// <remarks>
+    /// <c>overwriteExisting: true</c> is safe because the Save dialog has already asked the user before returning an
+    /// existing file (<see cref="IFileDialogService.ShowSaveFileDialog"/> contract). The input-equals-output check
+    /// repeats the Core rule on purpose: Core enforces it with an <see cref="ArgumentException"/> (a programming
+    /// error), while here the user gets a message and can choose again.
+    /// </remarks>
+    private async Task RunFileOperationAsync(bool encrypt)
+    {
+        string inputPath = SelectedFile!.FullPath;
+        string? outputPath = AskForOutputPath(encrypt, inputPath);
+        if (outputPath is null)
+        {
+            return;
+        }
+
+        State = MainViewState.Working;
+        ProgressPercentage = 0;
+        StatusMessage = encrypt ? "Encrypting…" : "Decrypting…";
+        await StartOperation(encrypt, inputPath, outputPath).ConfigureAwait(true);
+
+        State = MainViewState.Succeeded;
+        StatusMessage = SuccessMessage(encrypt, Path.GetFileName(outputPath));
+    }
+
+    /// <summary>Starts encryption or decryption with progress reported to <see cref="ProgressPercentage"/>.</summary>
+    /// <param name="encrypt"><see langword="true"/> to encrypt, <see langword="false"/> to decrypt.</param>
+    /// <param name="inputPath">The chosen file.</param>
+    /// <param name="outputPath">Where the result goes (the user confirmed replacing it if it exists).</param>
+    /// <returns>The running operation.</returns>
+    private Task StartOperation(bool encrypt, string inputPath, string outputPath)
+    {
+        var progress = new Progress<int>(percentage => ProgressPercentage = percentage);
+        return encrypt
+            ? _encryptionService.EncryptAsync(inputPath, outputPath, Password, overwriteExisting: true, progress)
+            : _encryptionService.DecryptAsync(inputPath, outputPath, Password, overwriteExisting: true, progress);
+    }
+
+    /// <summary>Shows the Save dialog with a suggestion and refuses the input itself as the output.</summary>
+    /// <param name="encrypt">Whether the operation is encryption (decides the suggested name).</param>
+    /// <param name="inputPath">The chosen file.</param>
+    /// <returns>The output path, or <see langword="null"/> when the user cancelled or chose the input.</returns>
+    private string? AskForOutputPath(bool encrypt, string inputPath)
+    {
+        string? outputPath = _fileDialogs.ShowSaveFileDialog(encrypt ? SuggestEncryptedPath(inputPath) : SuggestDecryptedPath(inputPath));
+        if (outputPath is not null && IsSameFile(inputPath, outputPath))
+        {
+            State = MainViewState.Failed;
+            StatusMessage = "Choose a different name: the result can't replace the file you selected.";
+            return null;
+        }
+
+        return outputPath;
+    }
+
+    /// <summary>Compares full paths ignoring case, like Core's own check (Windows and macOS ignore case).</summary>
+    /// <param name="first">One path.</param>
+    /// <param name="second">The other path.</param>
+    /// <returns><see langword="true"/> when both name the same file.</returns>
+    private static bool IsSameFile(string first, string second)
+    {
+        return string.Equals(Path.GetFullPath(first), Path.GetFullPath(second), StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>The success message; after encryption it says the original is unchanged (PROJECT_PLAN §11.1).</summary>
+    /// <param name="encrypt">Whether the operation was encryption.</param>
+    /// <param name="outputName">The result's file name (never the full path).</param>
+    /// <returns>The message to show.</returns>
+    private static string SuccessMessage(bool encrypt, string outputName)
+    {
+        return encrypt
+            ? $"Encrypted copy saved as \"{outputName}\". Your original file was not changed."
+            : $"Decrypted file saved as \"{outputName}\".";
+    }
+
     /// <summary>Browse is available whenever no operation is running.</summary>
     /// <returns><see langword="true"/> when the user may choose a file.</returns>
     private bool CanBrowse()
     {
         return !IsBusy;
+    }
+
+    /// <summary>Encrypt and Decrypt need a chosen file and a password, and no operation may be running.</summary>
+    /// <returns><see langword="true"/> when the user may start an operation.</returns>
+    private bool CanRunFileOperation()
+    {
+        return SelectedFile is not null && Password.Length > 0 && !IsBusy;
+    }
+
+    /// <summary>Suggests <c>report.pdf.enc</c> next to <c>report.pdf</c>.</summary>
+    /// <param name="inputPath">The file to encrypt.</param>
+    /// <returns>The suggested output path.</returns>
+    private static string SuggestEncryptedPath(string inputPath)
+    {
+        return inputPath + EncryptedFileFormat.FileExtension;
+    }
+
+    /// <summary>
+    /// Suggests <c>report.pdf</c> next to <c>report.pdf.enc</c>; a file without the <c>.enc</c> ending gets
+    /// <c>.decrypted</c> added, so the suggestion never names the input itself.
+    /// </summary>
+    /// <param name="inputPath">The file to decrypt.</param>
+    /// <returns>The suggested output path.</returns>
+    private static string SuggestDecryptedPath(string inputPath)
+    {
+        string fileName = Path.GetFileName(inputPath);
+        bool hasEncryptedEnding = fileName.Length > EncryptedFileFormat.FileExtension.Length
+            && fileName.EndsWith(EncryptedFileFormat.FileExtension, StringComparison.OrdinalIgnoreCase);
+
+        return hasEncryptedEnding
+            ? inputPath[..^EncryptedFileFormat.FileExtension.Length]
+            : inputPath + DecryptedFileExtension;
     }
 
     /// <summary>Shows an extension for people: <c>.pdf</c>, or "no extension".</summary>

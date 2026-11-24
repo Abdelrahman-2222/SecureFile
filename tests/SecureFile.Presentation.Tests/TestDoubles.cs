@@ -1,3 +1,4 @@
+using SecureFile.Core.Cryptography;
 using SecureFile.Core.Files;
 using SecureFile.Presentation.Dialogs;
 
@@ -21,6 +22,41 @@ internal sealed class FakeFileDialogService : IFileDialogService
     {
         SuggestedSavePath = suggestedFilePath;
         return SaveResult;
+    }
+}
+
+/// <summary>Records each call; finishes at once, throws a prepared exception, or waits until the test releases it.</summary>
+internal sealed class FakeFileEncryptionService : IFileEncryptionService
+{
+    public List<(string Operation, string Input, string Output, string Password, bool Overwrite)> Calls { get; } = [];
+
+    public Exception? ExceptionToThrow { get; set; }
+
+    /// <summary>When set, the operation stays running until this task completes.</summary>
+    public Task? WaitFor { get; set; }
+
+    public Task EncryptAsync(string inputFilePath, string outputFilePath, string password, bool overwriteExisting, IProgress<int>? progress = null, CancellationToken cancellationToken = default)
+    {
+        return RunAsync("Encrypt", inputFilePath, outputFilePath, password, overwriteExisting);
+    }
+
+    public Task DecryptAsync(string inputFilePath, string outputFilePath, string password, bool overwriteExisting, IProgress<int>? progress = null, CancellationToken cancellationToken = default)
+    {
+        return RunAsync("Decrypt", inputFilePath, outputFilePath, password, overwriteExisting);
+    }
+
+    private async Task RunAsync(string operation, string input, string output, string password, bool overwrite)
+    {
+        Calls.Add((operation, input, output, password, overwrite));
+        if (WaitFor is not null)
+        {
+            await WaitFor;
+        }
+
+        if (ExceptionToThrow is not null)
+        {
+            throw ExceptionToThrow;
+        }
     }
 }
 

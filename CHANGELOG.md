@@ -59,6 +59,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
   `IErrorLog` (local technical log, never throws).
 - `MainViewModel` with one `MainViewState` (no file → working → file selected → succeeded / failed) and a Browse
   command that reads the file details off the UI thread and shows name, extension and size.
+- Encrypt and Decrypt commands: enabled only with a file, a password and no running operation; the Save dialog
+  suggests `name.ext.enc` / the name without `.enc`; choosing the input itself as output is refused with a message.
 
 ### Changed
 
