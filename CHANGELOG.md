@@ -55,6 +55,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - `docs/NEXT_STEP_PROMPT.md`: a ready-to-paste prompt for starting the next step in a new chat.
 - `stryker-config.json`: mutation testing ignores `ConfigureAwait` arguments (no test can observe them).
 - `SECURITY.md`: how to report a vulnerability privately, and what is in scope.
+- Presentation service interfaces: `IFileDialogService` (native Open/Save dialogs; Save confirms replacing) and
+  `IErrorLog` (local technical log, never throws).
 
 ### Changed
 

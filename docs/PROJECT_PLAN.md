@@ -707,7 +707,7 @@ Why `FixedTimeEquals` instead of `==`? Why HKDF instead of 64 bytes from PBKDF2?
 
 | Step | Goal | Done when | Status |
 |---|---|---|---|
-| 2.1 | Service interfaces: `IFileDialogService`, `IMessageService`, `IShellService` (open folder), `IClipboardService`. | Interfaces documented. | ⬜ |
+| 2.1 | Service interfaces: `IFileDialogService`, `IMessageService`, `IShellService` (open folder), `IClipboardService`. | Interfaces documented. | 🟨 slice form — `IFileDialogService` + `IErrorLog` (ADR-13 log); `IShellService` and `IClipboardService` come with the steps that use them (3.5, 1.8); no `IMessageService`: messages are shown in the window |
 | 2.2 | `MainViewModel` with clear states: *No file → File selected → Working → Succeeded / Failed*. | State diagram in `LEARNING_LOG.md`. | ⬜ |
 | 2.3 | Commands: Browse, Encrypt, Decrypt, Cancel, Generate password, Open folder; `CanExecute` rules. | Buttons enable/disable correctly in tests. | ⬜ |
 | 2.4 | Auto-detect: if the file starts with `SFEN`, suggest Decrypt; otherwise Encrypt. A small Core method takes the path and returns `true`/`false` (built on `EncryptedFileFormat.HasSignature`), so the ViewModel never reads file bytes itself (Review Board 1.2, R8). | Tests for both cases. | ⬜ |
