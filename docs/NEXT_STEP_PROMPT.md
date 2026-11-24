@@ -1,25 +1,29 @@
 # Next step — copy-paste prompt for a new chat
 
-Last finished (2026-11-24): Step 3.6 (app icon, About with version, F1). Stage 3.2–3.5 was merged to `main` in PR #1.
-Branch `feature/stage-3-wpf-ui` (cut from `main`; keep using it for Stage 3, open a PR when 3.7 is done).
+Last finished (2026-11-24): Step 3.7 automated part (FlaUI UI tests). Branch `feature/stage-3-wpf-ui` (cut from `main`).
 
-**Model and effort for the next chat:** Sonnet 5.5, effort **medium**; Opus 5.5 only if the FlaUI or Accessibility
-Insights setup gets stuck.
+**Model and effort for the next chat:** Sonnet 5.5, effort **medium** (docs + review + PR). The reviewer agent runs on Sonnet.
+
+**Needs the user first (cannot be automated by Claude):**
+1. Run **Accessibility Insights for Windows → FastPass** against SecureFile.exe (Debug build is fine); expected: 0 failures.
+   Tell Claude the result (or paste failures) so Step 3.7 can be marked done.
+2. Check by hand and report: dark mode (switch Windows theme), 150%/200% scaling, a real drag-and-drop from Explorer,
+   the "Open folder" click, Narrator reads every control (T-41, T-43).
 
 ```text
-Branch feature/stage-3-wpf-ui (do not create another). Follow CLAUDE.md. Step 3.7: FlaUI smoke test + Accessibility
-Insights FastPass (grep "^| 3.7" docs/PROJECT_PLAN.md for the row; expected result: 0 accessibility failures).
-Put the FlaUI test in its own test project only if the plan names one (grep "FlaUI" docs/PROJECT_PLAN.md); it must
-not run in the pre-push gate if it needs a desktop session. The manual UI Automation PowerShell scripts used in Steps
-3.1-3.6 (encrypt, decrypt, wrong password, Save cancel, forced error, Cancel on a big file, F1 About) are the checklist
-to automate. Also verify by hand and record: dark mode, 150%/200% scaling, real drag-and-drop, Open folder click.
-Per step: build + tests, one commit, mark the plan row, CHANGELOG line, and REPLACE THIS FILE at the end. After 3.7:
-LEARNING_LOG section for Stage 3, one reviewer agent over the Stage 3 diff, then open a PR.
+Branch feature/stage-3-wpf-ui (do not create another). Follow CLAUDE.md. Stage 3 wrap-up: (1) apply the user's
+FastPass / manual-check results (fix real failures, mark plan row 3.7 done only when FastPass reports 0 failures);
+(2) append one short "Stage 3" section to docs/LEARNING_LOG.md (built, decisions, review table, gate table, 5 questions)
+without reading the file; (3) one reviewer agent (Sonnet, all §1.8 roles, read-only, diff main..HEAD, report <= 30 lines),
+fix High/Medium; (4) push, open a PR into main (no AI attribution), confirm CI green with `gh pr checks`.
+UI tests: run locally with SECUREFILE_UI_TESTS=1 dotnet test --project tests/SecureFile.Wpf.UiTests -c Release
+(they take over the keyboard for ~30 s; they are skipped in the gate and CI).
+Replace this file at the end.
 ```
 
 **Open items**
-- One unexplained flaky test failure in the pre-push run after Step 3.5 (passed on re-run; name not captured):
-  hunt it in the final hardening stage.
+- One unexplained flaky test failure in the pre-push run after Step 3.5 (passed on re-run; name not captured): hunt it in
+  the final hardening stage.
 - Deferred review items: Unix errno values in `ErrorMessageProvider`, `IsSameFile` case rule on Linux, `FileErrorLog`
   tests, `DateTime` vs `Stopwatch` for the repeat-error window.
-- GitGuardian flags the public RFC 7914 test vector in `KeyDerivationTests.cs`; marked as false positive in its dashboard.
+- GitGuardian flags the public RFC 7914 test vector in `KeyDerivationTests.cs` (false positive).
