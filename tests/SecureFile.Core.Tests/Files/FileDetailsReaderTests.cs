@@ -61,6 +61,18 @@ public sealed class FileDetailsReaderTests : IDisposable
     }
 
     [Fact]
+    public void Read_EncryptedFileOpenForWritingByAnotherProgram_IsStillRecognised()
+    {
+        string filePath = Path.Combine(_temporaryFolder.FullName, "busy.enc");
+        File.WriteAllText(filePath, "SFEN-and-more");
+        using var writer = new FileStream(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite);
+
+        FileDetails details = _reader.Read(filePath);
+
+        Assert.True(details.IsEncrypted); // sharing is permissive on purpose (see StartsWithSignature)
+    }
+
+    [Fact]
     public void Read_EmptyFile_ReturnsZeroSize()
     {
         string filePath = CreateFile("empty.txt", sizeInBytes: 0);

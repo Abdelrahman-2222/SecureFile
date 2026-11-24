@@ -1,0 +1,4 @@
+SecureFile.Core | worst complexity 7 (Evaluate in Passwords\PasswordStrengthEvaluator.cs) | lowest MI 60 (DecryptContentAsync in Cryptography\FileEncryptionService.cs) | max coupling  () | max inheritance  () | rows 252
+SecureFile.Presentation | worst complexity 6 (OnProgress in Main\MainViewModel.cs) | lowest MI 61 (Format in Main\ProgressTextFormatter.cs) | max coupling  () | max inheritance  () | rows 230
+SecureFile.Cli | worst complexity 5 (Parse in CliArgumentParser.cs) | lowest MI 61 (Resolve in PasswordResolver.cs) | max coupling  () | max inheritance  () | rows 154
+SecureFile.Wpf | worst complexity 6 (GetVersionText in AboutWindow.xaml.cs) | lowest MI 61 (OnDispatcherUnhandledException in App.xaml.cs) | max coupling  () | max inheritance  () | rows 86

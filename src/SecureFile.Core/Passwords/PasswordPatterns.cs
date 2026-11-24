@@ -19,7 +19,7 @@ internal static class PasswordPatterns
     private const double SequenceShare = 0.5;
 
     /// <summary>Very common passwords and password bases, compared ignoring case, with everything but letters removed.</summary>
-    private static readonly HashSet<string> CommonWords = new(StringComparer.OrdinalIgnoreCase)
+    internal static readonly HashSet<string> CommonWords = new(StringComparer.OrdinalIgnoreCase)
     {
         "password", "passw", "pass", "qwerty", "qwertyuiop", "azerty", "azertyuiop", "asdfghjkl", "zxcvbnm", "letmein",
         "welcome", "admin", "administrator", "iloveyou", "monkey", "dragon", "football", "baseball", "basketball",

@@ -111,7 +111,51 @@ works from PowerShell.
 
 ## 5.3 Code metrics, coverage, mutation
 
-_pending_
+**Code metrics** (exported by running the CA1502/CA1505 analyzers with the thresholds temporarily set to 0 and 101, so
+that every method reports its value; raw lines are not committed, the summary is `docs/quality/code-metrics.txt`;
+limits stay at 10 and 60 in `CodeMetricsConfig.txt`):
+
+| Project | Worst cyclomatic complexity (limit 10) | Lowest maintainability index (limit 60) |
+|---|---|---|
+| Core | 7 (`PasswordStrengthEvaluator.Evaluate`) | 60 (`FileEncryptionService.DecryptContentAsync`, exactly at the limit) |
+| Presentation | 6 (`MainViewModel.OnProgress`, after the throttle) | 61 (`ProgressTextFormatter.Format`) |
+| Cli | 5 (`CliArgumentParser.Parse`) | 61 (`PasswordResolver.Resolve`) |
+| Wpf | 6 (`AboutWindow.GetVersionText`) | 61 (`App.OnDispatcherUnhandledException`) |
+
+Class coupling and inheritance depth: the analyzer route (CA1506/CA1501) produced no values, so they are **not
+exported**; Visual Studio *Analyze > Calculate Code Metrics* gives them (user checklist). Inheritance depth is
+visibly small (no class hierarchies besides exceptions).
+Note: `DecryptContentAsync` sits exactly on the limit; any growth of that method fails the build (by design).
+
+**Coverage** (`scripts/verify.ps1`, Microsoft code coverage, one run; raw `docs/quality/coverage-*-summary.txt`):
+
+| Assembly | Lines | Branches | Target | Verdict |
+|---|---|---|---|---|
+| Core | 98.7 % (457 of 463) | 98.6 % (144 of 146) | >= 90 % / >= 85 % | Met |
+| Presentation | 95.8 % | about 91 % (168 of 184, derived: combined minus Core) | >= 85 % (plan row 2.5) | Met |
+| Cli, Wpf | not instrumented by the gate | | no target | Covered by CLI tests and the FlaUI UI tests; no number |
+
+**Mutation testing** (Stryker.NET 5.1.0, Core, full run; config `tests/SecureFile.Core.Tests/stryker-config.json`, run
+from that folder: `dotnet dotnet-stryker -O ../../artifacts/stryker`; raw `docs/quality/mutation-core.txt`):
+
+| Run | Tested | Killed | Survived | Score |
+|---|---|---|---|---|
+| First run of Stage 5 | 384 | 367 (+1 timeout) | 16 (+2 no coverage) | 95.34 % |
+| After this step | 379 | 378 (+1 timeout) | 0 | **100 %** (target >= 80 %) |
+
+The survivors, and what was done:
+- **Killed with new tests (13 of 19):** strength rating needs exactly three kinds (`aB3kqzvm` and two more), a run that
+  covers exactly half is predictable (`kqabcdeQ7z`), a zig-zag walk is not a run, four different characters repeated are
+  predictable, an even number of one kind does not cancel it (the `|=` to `^=` mutant), every word of the common-word list
+  is recognised (one theory case per word, 49 mutants), the padding error message, and a file another program holds open
+  for writing is still recognised as encrypted.
+- **Disabled with `// Stryker disable once` and a written reason (6):** the retry loop bounds and the last pause in
+  `AtomicFileWriter.TryDeleteFile` (only observable with a scanner that lets go at an exact moment; backlog C15), the
+  `SetLength` failure branch in `TryEmpty`, the `UnauthorizedAccessException` branch of `StartsWithSignature` (needs a file
+  that can be listed but not read), and `throwOnEndOfStream` (equivalent: `EndOfStreamException` is an `IOException`
+  caught with the same result).
+- Total disabled mutants in Core, including those from earlier steps: 207 (each has a comment with its reason).
+- Stryker on the CLI's pure logic (parser, resolvers) was **not run** (time-box); recorded as an open item.
 
 ## 5.4 Security and threat model
 
@@ -126,4 +170,5 @@ _pending_
 - [ ] **Cold start (5.2):** reboot, wait 2 minutes, then run `pwsh scripts/measure-startup.ps1 -Runs 1` once and note the number (target < 1.5 s). Optional: `-Runs 10` afterwards for the warm figure.
 - [ ] **Visual Studio Performance Profiler (5.2), click by click:** open `SecureFile.slnx` in Visual Studio, set `SecureFile.Wpf` as startup project, set the configuration to **Release**, press **Alt+F2**, tick **CPU Usage** and **.NET Async** (and **.NET Object Allocation** for a second run), press **Start**. In the app choose a 100 MB file, encrypt it, wait for "Done", close the app. In the report open **Top Functions** and the **timeline**: the UI thread must show no block longer than 50 ms during the encryption; note the main-thread time before the window appears. Screenshot the timeline and save it as `docs/quality/screenshots/profiler-cpu.png`.
 - [ ] **Windows Performance Analyzer (optional, 5.2):** `wpr -start GeneralProfile`, start the app, `wpr -stop startup.etl`, open in WPA, expand *Computation > CPU Usage (Sampled)*, filter for `SecureFile.exe`, look at the first second.
+- [ ] **Class coupling (5.3):** in Visual Studio, Analyze > Calculate Code Metrics for Solution, note the class-coupling and inheritance-depth columns for Core, Presentation, Cli, Wpf (analyzers could not export them).
 - [ ] **Decision C1:** accept `EnableCompressionInSingleFile` (65 MB, about 0.2 s slower start) or keep 134 MB uncompressed.

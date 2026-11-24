@@ -1,0 +1,42 @@
+Summary
+  Generated on: 11/24/2026 - 10:37:16 PM
+  Parser: MultiReport (6x Cobertura)
+  Assemblies: 2
+  Classes: 19
+  Files: 19
+  Line coverage: 97.6%
+  Covered lines: 736
+  Uncovered lines: 18
+  Coverable lines: 754
+  Total lines: 3173
+  Branch coverage: 94.5% (312 of 330)
+  Covered branches: 312
+  Total branches: 330
+  Method coverage: 99.3% (160 of 161)
+  Full method coverage: 92.5% (149 of 161)
+  Covered methods: 160
+  Fully covered methods: 149
+  Total methods: 161
+
+SecureFile.Core                                                98.7%
+  SecureFile.Core.Cryptography.AesCbc                           100%
+  SecureFile.Core.Cryptography.AuthenticationFailedException    100%
+  SecureFile.Core.Cryptography.EncryptedFileFormat              100%
+  SecureFile.Core.Cryptography.EncryptedFileHeader              100%
+  SecureFile.Core.Cryptography.FileEncryptionService            100%
+  SecureFile.Core.Cryptography.FileKeys                         100%
+  SecureFile.Core.Cryptography.InvalidEncryptedFileException    100%
+  SecureFile.Core.Cryptography.KeyDerivation                   97.7%
+  SecureFile.Core.Cryptography.PercentageProgress               100%
+  SecureFile.Core.Files.AtomicFileWriter                       95.3%
+  SecureFile.Core.Files.FileDetails                             100%
+  SecureFile.Core.Files.FileDetailsReader                      92.3%
+  SecureFile.Core.Files.FileSizeFormatter                       100%
+  SecureFile.Core.Passwords.PasswordPatterns                    100%
+  SecureFile.Core.Passwords.PasswordStrengthEvaluator           100%
+  SecureFile.Core.SecureFileException                           100%
+
+SecureFile.Presentation                                        95.8%
+  SecureFile.Presentation.Errors.ErrorMessageProvider          96.6%
+  SecureFile.Presentation.Main.MainViewModel                   95.5%
+  SecureFile.Presentation.Main.ProgressTextFormatter            100%

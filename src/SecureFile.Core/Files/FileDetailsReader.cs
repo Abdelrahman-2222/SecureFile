@@ -54,6 +54,7 @@ public sealed class FileDetailsReader : IFileDetailsReader
         {
             using FileStream stream = new(contentFile.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
             Span<byte> start = stackalloc byte[EncryptedFileFormat.SignatureLength];
+            // Stryker disable once Boolean : equivalent mutant - EndOfStreamException is an IOException, caught below with the same result (false)
             int read = stream.ReadAtLeast(start, start.Length, throwOnEndOfStream: false);
             return EncryptedFileFormat.HasSignature(start[..read]);
         }
@@ -61,8 +62,10 @@ public sealed class FileDetailsReader : IFileDetailsReader
         {
             return false;
         }
+        // Stryker disable once Block : needs a file the user may list but not read; no portable test can create one (the same branch is covered for IOException)
         catch (UnauthorizedAccessException)
         {
+            // Stryker disable once Boolean : same reason as the block above
             return false;
         }
     }
