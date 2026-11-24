@@ -1375,3 +1375,220 @@ only on a match, `TransformFinalBlock` → flush → move. Encrypt uses the same
 6. Why are 16- and 24-byte keys rejected, when AES accepts them?
 7. CA5401 fired twice. Why is it suppressed in the tests and in `CreateEncryptor`, and why is that honest?
 8. Why must Step 1.6 call `TransformFinalBlock` only after the HMAC check, and not use a decrypting `CryptoStream`?
+
+---
+
+## Step 1.5 — Encrypting a file: the streaming loop (requirements R3, D2–D5) · 2026-11-24
+
+### Lesson 1.5 — the concepts used in this step
+
+**1. Streaming: never hold the whole file.**
+A file can be 10 GB, but our memory use must not grow with it (§1.9: O(n) time, O(1) memory). So we read a
+**chunk** (1 MiB), encrypt it, write it, and reuse the same buffer for the next chunk. *Analogy:* emptying a bath
+with a bucket — the bucket's size, not the bath's, decides how much you carry at once. Why 1 MiB? Big enough that
+the cost of each read/write call is tiny compared with the data moved; small enough to be irrelevant for memory.
+Smaller buffers (4–80 KB) mean many more calls; much bigger ones bring no measurable speed-up.
+
+**2. `ArrayPool<byte>`: borrow a buffer instead of buying one.**
+`ArrayPool<byte>.Shared.Rent(size)` lends an array that already exists, and `Return` gives it back. A new 1 MiB array
+on every encryption would land on the *Large Object Heap*, which the garbage collector cleans rarely and slowly.
+We rent **one 2 MiB buffer**: the first half receives the plaintext chunk, the second half the ciphertext
+(`TransformBlock` takes an input and an output offset). Two rules: `Rent` may return a *bigger* array than asked for,
+so we always use our own `ChunkLength`, never `buffer.Length`; and the buffer is returned with `clearArray: true`, so
+the next borrower never sees our user's data. Why not encrypt in place (same half for input and output)? The
+`ICryptoTransform` documentation does not promise that overlapping input and output work, so we do not rely on it.
+
+**3. `ICryptoTransform`: AES in pieces.**
+`AesCbc.CreateEncryptor(key, iv)` (Step 1.4) returns an object with two methods:
+- `TransformBlock(input, …, output, …)` encrypts **whole 16-byte blocks** and remembers the last ciphertext block,
+  so the next call continues the CBC chain exactly where the previous one stopped.
+- `TransformFinalBlock(input, …)` encrypts the **rest** (0–15 bytes) and adds the PKCS7 padding.
+So "1 MiB, 1 MiB, …, then the last bit" gives byte-for-byte the same result as encrypting the whole file in one call
+(test *chunked == single call*, Review Board 1.4 R5). We do not use `CryptoStream`: it hides when the last block is
+processed, and for decryption that is exactly what we must control (ADR-06). We do not call the one-shot
+`EncryptCbc` per chunk: we would have to carry the IV chain and avoid padding by hand — new risk for no gain.
+
+**4. `IncrementalHash`: an HMAC fed in pieces.**
+HMAC-SHA256 with the authentication key gives a 32-byte **tag**: a fingerprint only someone with the key can make.
+`IncrementalHash.CreateHMAC(SHA256, key)` lets us add data piece by piece (`AppendData`) and get the tag at the end
+(`GetHashAndReset`), so the HMAC streams like the encryption. It covers **the header and the ciphertext**
+(encrypt-then-MAC, ADR-04): if anyone changes the salt, IV, iteration count or any ciphertext byte, the tag no longer
+matches. The tag is written as the last 32 bytes.
+
+**5. `async`/`await` and `Task.Run`: keep the window responsive.**
+- *I/O* (reading/writing the disk) uses `ReadAtLeastAsync` / `WriteAsync`: while the disk works, no thread waits.
+- *CPU work* (PBKDF2, ≈0.5 s of pure computing) cannot be made "async" — it needs a thread. `Task.Run` moves it to a
+  thread-pool thread, so the UI thread keeps drawing. Without it, the window would freeze for half a second.
+- `ConfigureAwait(false)` (library rule, CA2007): "I don't need to come back to the UI thread after this await", so
+  Core never blocks or deadlocks on the UI thread.
+
+**6. `CancellationToken`: polite stopping.**
+The UI's Cancel button sets a flag; our loop asks `ThrowIfCancellationRequested()` before each chunk and throws
+`OperationCanceledException`. Nothing is killed from outside — the loop stops itself at a safe point, so `finally`
+blocks run and clean up. PBKDF2 itself cannot be interrupted, so we check the token right after it.
+
+**7. `IProgress<int>`: telling the UI how far we are.**
+The service reports a **whole** percentage (0–100), and only when it goes up (`PercentageProgress`): at most 101
+reports for any file. One report per chunk would be ~10,000 for a 10 GB file, each one a message to the UI thread,
+for changes a progress bar cannot even draw (Review Board R3). In the app, `new Progress<int>(…)` captures the UI
+thread and runs the callback there, so the progress bar can be updated safely. 100 % means "all data encrypted"; the
+task finishing means "the file is in place" — on a slow USB stick the flush and move can take a moment, so the
+ViewModel shows "Finishing…" in between. (Tests use a tiny synchronous `IProgress` so the order of reports is exact;
+`Progress<T>` posts them asynchronously.)
+
+**8. Temp file + atomic move: the result appears whole or not at all (ADR-07).**
+We write into a hidden-named temp file **in the destination folder** (`.~report.pdf.enc.<random>.securefile-tmp`),
+flush it to the disk (`Flush(flushToDisk: true)`, so a power cut cannot leave a renamed-but-empty file), and only then
+`File.Move` it to the chosen name. A move inside one folder is a rename: atomic. A move across drives would be a
+copy, not atomic — that is why the temp file is next to the output, not in `%TEMP%`. On any error or cancel, `finally`
+deletes the temp file. The input file is only read, never changed.
+
+**9. Validate first, then go async (ADR-13).**
+`EncryptAsync` is *not* `async`: it checks the arguments immediately and throws at the call, then hands over to a
+private `async` method. Otherwise a bad argument would only appear when the task is awaited — later and further from
+the bug.
+
+**10. A test seam: a delegate instead of an interface.**
+The header (salt + IV) must be random in the app, but a golden-output test needs a fixed one, and tests want 100,000
+iterations instead of 600,000 (6× faster). An `internal` constructor takes a `Func<EncryptedFileHeader>` ("how to
+make a header"). The public constructor passes the real one. An `IHeaderFactory` interface would be more ceremony for
+the same thing (YAGNI).
+
+### Design review before coding (§1.10)
+
+| Principle | Answer for this step |
+|---|---|
+| Single responsibility | `FileEncryptionService` does the crypto; `AtomicFileWriter` (in `Files/`) makes a file appear whole or not at all; `PercentageProgress` turns bytes into percents. Step 1.6 reuses the last two. |
+| Dependency inversion / Strategy | The ViewModel will depend on `IFileEncryptionService`; a format v2 (AES-GCM) would be a new class behind it. |
+| Fail fast | Arguments are checked before the task starts; the input and the temp file are opened **before** the 0.5 s key derivation, so a missing file or a read-only folder is reported at once. |
+| YAGNI / KISS | A `Func<EncryptedFileHeader>` test seam instead of an `IHeaderFactory`; no options record; no free-space pre-check (see R-Q1 below). |
+| Algorithms | O(n) time, O(1) memory: one 2 MiB pooled buffer, whatever the file size. AES-CBC encryption is sequential by nature (each block needs the previous one). |
+| Secure by design | Encrypt-then-MAC over header + ciphertext; plaintext buffer cleared when returned; keys wiped by `using`; messages never contain paths, passwords or keys. |
+
+The design was reviewed by an independent reviewer **before** coding (findings F1–F14). Applied: input and temp file
+opened before key derivation (F6), the count returned by `TransformBlock` is used for the HMAC and the write (F3),
+no cancel check after the move (F8), long names shortened in the temp name (F11), §5.3 and ADR-07/ADR-13 updated
+(F2, F5). F1 (temp stream disposed before the delete) was already true: the stream's `await using` is inside the `try`.
+
+### Walkthrough — `src/SecureFile.Core/Cryptography/FileEncryptionService.cs`
+
+| Code | Meaning |
+|---|---|
+| `public sealed class FileEncryptionService : IFileEncryptionService` | The app's encryption service. `sealed`: nothing inherits from it (composition over inheritance). |
+| `internal const int ChunkLength = 1024 * 1024;` | 1 MiB per round, a multiple of 16, so every full chunk is whole AES blocks. |
+| `private readonly Func<EncryptedFileHeader> _createHeader;` | "How to make a header". The public constructor passes `CreateNew(600_000)`; tests pass 100,000 iterations or a fixed salt/IV. |
+| `EncryptAsync(…)` — not `async` | Checks the arguments at once (`ThrowIfNullOrWhiteSpace`, `ThrowIfNullOrEmpty`), turns both paths into full paths, calls `ThrowIfOutputPathIsUnusable`, then returns the task of `EncryptCoreAsync`. A bad argument throws at the call (ADR-13). |
+| `ThrowIfOutputPathIsUnusable` | Refuses: no file name, a character a file name cannot have (`:` on Windows would address a hidden NTFS stream), an existing folder, the input itself (ignoring case), and an existing file when overwriting was not confirmed. The final move is the real guard; this saves the user the wait. |
+| `new FileStream(…, FileShare.Read, Asynchronous \| SequentialScan, BufferSize = 0)` | Read-only; others may read but nobody may change the file meanwhile; true async I/O; a hint that we read front to back; no second buffer, because we have our own. |
+| `await using (input.ConfigureAwait(false))` | Closes the input at the end, also on errors, without returning to the UI thread. |
+| `AtomicFileWriter.WriteAsync(outputFilePath, overwriteExisting, output => WriteEncryptedFileAsync(…))` | The writer creates the temp file and hands us its stream; we fill it; the writer flushes and moves it, or deletes it on failure. |
+| `using FileKeys keys = await Task.Run(() => KeyDerivation.DeriveKeys(password, header), ct)` | PBKDF2 on a thread-pool thread. The string is passed because a lambda cannot capture a span. `using` wipes the keys at the end. |
+| `AesCbc.CreateEncryptor(keys.EncryptionKey, header.Iv.Span)` / `IncrementalHash.CreateHMAC(SHA256, keys.AuthenticationKey)` | The two tools for this file, both disposed by `using`. |
+| `header.WriteTo(headerBytes); AuthenticateAndWriteAsync(…)` | The 41 header bytes go into the HMAC **and** the file: changing the salt, IV or iterations breaks the tag. |
+| `new PercentageProgress(progress, input.Length)` | Progress is measured against the length at the start. |
+| `output.WriteAsync(hmac.GetHashAndReset(), ct)` | The 32-byte tag, last. The token reaches this write too, so a cancel after the last chunk still leaves no file. |
+| `EncryptContentAsync`: `ArrayPool<byte>.Shared.Rent(2 * ChunkLength)` | One buffer: plaintext in the first half, ciphertext in the second. |
+| `ReadAtLeastAsync(buffer[..ChunkLength], ChunkLength, throwOnEndOfStream: false, ct)` | Keeps reading until 1 MiB is in or the file ends. A plain `ReadAsync` may return less on a network drive, and treating that as the end would give a **cut-short file with a valid tag** — the High finding F1, now pinned by a test. |
+| `while (bytesRead == ChunkLength)` | A shorter read is the end. A file of exactly 1 MiB takes a second round with 0 bytes, which writes a whole padding block. |
+| `finally { Return(buffer, clearArray: true); }` | The buffer goes back to the pool wiped. |
+| `EncryptOneChunkAsync`: `wholeBlockLength = length - length % 16` | The part that is whole blocks. |
+| `if (wholeBlockLength > 0)` | `TransformBlock` throws on 0 bytes (found by the empty-file test). |
+| `TransformBlock(buffer, 0, wholeBlockLength, buffer, ChunkLength)` | Encrypt into the second half; the encryptor remembers the last block, so the CBC chain continues into the next chunk. |
+| `if (length < ChunkLength) TransformFinalBlock(buffer, wholeBlockLength, rest)` | Only for the last chunk: the 0–15 remaining bytes plus PKCS7 padding → 16 bytes. |
+| `AuthenticateAndWriteAsync` | `hmac.AppendData` then `WriteAsync`: no byte reaches the file without entering the tag. |
+
+### Walkthrough — `Files/AtomicFileWriter.cs` and `Cryptography/PercentageProgress.cs`
+
+| Code | Meaning |
+|---|---|
+| `CreateTempFilePath`: `.~<name, max 100 chars>.<8 random hex>.securefile-tmp` in the output's folder | Same folder → the move is a rename (atomic). The random part lets two operations run at once and means a leftover never blocks the next try. Names are cut at 100 characters, never between the two halves of an emoji. A path without a folder (a drive root) is refused. |
+| `CreateTempFile`: `FileMode.CreateNew`, `FileShare.None` | Never opens an existing file — so a foreign file with the same name is never overwritten or deleted. It is created **before** the `try` for the same reason. |
+| `await using (tempFile…) { await writeContent(tempFile); tempFile.Flush(flushToDisk: true); }` | The stream is closed before the move (Windows cannot move an open file) and before the delete. `Flush(true)` forces the data onto the disk; it has no async version, hence the documented CA1849 suppression. |
+| `File.Move(temp, output, overwriteExisting); isMoved = true;` | The result appears in one step. |
+| `finally { if (!isMoved) _ = TryDeleteFile(temp); }` | Cleanup on every failure or cancel. "Try": a virus scanner may hold the file for a moment, and a failed delete must not hide the real error. |
+| `PercentageProgress.Advance(byteCount)` | Adds the bytes, computes the whole percent (`0` length = 100 %, capped at 100) and reports only when it rose: at most 101 reports. |
+
+### Walkthrough — the tests
+
+| Test | What it proves |
+|---|---|
+| `EncryptAsync_FixedSaltAndIv_MatchesIndependentlyComputedGoldenFile` | 121 bytes computed with Python (`hashlib`, `hmac`) and OpenSSL 3.2.1 — outside .NET — match ours exactly: format, key derivation, AES, HMAC, all at once. |
+| `…_ChunkedFileEqualsOneCallReference` (0, 1, 15, 16, 17, 1 MiB−1, 1 MiB, 1 MiB+1, 2 MiB+17) | Our loop equals "everything in one call" at every block and chunk boundary (Review Board 1.4, R5). |
+| `…_FileLengthMatchesFormatFormula` | `41 + (⌊n/16⌋+1)·16 + 32` (§5.1). |
+| `…_RoundTripsWithReferenceDecryption` | A minimal reader (check tag with `FixedTimeEquals`, then decrypt) gets the original back. Step 1.6 replaces it with the real `DecryptAsync`. |
+| `WriteEncryptedFileAsync_InputThatReturnsFewBytesPerRead_…` | A stream that returns ≤ 7,777 bytes per read still gives the reference file (F1). |
+| `…_SameInputTwice_ProducesDifferentFiles` | Fresh salt and IV per file. |
+| `…_Progress_RisesAfterEveryChunkAndEndsAt100` | Exact sequences: `[100]`, `[100]`, `[100]` for exactly 1 MiB, `[40, 80, 100]` for 2.5 MiB. |
+| Cancel: already cancelled / during key derivation / after the first chunk / after the last chunk | Always `OperationCanceledException`, and the folder holds only the input. |
+| `…_OutputAppearsDuringEncryption_…` | The move refuses to overwrite a file that appeared meanwhile; that file is kept, the temp file is gone. |
+| Invalid arguments (null, empty, same file in other case, folder, NTFS stream, existing output) | Thrown **at the call** (`Assert.Throws`, not `ThrowsAsync`), with the expected parameter name and message. |
+| `AtomicFileWriterTests`, `PercentageProgressTests` | Temp name format, randomness, truncation (also emoji-safe), root path, content-writer failure, overwrite rules, `TryDeleteFile` on success, IOException and (Windows) read-only. |
+
+### Step 1.5 — Review Board report (2026-11-24)
+
+Three independent reviewer agents on the strongest model: a design reviewer before coding (above) and two code
+reviewers after the tests were green — (A) Security + QA + Critic, who wrote probe programs; (B) Architect +
+Performance + PM + End user + Team Lead. Findings marked **P** were confirmed with a probe.
+
+| ID | Role | Severity | Finding | Decision |
+|---|---|---|---|---|
+| A-F1 | QA | **High** (test gap) | Replacing `ReadAtLeastAsync` by `ReadAsync` would pass every test (local disks always return full reads), but on a network drive a short read would end the file early — with a **valid tag**. | **Fixed:** `WriteEncryptedFileAsync` is `internal` and takes any `Stream`; a test feeds a stream returning ≤ 7,777 bytes per read and compares with the reference. |
+| A-F2 | QA | Medium | The final "last chance" cancel check and the per-read cancel check were redundant: the token already reaches every read and write (**P**). Stryker agreed (survivors). | **Fixed:** both lines removed; tests prove cancel after the first chunk, after the last chunk and during key derivation (B-R12). |
+| A-F3 / B-R8 | Critic / Architect | Medium | An existing **folder** as output passed the checks; the error came only after the whole encryption, with a misleading message (**P**). | **Fixed:** `Directory.Exists` → `ArgumentException` up front, tested. |
+| A-F4 | Security | Medium | `out.enc:s` (an NTFS alternate data stream) passed every check and left an empty `.~out.enc` file behind (**P**). | **Fixed:** names with characters a file name cannot have are refused up front; Windows-only test. |
+| A-F5 | Critic | Medium | A device or pipe as input throws `NotSupportedException` at `Length` (**P**); a folder as input gives `UnauthorizedAccessException`. Neither was documented. | **Documented** in the interface (ADR-13). The file dialog only offers regular files, so no extra guard (YAGNI). |
+| B-R3 | Performance / End user | Medium | One progress report per chunk = ~10,000 UI messages for 10 GB, ~1,000/s on a fast disk (§8.2 says ≤ 10 updates/s). | **Fixed:** `PercentageProgress` reports whole percents only when they rise (≤ 101 reports); `IProgress<int>`. |
+| B-R1 / B-R2 | Architect / PM | Medium | ADR-07 promised a hidden temp file; §5.3 still described `CryptoStream`. | **Fixed** (already after the design review): §5.3 rewritten; ADR-07 says the hidden attribute is for the decrypt temp file (Step 1.6). |
+| B-R4 | Team Lead | Medium | "Output exists" is a plain `IOException`, like "disk full". | **Decision:** the ViewModel checks and asks *before* calling (it must ask the user anyway); Core's check is the safety net. Row added to the ADR-13 table. A custom exception would be ceremony for a case the UI prevents. |
+| A-F9 | Critic | Low | Cutting the name at 100 characters could split an emoji (**P**). | **Fixed** + test. |
+| A-F10 / B-R6 | Critic / Team Lead | Low / Note | `EncryptChunkAsync` vs `EncryptChunksAsync` differ by one letter; `WriteAuthenticatedAsync` is ambiguous; helpers are fragmented. | **Fixed:** `EncryptContentAsync`, `EncryptOneChunkAsync`, `AuthenticateAndWriteAsync`; one-line helpers folded back in. |
+| A-F8 | QA | Low | "The last report is 100" is not guaranteed when a file is cut short on Linux while we read it. | **Kept**, wording: "100 means all data is encrypted"; the task completing is the real signal. |
+| B-R5 | Performance | Low | The per-chunk `async` method allocates a small state machine per chunk (~2 MB per 10 GB). | **Recorded:** §8.2 now says "no per-chunk *buffer* allocations"; measured in Stage 5 before any pooling trick. |
+| B-R7 | End user | Low | 100 % can show for a moment before the flush and move finish. | **Recorded** for the ViewModel ("Finishing…"), in the lesson and the interface docs. |
+| A-F6 | Critic | Low | Opening the files runs on the caller's thread before the first real `await`. | **Accepted:** milliseconds on local disks; measured in Stage 5 on a network drive. |
+| A-F7 / B-R11 | Security / Perf | Low / Note | The data is flushed, but the rename itself is not made durable. | **Recorded** in ADR-07 ("Accepted limits"). |
+| B-R9 | API | Low | `bool overwriteExisting` is a "boolean trap". | **Kept;** callers use the named argument (as the tests do). |
+| B-Q1 | Team Lead | Question | "10 GB to a nearly full USB stick — do we learn it after 5 minutes?" | **Decision:** no free-space pre-check: it is racy and network drives report it unreliably. Disk full gives an `IOException` (ADR-13 message), and the temp file is deleted. A pre-check is a Stage 8 suggestion. |
+| B-Q2 | Team Lead | Question | "Who cleans up temp files left by a crash?" | Recorded in ADR-07 "Accepted limits"; start-up scan is a Stage 8 suggestion. |
+| Others | All | Note | Buffer cleared, no FileStream buffer, keys disposed, no overlap in `TransformBlock`, no secrets in messages, `TransformBlock(…,0,…)` throws (**P**); the seam, the 2 MiB split buffer and `AtomicFileWriter`'s shape for Step 1.6 judged right. | No change. |
+
+**Mutation testing.** The first run scored 69 % (26 survivors). What they taught:
+- 14 were `ConfigureAwait(false → true)`: only observable with a UI synchronization context. `stryker-config.json`
+  now ignores `ConfigureAwait` arguments (`ignore-methods`), with this reason.
+- 2 showed redundant code (the two extra cancel checks) → removed.
+- 4 were unasserted messages → tests now assert them.
+- The rest cannot be observed by any test and are excluded line by line with the reason written next to them:
+  clearing/returning the pooled buffer, `Flush(flushToDisk: true)` (needs a power cut), the `isMoved` flag (deleting a
+  no-longer-existing temp path is a no-op), the FileStream speed options, the 100 % cap (Windows prevents a growing
+  file), and an equivalent `>`/`>=` mutant at exactly 100 characters.
+- One `Timeout` (the loop condition inverted → endless loop) counts as detected.
+
+#### Quality gate — Step 1.5
+
+| # | Check | Result |
+|---|---|---|
+| G1 | "Done when": round trip at 0, 1, 15, 16, 17 bytes, 1 MiB ± 1; different output each time; keys via `Task.Run` | ✅ plus golden file, chunked = one-call reference, short-read stream, length formula |
+| G2–G3 | Format, build with all analyzers | ✅ 0 warnings (CA1505 forced smaller methods; CA1849 suppressed once with a reason) |
+| G4 | Tests | ✅ 266 passed (76 new), 0 failed, 0 skipped on Windows (3 Windows-only cases skip on Linux/macOS by design) |
+| G5 | Core coverage | ✅ 99.6 % lines, 98.7 % branches |
+| G6–G8 | Packages, secrets, forbidden patterns | ✅ |
+| G9 | Exceptions documented (ADR-13); no secrets or paths in messages; cleanup in `using`/`finally` | ✅ interface lists every exception, incl. `NotSupportedException` (device input) found by the Review Board |
+| G10–G11 | Architecture, complexity ≤ 10, MI ≥ 60 | ✅ |
+| G12 | Mutation score | ✅ **100 %** (66 killed, 1 timeout); exclusions listed above, each with its reason; `ConfigureAwait` ignored via `stryker-config.json` |
+| G13 | Performance | ✅ O(n) time, O(1) memory (one 2 MiB pooled buffer); ≤ 101 progress reports; throughput measured in Stage 5 |
+| G14 | Docs | ✅ XML docs, lesson, walkthrough, §5.3/ADR-07/ADR-13/§8.2 updated, CHANGELOG, plan row and progress log |
+| G15 | Git | ✅ Conventional Commit, no AI attribution |
+| G16–G18 | Design, complexity, Review Board | ✅ design review + 2 code reviewers; 1 High and all Medium findings fixed or answered with a recorded decision |
+
+### Self-check 1.5 (open book)
+
+1. Why do we read 1 MiB at a time instead of the whole file? What would `File.ReadAllBytes` do with a 5 GB file?
+2. `TransformBlock` vs `TransformFinalBlock`: which one adds the padding, and why does a file of exactly 1 MiB need a second, empty round?
+3. Why `ReadAtLeastAsync` and not `ReadAsync`? What exactly would go wrong on a network drive — and why would the tag *not* catch it?
+4. Why does the HMAC cover the header too? What could an attacker do if only the ciphertext were covered?
+5. Why `Task.Run` for PBKDF2 but plain `await` for the disk? What does `ConfigureAwait(false)` change?
+6. Why is `EncryptAsync` itself not `async`?
+7. Why is the temp file in the destination folder, created with `CreateNew`, and created *before* the `try`?
+8. What does `Flush(flushToDisk: true)` protect against that `FlushAsync` does not? What is still not protected (ADR-07 "Accepted limits")?
+9. Why does the service report whole percents only when they rise? What does the user see between 100 % and "done"?
+10. Which Stryker survivors were excluded, and why is each exclusion honest?

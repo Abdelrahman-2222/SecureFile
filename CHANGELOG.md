@@ -37,10 +37,21 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - `AesCbc` (internal): creates the AES-256-CBC/PKCS7 encryptor and decryptor for a file's key and IV, with both
   lengths checked; verified against NIST SP 800-38A F.2.5/F.2.6 and OpenSSL.
 
+- File encryption (`IFileEncryptionService`, `FileEncryptionService.EncryptAsync`): streams any file size in 1 MiB
+  chunks through AES-256-CBC and an HMAC-SHA256 over header and ciphertext, derives the keys off the UI thread,
+  reports whole-percent progress, supports cancel, and never leaves a partial output file.
+- `AtomicFileWriter` (internal): writes through a temp file in the destination folder, flushes it to the disk and
+  moves it into place; deletes the temp file on any error or cancel.
+- `PercentageProgress` (internal): turns processed bytes into at most 101 whole-percent reports.
+- Tests: golden file computed with Python and OpenSSL, chunked output equal to a one-call reference at block and
+  chunk boundaries, a stream that returns short reads, progress, cancel and failure cleanup.
+- `stryker-config.json`: mutation testing ignores `ConfigureAwait` arguments (no test can observe them).
 - `SECURITY.md`: how to report a vulnerability privately, and what is in scope.
 
 ### Changed
 
+- Test code is exempt from the "async methods end in Async" naming rule (test names follow
+  `Method_Condition_Result`).
 - CI also runs on every push to `feature/**` branches (Ubuntu only there; macOS runs for pull requests, `main` and
   manual runs); the gitleaks scan allows only the published NIST test key.
 - File details of a symbolic link now report the size and change time of the file it points to (Windows reported

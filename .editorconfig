@@ -144,3 +144,6 @@ dotnet_diagnostic.CA2007.severity = none
 # Maintainability Index counts [InlineData] rows (test DATA tables) as code volume, which says nothing about
 # test logic. The complexity limit (CA1502) still applies to tests.
 dotnet_diagnostic.CA1505.severity = none
+# Test names already follow Method_Condition_Result (e.g. EncryptAsync_AlreadyCancelled_ThrowsAndWritesNothing); the
+# runner calls them, never a person, so an "Async" suffix would add noise without telling a caller anything.
+dotnet_naming_rule.async_methods_end_in_async.severity = none

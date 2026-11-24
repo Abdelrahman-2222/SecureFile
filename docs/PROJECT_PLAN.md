@@ -374,10 +374,17 @@ We need **two different keys**: one for AES, one for HMAC (never reuse one key f
 **Trade-off accepted (Review Board Step 1.1, Team Lead question):** during the single pass, *not-yet-verified*
 plaintext exists in the temp file. If the app is killed or the power fails before verification, that temp file stays
 behind. Mitigations: (1) the temp file has a recognisable hidden name (`.~<name>.securefile-tmp`) so it is obviously
-not a real result; (2) it is deleted in `finally` on every handled failure or cancel; (3) on Windows it is created with
-the *hidden* attribute; (4) the user chose that folder for the decrypted output anyway. The two-pass alternative would
+not a real result; (2) it is deleted in `finally` on every handled failure or cancel; (3) on Windows the *decrypt* temp file is created with
+the *hidden* attribute (decided in Step 1.6; the encrypt temp file holds only ciphertext, and a move keeps the
+attribute, so it is not hidden); (4) the user chose that folder for the decrypted output anyway. The two-pass alternative would
 avoid unverified plaintext on disk at the cost of reading the whole file twice; it stays the fallback if a reviewer
 judges the risk higher than the speed benefit.
+
+**Accepted limits (Review Board Step 1.5):** the *data* is forced to the disk before the move
+(`Flush(flushToDisk: true)`), but the *rename* itself is best effort: .NET has no API to flush the folder entry
+(Linux would need an `fsync` of the folder, Windows `MOVEFILE_WRITE_THROUGH`), so after a power cut right at the end
+the result may be missing — never half-written. Temp files left by a crash or power cut are not cleaned up
+automatically; a start-up scan of recent folders is a Stage 8 suggestion.
 
 ### ADR-14 — Code organisation: by feature, interface next to implementation
 
@@ -469,6 +476,7 @@ Each command (Browse, Encrypt, Decrypt) has one `try/catch` with **specific** ca
 | `FileNotFoundException` / `DirectoryNotFoundException` | "The file or folder can't be found or opened." |
 | `UnauthorizedAccessException` | "Access to this file or folder was denied. Choose another folder or check its permissions." |
 | `PathTooLongException` | "The path is too long. Choose a shorter folder or name." |
+| `IOException` — the output file already exists (the ViewModel asks *before* calling, so this is only the safety net) | "A file with this name already exists. Choose another name or confirm replacing it." |
 | `IOException` — disk full (Windows HResult `0x80070070`, `ENOSPC` on Linux/macOS) | "There is not enough free space to save the file. Free up space or choose another drive." |
 | `IOException` — file in use (sharing violation `0x80070020`) | "The file is being used by another program. Close it and try again." |
 | `IOException` (any other) | "The file couldn't be read or written. Check that the drive is still connected and try again." |
@@ -552,14 +560,20 @@ password ──NFC normalize──► UTF-8 bytes
 
 ### 5.3 Encrypt flow
 
-1. Validate input (file exists, readable; output path is not the input path; password rules).
-2. Generate `salt` and `iv` with `RandomNumberGenerator`.
-3. Derive `encryptionKey` and `authenticationKey` (§5.2).
-4. Open a **temp file** in the destination folder. Write the header; add the header bytes to the HMAC.
-5. Loop: read plaintext through `CryptoStream` (AES-256-CBC encryptor) → add ciphertext chunk to the HMAC → write chunk → report progress → check cancel.
-6. Write the 32-byte HMAC tag. Flush to disk.
-7. Atomic `File.Move(temp, output, overwrite: <user confirmed>)`.
-8. On any error or cancel: delete the temp file. The source file is never modified.
+1. Validate the arguments **synchronously**, before any work (ADR-13): paths not empty, output names a file and is not
+   the input path, password not empty, output does not exist unless the user confirmed overwriting.
+2. Open the input (`FileShare.Read`: nobody may change it meanwhile) and generate `salt` and `iv` with
+   `RandomNumberGenerator`.
+3. Open a **temp file** `.~<name>.<8 random hex>.securefile-tmp` in the destination folder (`FileMode.CreateNew`) —
+   before the slow step, so a missing or read-only folder fails at once.
+4. Derive `encryptionKey` and `authenticationKey` (§5.2) inside `Task.Run` (≈0.5 s of CPU work, off the UI thread).
+5. Write the header; add the header bytes to the HMAC.
+6. Loop (our own, ADR-06; one 2 MiB pooled buffer): check cancel → read up to 1 MiB → `encryptor.TransformBlock` on
+   the whole 16-byte blocks → add the ciphertext to the HMAC → write → report progress. A short read is the end of
+   the file: `TransformFinalBlock` encrypts the last 0–15 bytes plus padding. **No `CryptoStream`.**
+7. Write the 32-byte HMAC tag; a last cancel check; flush **to the disk** (`Flush(flushToDisk: true)`).
+8. Atomic `File.Move(temp, output, overwrite: <user confirmed>)`.
+9. On any error or cancel: delete the temp file (`finally`). The source file is never modified.
 
 ### 5.4 Decrypt flow
 
@@ -648,7 +662,7 @@ Why does Core not reference WPF? What does `TreatWarningsAsErrors` buy us?
 | 1.2 | `EncryptedFileFormat` constants + `EncryptedFileHeader` (write/read/validate). | Tests: round-trip, wrong magic, unknown version, iterations out of range, file too short. | 🟨 done — quality gate passed (Review Board: 0 High, 2 Medium fixed), mutation 100 % — self-check pending |
 | 1.3 | `KeyDerivation`: PBKDF2 → HKDF (§5.2), NFC normalization, key wiping. | Known-answer tests: RFC 7914 §11 (PBKDF2-HMAC-SHA256), RFC 5869 test case 1 (HKDF-SHA256). | 🟨 done — quality gate passed (Review Board: 0 High, 3 Medium fixed), mutation 100 % — self-check pending |
 | 1.4 | AES-CBC check against NIST: prove we call `Aes` correctly. | NIST SP 800-38A F.2.5/F.2.6 (CBC-AES256) vectors pass (with `PaddingMode.None` for the vector). | 🟨 done — through the production factory (`AesCbc.CreateEncryptor/CreateDecryptor`), quality gate passed, mutation 100 % — self-check pending |
-| 1.5 | `FileEncryptionService.EncryptAsync` (§5.3): streaming, HMAC, progress, cancel, temp + move. | Round-trip tests at 0, 1, 15, 16, 17 bytes, 1 MiB ± 1; same input → different output each time. Keys: `using FileKeys keys = await Task.Run(() => KeyDerivation.DeriveKeys(password, header), ct);` (off the UI thread; pass the `string`, a span cannot be captured; Review Board 1.3, R9). | ⬜ |
+| 1.5 | `FileEncryptionService.EncryptAsync` (§5.3): streaming, HMAC, progress, cancel, temp + move. | Round-trip tests at 0, 1, 15, 16, 17 bytes, 1 MiB ± 1; same input → different output each time. Keys: `using FileKeys keys = await Task.Run(() => KeyDerivation.DeriveKeys(password, header), ct);` (off the UI thread; pass the `string`, a span cannot be captured; Review Board 1.3, R9). | 🟨 done — golden file (Python + OpenSSL), chunked = one-call reference, short-read stream; `AtomicFileWriter` + `PercentageProgress` for 1.6; quality gate passed (Review Board: 1 High fixed, all Medium fixed or decided), mutation 100 % — self-check pending |
 | 1.6 | `FileEncryptionService.DecryptAsync` (§5.4): verify-then-commit. | Wrong password and every tamper/truncation case fail **and leave no output file**. Header read with `ReadAtLeast(buffer, 41, throwOnEndOfStream: false)` and only the bytes read passed to `EncryptedFileHeader.Read`, **before** `GetCiphertextLength` (Review Board 1.2, R1); tests: a 3-byte text file → `NotEncryptedFile`, an 80-byte file starting with `SFEN` → `Damaged`. Decrypt with our own `TransformBlock` loop and call `TransformFinalBlock` only after `FixedTimeEquals` succeeds (§5.4, Review Board 1.4, R1); test that chunked and one-call results are equal (R5). | ⬜ |
 | 1.7 | Error model (ADR-13 Layer 1): `AuthenticationFailedException` with the three standard constructors (`SecureFileException` and `InvalidEncryptedFileException` were pulled forward into Step 1.2). | Every failure in §9 maps to one exception type; tests prove no partial output. | ⬜ |
 | 1.8 | `PasswordStrengthEvaluator` (simple rules: length + character variety) and `PasswordGenerator` (`RandomNumberGenerator`). | Tests for empty, short, long, Unicode passwords. A maximum length (e.g. 1,024 characters, also `PasswordBox.MaxLength`) so a pasted 100 MB text cannot waste memory (Review Board 1.3, R5). | ⬜ |
@@ -782,7 +796,7 @@ Targets are measured on one reference machine (recorded in the report: CPU, RAM,
 | Throughput (MB/s) for 1 MB, 100 MB, 1 GB | BenchmarkDotNet | ≥ 70% of a plain file copy on the same disk |
 | Key-derivation time (p50, p95) | BenchmarkDotNet | Reported; ~0.3–1 s is the intended security cost |
 | Peak memory vs file size | VS Memory Usage, `dotnet-counters` | Flat (e.g. < 150 MB) for 1 MB and 4 GB alike |
-| Allocations per operation | BenchmarkDotNet `MemoryDiagnoser`, VS .NET Object Allocation | No per-chunk allocations (buffer reused) |
+| Allocations per operation | BenchmarkDotNet `MemoryDiagnoser`, VS .NET Object Allocation | No per-chunk **buffer** allocations (one pooled buffer reused); small async bookkeeping per chunk is measured in Stage 5 |
 | UI responsiveness | VS profiler / WPA | UI thread never blocked > 50 ms; progress updates ≤ 10 per second |
 | Published size | File size after publish | Reported per architecture (WPF cannot be trimmed; Avalonia can — bonus comparison) |
 
@@ -1147,4 +1161,5 @@ whether the WPF Fluent `ThemeMode` API is still marked experimental in .NET 10, 
 | 2026-11-24 | Decision | Vertical slice first: after Step 1.7, build the thinnest end-to-end app before Step 1.8 and UI polish (§7). |
 | 2026-11-24 | Step 1.2 | Encrypted file header: format constants, header write/read/validate, `SecureFileException` + `InvalidEncryptedFileException` (with `Reason`), 80 tests incl. golden bytes and fuzzing. Review Board: 0 High, 2 Medium + 3 Low fixed. Gate passed. |
 | 2026-11-24 | Step 1.3 | Key derivation: NFC → UTF-8 → PBKDF2-HMAC-SHA256 → HKDF-Expand into two keys; `FileKeys` wipes keys on dispose. RFC 7914 / RFC 5869 vectors + Python-computed golden keys; PBKDF2 600k measured at ≈0.46 s. Review Board: 0 High, 3 Medium fixed (fail-closed normalisation, error naming, mutation exclusions with reasons). Gate passed, mutation 100 %. |
+| 2026-11-24 | Step 1.5 | `FileEncryptionService.EncryptAsync`: own `TransformBlock` loop over one pooled 2 MiB buffer, HMAC over header + ciphertext, PBKDF2 in `Task.Run`, whole-percent progress, cancel; `AtomicFileWriter` (temp in output folder, fsync, atomic move, cleanup). Golden file from Python + OpenSSL; 76 new tests. Review Board (design + 2 code reviewers): 1 High (short-read test gap) + Medium findings fixed. Gate passed, mutation 100 %. |
 | 2026-11-24 | Step 1.4 | `AesCbc` factory returns ready AES-256-CBC/PKCS7 encryptor/decryptor for (key, IV). NIST SP 800-38A F.2.5/F.2.6 + OpenSSL-checked padding cases. Review Board: 1 High for the 1.6 design recorded (no decrypting CryptoStream; finish last block only after HMAC check), 3 Medium fixed. Gate passed, mutation 100 %. |
