@@ -128,7 +128,7 @@
                     </TextBlock.Style>
                 </TextBlock>
 
-                <Label Content="Con_firm password" Target="{Binding ElementName=ConfirmInput}" Margin="0,12,0,4" Padding="0" FontSize="14" />
+                <Label Content="Co_nfirm password" Target="{Binding ElementName=ConfirmInput}" Margin="0,12,0,4" Padding="0" FontSize="14" />
                 <Grid>
                     <PasswordBox x:Name="ConfirmInput" AutomationProperties.AutomationId="ConfirmInput"
                                  AutomationProperties.Name="Confirm password"
@@ -161,7 +161,7 @@
                                 <DataTrigger Binding="{Binding PasswordsMatch}" Value="True">
                                     <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
                                 </DataTrigger>
-                                <DataTrigger Binding="{Binding PasswordsMatch}" Value="False">
+                                <DataTrigger Binding="{Binding IsPasswordMismatch}" Value="True">
                                     <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding PasswordMatchText}" Value="">
@@ -239,7 +239,7 @@
                     <Button.Style>
                         <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsDecrypting}" Value="True">
+                                <DataTrigger Binding="{Binding IsEncryptOffered}" Value="False">
                                     <Setter Property="ToolTip" Value="This file is already encrypted. Use Decrypt." />
                                 </DataTrigger>
                             </Style.Triggers>
@@ -253,7 +253,7 @@
                     <Button.Style>
                         <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding IsEncrypting}" Value="True">
+                                <DataTrigger Binding="{Binding IsDecryptOffered}" Value="False">
                                     <Setter Property="ToolTip" Value="This file is not encrypted by SecureFile. Use Encrypt." />
                                 </DataTrigger>
                             </Style.Triggers>

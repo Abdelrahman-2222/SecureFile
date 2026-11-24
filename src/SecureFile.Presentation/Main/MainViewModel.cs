@@ -45,6 +45,9 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>The file the last successful operation wrote, for "Open folder".</summary>
     private string? _lastOutputPath;
 
+    /// <summary>The success message of the last operation, kept so a failed "Open folder" can add to it instead of replacing it.</summary>
+    private string _lastSuccessMessage = string.Empty;
+
     /// <summary>Creates the ViewModel with the services it uses (pure dependency injection, ADR-09).</summary>
     /// <param name="encryptionService">Encrypts and decrypts files.</param>
     /// <param name="fileDetailsReader">Reads the name and size of the chosen file.</param>
@@ -106,7 +109,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// file is still offered. The command itself still works on any file and reports a plain message for a file that
     /// is not ours (T-08).
     /// </remarks>
-    public bool IsDecryptOffered => SelectedFile is null || SelectedFile.IsEncrypted;
+    public bool IsDecryptOffered => SelectedFile is null || SelectedFile.IsEncrypted || HasEncryptedName(SelectedFile);
 
     /// <summary>Gets the note under the password box: a warning when a password is being chosen, a reminder when decrypting.</summary>
     /// <remarks>
@@ -124,13 +127,13 @@ public sealed partial class MainViewModel : ObservableObject
     /// <c>PasswordBox.Password</c> cannot be data-bound on purpose.
     /// </remarks>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Strength), nameof(StrengthText), nameof(StrengthPercent), nameof(PasswordMatchText), nameof(PasswordsMatch))]
+    [NotifyPropertyChangedFor(nameof(Strength), nameof(StrengthText), nameof(StrengthPercent), nameof(PasswordMatchText), nameof(PasswordsMatch), nameof(IsPasswordMismatch))]
     [NotifyCanExecuteChangedFor(nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand))]
     public partial string Password { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the password typed a second time; it is only checked when encrypting (a typo there loses the file for good).</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(PasswordMatchText), nameof(PasswordsMatch))]
+    [NotifyPropertyChangedFor(nameof(PasswordMatchText), nameof(PasswordsMatch), nameof(IsPasswordMismatch))]
     [NotifyCanExecuteChangedFor(nameof(EncryptCommand), nameof(RunPrimaryCommand))]
     public partial string ConfirmPassword { get; set; } = string.Empty;
 
@@ -152,15 +155,18 @@ public sealed partial class MainViewModel : ObservableObject
     {
         PasswordStrength.Empty => string.Empty,
         PasswordStrength.TooShort => string.Create(CultureInfo.CurrentCulture, $"Too short: use at least {PasswordStrengthEvaluator.MinimumLength} characters."),
-        PasswordStrength.Weak => "Weak: a longer password or a few words is safer.",
+        PasswordStrength.Weak => "Weak: avoid repeats, sequences and common words. A few unrelated words are safer.",
         PasswordStrength.Fair => "Fair.",
         _ => "Strong.",
     };
 
-    /// <summary>Gets whether the two typed passwords are the same, as a sentence; empty until the second one is started.</summary>
-    public string PasswordMatchText => ConfirmPassword.Length == 0
-        ? string.Empty
-        : string.Equals(Password, ConfirmPassword, StringComparison.Ordinal) ? "Passwords match." : "Passwords don't match yet.";
+    /// <summary>Gets the line under the confirm box: "match", "don't match", or a prompt to type it again; empty while there is nothing to say.</summary>
+    public string PasswordMatchText => ConfirmPassword.Length > 0
+        ? (PasswordsMatch ? "Passwords match." : "Passwords don't match yet.")
+        : Password.Length >= PasswordStrengthEvaluator.MinimumLength ? "Type the password again to confirm it." : string.Empty;
+
+    /// <summary>Gets a value indicating whether a confirmation was started and differs from the password (the window colours the line red).</summary>
+    public bool IsPasswordMismatch => ConfirmPassword.Length > 0 && !PasswordsMatch;
 
     /// <summary>Gets how much of the running operation is done, 0–100.</summary>
     [ObservableProperty]
@@ -253,11 +259,22 @@ public sealed partial class MainViewModel : ObservableObject
     /// <returns>A task that completes when the details are shown.</returns>
     private async Task LoadFileAsync(string path)
     {
+        ClearProgress();
         State = MainViewState.Working;
         StatusMessage = "Reading the file details…";
         SelectedFile = await Task.Run(() => _fileDetailsReader.Read(path)).ConfigureAwait(true);
         State = MainViewState.FileSelected;
-        StatusMessage = "Enter the password, then choose Encrypt or Decrypt.";
+        StatusMessage = SelectedFile.IsEncrypted || !HasEncryptedName(SelectedFile)
+            ? "Enter the password to continue."
+            : "This file ends in .enc but is not a valid SecureFile file: it may be damaged or made by another program. You can still try Decrypt to see what is wrong.";
+    }
+
+    /// <summary>Tells whether the file's name ends in <c>.enc</c>, whatever its content.</summary>
+    /// <param name="file">The chosen file.</param>
+    /// <returns><see langword="true"/> when the name ends in <c>.enc</c>.</returns>
+    private static bool HasEncryptedName(FileDetails file)
+    {
+        return file.Name.EndsWith(EncryptedFileFormat.FileExtension, StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>Stops the running encryption or decryption; the output file is not created (atomic write, ADR-07).</summary>
@@ -280,7 +297,8 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (!_folderOpener.OpenContainingFolder(_lastOutputPath!))
         {
-            StatusMessage = "The folder couldn't be opened. Open it yourself in File Explorer.";
+            // Appended to the success message (not replacing it): the operation did succeed, only showing it failed.
+            StatusMessage = $"{_lastSuccessMessage} The folder couldn't be opened. Open it yourself in File Explorer.";
         }
     }
 
@@ -327,11 +345,11 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Sets the idle state that matches whether a file is chosen.</summary>
     private void ResetToIdle()
     {
-        ProgressPercentage = 0;
+        ClearProgress();
         State = SelectedFile is null ? MainViewState.NoFile : MainViewState.FileSelected;
         StatusMessage = SelectedFile is null
             ? "Choose a file to encrypt or decrypt."
-            : "Enter the password, then choose Encrypt or Decrypt.";
+            : "Enter the password to continue.";
     }
 
     /// <summary>
@@ -354,7 +372,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
         catch (OperationCanceledException exception)
         {
-            Fail(exception, clearSelectionOnFailure);
+            ShowCancelled(exception);
         }
         catch (SecureFileException exception)
         {
@@ -383,12 +401,32 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
+    /// <summary>Shows that the user cancelled: a neutral message, back to the chosen file, and nothing is logged.</summary>
+    /// <param name="exception">The cancellation, used only for its standard message.</param>
+    /// <remarks>
+    /// Cancelling is something the user did on purpose, not an error: no red banner and no entry in the error log.
+    /// </remarks>
+    private void ShowCancelled(OperationCanceledException exception)
+    {
+        ClearProgress();
+        State = SelectedFile is null ? MainViewState.NoFile : MainViewState.FileSelected;
+        StatusMessage = ErrorMessageProvider.GetMessage(exception);
+    }
+
+    /// <summary>Forgets the progress of the last operation, so an old percentage or speed is never shown again.</summary>
+    private void ClearProgress()
+    {
+        ProgressPercentage = 0;
+        ProgressText = string.Empty;
+    }
+
     /// <summary>Logs a handled exception and shows its plain message.</summary>
     /// <param name="exception">The expected exception.</param>
     /// <param name="clearSelection">Whether to forget the chosen file.</param>
     private void Fail(Exception exception, bool clearSelection)
     {
         _errorLog.Write(exception);
+        ClearProgress();
         if (clearSelection)
         {
             SelectedFile = null;
@@ -435,8 +473,9 @@ public sealed partial class MainViewModel : ObservableObject
     private void ShowSuccess(bool encrypt, string outputPath)
     {
         _lastOutputPath = outputPath;
+        _lastSuccessMessage = SuccessMessage(encrypt, Path.GetFileName(outputPath));
         State = MainViewState.Succeeded;
-        StatusMessage = SuccessMessage(encrypt, Path.GetFileName(outputPath));
+        StatusMessage = _lastSuccessMessage;
         SelectedFile = null;
         Password = string.Empty;
         ConfirmPassword = string.Empty;

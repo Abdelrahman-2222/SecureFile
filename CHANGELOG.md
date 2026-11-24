@@ -90,8 +90,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Found in the manual test run (Step 4.3): after a successful Encrypt or Decrypt the chosen file and the password are
   cleared (the result message and "Open folder" stay); the result is a green banner and an error a red one; the Save
   dialog's "Save as type" lists the file type and all files; a "Show password" check box reveals the typed password;
-  the window is taller so the About button is not hidden behind a scroll bar; the "if you forget this password" warning
-  is shown only when a password is being chosen (a `.enc` file shows "enter the password that was used" instead); the
+  the "if you forget this password" warning
+  is shown only when a password is being chosen (an encrypted file shows "enter the password that was used" instead);
   Encrypt is greyed out for an encrypted file and Decrypt for a normal one; "encrypted" is decided by the file's
   content (its SecureFile signature), so a renamed encrypted file is still recognised.
 - The "if you forget this password" note is an amber caution box with a warning symbol and bold text while a password is
@@ -101,6 +101,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
   confirmation box. No symbol/digit rules on purpose.
 - The window height now follows its content: it grows when text appears (match line, messages, the confirm box) and
   shrinks when it goes away, up to the screen height, after which it scrolls.
+- Review pass (product owner and tester review, see `docs/REVIEW_BACKLOG.md`): typed passwords no longer stay on screen after a  success with Show password on; closing the window during an operation asks first and cancels cleanly; the strength check  rates repeats, runs (`abcdefgh`, `12345678`) and common words (`Password1234`) as Weak; the confirm line prompts when empty,  and a mismatch is red; Cancel is a neutral message (no red banner, nothing logged); old progress text is cleared; a failed  Open folder keeps the success message; a `.enc` file with a damaged start explains itself and still allows Decrypt; focus  moves sensibly (Browse at start, password after a failure, Open folder after success); mnemonic Co_nfirm.
 - The confirm box, strength bar and the password warning appear only once a normal file is chosen (not with no file, not
   for an encrypted file); the strength and match texts are coloured to match their meaning; a visible password cannot be
   copied or cut (paste still works).

@@ -30,6 +30,7 @@ internal sealed partial class MainWindow : Window
         DataContext = viewModel;
         viewModel.PropertyChanged += OnViewModelPropertyChanged;
         WirePasswordBoxes();
+        Loaded += (_, _) => BrowseButton.Focus(); // a keyboard user starts on the first action
 #if DEBUG
         // Test hook for the global safety net (ADR-13 Layer 3): Ctrl+Shift+F12 throws an unexpected exception.
         InputBindings.Add(new System.Windows.Input.KeyBinding(
@@ -145,11 +146,6 @@ internal sealed partial class MainWindow : Window
         SetBoxes(_viewModel.Password, _viewModel.ConfirmPassword);
         SwapVisibility(PasswordInput, PasswordVisibleInput, show);
         SwapVisibility(ConfirmInput, ConfirmVisibleInput, show);
-        if (show)
-        {
-            PasswordVisibleInput.CaretIndex = PasswordVisibleInput.Text.Length;
-        }
-
         (show ? PasswordVisibleInput : (System.Windows.Controls.Control)PasswordInput).Focus();
     }
 
@@ -168,11 +164,28 @@ internal sealed partial class MainWindow : Window
     /// <param name="e">The name of the changed property.</param>
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        bool relevant = e.PropertyName is nameof(MainViewModel.Password) or nameof(MainViewModel.ConfirmPassword);
-        if (relevant && (PasswordInput.Password != _viewModel.Password || ConfirmInput.Password != _viewModel.ConfirmPassword))
+        if (e.PropertyName is nameof(MainViewModel.Password) or nameof(MainViewModel.ConfirmPassword) && BoxesDifferFromViewModel())
         {
             SetBoxes(_viewModel.Password, _viewModel.ConfirmPassword);
         }
+        else if (e.PropertyName == nameof(MainViewModel.State))
+        {
+            OnStateChanged();
+        }
+    }
+
+    /// <summary>Tells whether any of the four boxes shows something other than the ViewModel's password or confirmation.</summary>
+    /// <returns><see langword="true"/> when the boxes must be rewritten.</returns>
+    /// <remarks>
+    /// All four are compared, hidden and visible: typing in the visible box changes only that one, so comparing just
+    /// the hidden boxes missed the clearing after a success and left the typed password on screen.
+    /// </remarks>
+    private bool BoxesDifferFromViewModel()
+    {
+        return PasswordInput.Password != _viewModel.Password
+            || PasswordVisibleInput.Text != _viewModel.Password
+            || ConfirmInput.Password != _viewModel.ConfirmPassword
+            || ConfirmVisibleInput.Text != _viewModel.ConfirmPassword;
     }
 
     /// <summary>Writes the texts into the hidden and visible boxes of both fields without sending them back to the ViewModel.</summary>
@@ -187,6 +200,10 @@ internal sealed partial class MainWindow : Window
             PasswordVisibleInput.Text = password;
             ConfirmInput.Password = confirmation;
             ConfirmVisibleInput.Text = confirmation;
+
+            // Setting Text puts the caret at the start; typing afterwards must continue at the end.
+            PasswordVisibleInput.CaretIndex = password.Length;
+            ConfirmVisibleInput.CaretIndex = confirmation.Length;
         }
         finally
         {

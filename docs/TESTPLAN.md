@@ -17,7 +17,7 @@ Result column: ✅ pass · ❌ fail (write the bug id) · ➖ not applicable.
 
 | # | Step | Expected | Result |
 |---|---|---|---|
-| A1 | Start the app. | One window, no error, focus is in a sensible place, the main button is disabled. | |
+| A1 | Start the app. | One window, no error; focus is on Browse; Encrypt and Decrypt are both disabled; no confirm box, strength bar or password warning yet. | |
 | A2 | Click Browse, pick `small.txt`. | Path shown; the app offers Encrypt (not Decrypt). | |
 | A3 | Type the passphrase, click Encrypt. | Progress shown, success message, `small.txt.enc` (or the app's extension) exists next to the source, source untouched. | |
 | A4 | Click "Open folder". | Explorer opens with the new file selected or visible. | |
@@ -29,12 +29,13 @@ Result column: ✅ pass · ❌ fail (write the bug id) · ➖ not applicable.
 | A10 | Decrypt with a wrong passphrase. | Plain message ("wrong password or damaged file"), no output file, no crash, app stays usable. | |
 | A11 | Encrypt when the output file already exists. | The app asks before replacing; "No" keeps the old file; "Yes" replaces it. | |
 | A12 | Select an encrypted file, then a normal file, then rename an encrypted file to `x.bak` and select it. | Encrypted (any name): only Decrypt is enabled; normal file: only Encrypt is enabled (tooltips explain). Double encryption is covered by the integration test (T-26). | |
-| A13 | Select a normal file; type a 5-character password in both boxes; click Encrypt. | Red banner "too short, use at least 8 characters"; no file written. The strength bar is red with "Too short". | |
-| A14 | Type a valid password in the first box and a different one in the second. | "Passwords don't match yet." is shown; Encrypt shows a red "not the same" banner; no file written. | |
-| A15 | Type `blue river coffee lamp` in both boxes. | Bar green, "Strong.", "Passwords match."; Encrypt works. A short password for Decrypt of an old file is accepted (no rules, no confirmation box). | |
+| A13 | Select a normal file; type a 5-character password in both boxes. | Encrypt stays disabled. Strength bar is red with "Too short: use at least 8 characters." | |
+| A14 | Type a valid password in the first box, then a different one in the second. | Before typing the second: "Type the password again to confirm it." (neutral). While different: "Passwords don't match yet." in red and Encrypt stays disabled; same text: green "Passwords match." and Encrypt becomes enabled. | |
+| A15 | Type `blue river coffee lamp` in both boxes. | Bar green, "Strong.", "Passwords match."; Encrypt works. Then try `Password1234`, `aaaaaaaaaaaaaaaa`, `abcdefghijklmnop`: all must show "Weak" (red). A short password for Decrypt of an old file is accepted (no rules, no confirmation box). | |
 | A16 | Turn Caps Lock on and click into any password box; press a key. | "Caps Lock is on." appears while the box has focus and disappears when Caps Lock is off or focus leaves. | |
 | A17 | Tick "Show password". | Both boxes show their text; typing in either still works; unticking hides them again with the text kept. | |
-| A18 | With "Show password" ticked, select the text and press Ctrl+C, Ctrl+X, right-click, and drag it out. | Nothing is copied; no context menu; pasting into the box still works. Without a file chosen, no confirm box, strength bar or warning is shown. | |
+| A18 | With "Show password" ticked, select the text and press Ctrl+C, Ctrl+X, right-click, and drag it out. | Nothing is copied; no context menu; pasting into the box still works. Also: with Show password ticked, encrypt successfully: both boxes and the password text are empty afterwards (nothing left on screen), and the next file starts clean. | |
+| A19 | Start a large encryption, then close the window (X or Alt+F4). | A question "An operation is still running. Cancel it and close SecureFile? Nothing will be written."; No keeps working; Yes cancels, the window closes, and no partial or temp file is left. | || A20 | Start an operation and press Cancel (or Esc). | Neutral message "Cancelled. No file was written." (no red banner), the chosen file is still selected, no stale percentage or speed is shown on the next file. | || A21 | After a failure (for example a wrong password) look at the focus. After a success look at the focus. | Failure: focus is in the password box with its text selected. Success: focus is on Open folder. | || A22 | With Open folder unavailable (no Explorer, or simulate), click it. | The green success message stays and a note is added that the folder couldn't be opened. | |
 
 ## B. Keyboard only (T-41) — do not touch the mouse
 
@@ -86,7 +87,7 @@ Result column: ✅ pass · ❌ fail (write the bug id) · ➖ not applicable.
 | F3 | Choose an output folder without write permission (for example `C:\Windows\System32`). | Clear permission message; no partial file (T-22). | |
 | F4 | Start the 500 MB file on a USB stick or network share and unplug/disconnect mid-run (T-25). | Clear error, app recovers, no crash; no half-written file left under the final name. | |
 | F5 | Fill a small virtual disk or USB stick, then encrypt a larger file to it (T-23). | "Disk full" style message; no partial file. | |
-| F6 | Select a random non-SecureFile file and click Decrypt. | "Not a SecureFile file" message, no crash. | |
+| F6 | Select a random non-SecureFile file (Decrypt is disabled, Encrypt offered). Then rename a copy of it to `x.enc` and select that; click Decrypt. | The `.enc`-named file shows "ends in .enc but is not a valid SecureFile file" and both buttons are enabled; Decrypt gives "This isn't a file encrypted by SecureFile, or its start is damaged"; no crash, no output. | |
 | F7 | Edit one byte of a `.enc` file with a hex editor, then decrypt. | Detected as damaged; no output. | |
 | F8 | Start two operations quickly (double-click Encrypt). | Only one runs; inputs lock while working. | |
 
@@ -103,7 +104,7 @@ Result column: ✅ pass · ❌ fail (write the bug id) · ➖ not applicable.
 |---|---|---|---|
 | H1 | Run the exe from a path with spaces and from a non-admin account. | Starts and works; no admin prompt. | |
 | H2 | Check `%LOCALAPPDATA%\SecureFile\logs\securefile.log` after the failure tests. | Contains error types and times, never a passphrase or file content. | |
-| H3 | Check no `*.tmp` or partial files remain next to the sources after all tests. | None. | |
+| H3 | Check that no leftover `.~*.securefile-tmp` (hidden) or other partial files remain next to the sources after all tests, including after a cancel and after closing the window during an operation. | None. | |
 
 ## I. Exploratory session (30 minutes, T-44)
 

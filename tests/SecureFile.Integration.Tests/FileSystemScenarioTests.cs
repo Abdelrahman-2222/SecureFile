@@ -91,7 +91,7 @@ public sealed class FileSystemScenarioTests : IDisposable
         await _scenario.RunAsync(viewModel.DecryptCommand, _scenario.PathOf("notes.out"));
 
         Assert.Equal(MainViewState.Failed, viewModel.State);
-        Assert.StartsWith("This isn't a file encrypted by SecureFile.", viewModel.StatusMessage, StringComparison.Ordinal);
+        Assert.StartsWith("This isn't a file encrypted by SecureFile", viewModel.StatusMessage, StringComparison.Ordinal);
         Assert.Equal(["notes.txt"], _scenario.FileNames());
     }
 

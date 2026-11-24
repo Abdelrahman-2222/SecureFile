@@ -450,10 +450,72 @@ public sealed class MainViewModelTests
         viewModel.CancelCommand.Execute(null);
         await running;
 
-        Assert.Equal(MainViewState.Failed, viewModel.State);
+        Assert.Equal(MainViewState.FileSelected, viewModel.State); // back to the chosen file, not an error state
+        Assert.False(viewModel.IsFailed);
         Assert.Equal("Cancelled. No file was written.", viewModel.StatusMessage);
+        Assert.Empty(_errorLog.Exceptions); // cancelling is not an error: nothing is logged
+        Assert.NotNull(viewModel.SelectedFile);
+        Assert.Equal(0, viewModel.ProgressPercentage);
+        Assert.Equal(string.Empty, viewModel.ProgressText);
         Assert.False(viewModel.CancelCommand.CanExecute(null));
         Assert.True(viewModel.CanEditInputs);
+    }
+
+    [Fact]
+    public async Task OpenFolder_FileManagerFails_KeepsTheSuccessMessageAndAddsTheHint()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        _dialogs.SaveResult = InputPath + ".enc";
+        _folderOpener.Result = false;
+        await viewModel.EncryptCommand.ExecuteAsync(null);
+
+        viewModel.OpenFolderCommand.Execute(null);
+        viewModel.OpenFolderCommand.Execute(null); // twice: the hint is not appended twice
+
+        Assert.True(viewModel.IsSucceeded);
+        Assert.StartsWith("Encrypted copy saved as", viewModel.StatusMessage, StringComparison.Ordinal);
+        Assert.Single(System.Text.RegularExpressions.Regex.Matches(viewModel.StatusMessage, "couldn't be opened"));
+    }
+
+    [Fact]
+    public async Task EncryptedNameButNoSignature_OffersBothButtonsAndExplainsWhy()
+    {
+        _detailsReader.IsEncryptedOverride = false; // "report.pdf.enc" whose content is not ours: damaged or foreign
+        MainViewModel viewModel = await CreateWithFileAsync(Path.Combine(Path.GetTempPath(), "report.pdf.enc"));
+
+        Assert.True(viewModel.IsDecryptOffered); // lets the user try and get the exact reason
+        Assert.True(viewModel.IsEncryptOffered);
+        Assert.Contains("not a valid SecureFile file", viewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RenamedEncryptedFile_IsRecognisedByContent_AndOnlyDecryptIsOffered()
+    {
+        _detailsReader.IsEncryptedOverride = true; // content has our signature, name is "report.bak"
+        MainViewModel viewModel = await CreateWithFileAsync(Path.Combine(Path.GetTempPath(), "report.bak"));
+
+        Assert.True(viewModel.IsDecrypting);
+        Assert.True(viewModel.IsDecryptOffered);
+        Assert.False(viewModel.IsEncryptOffered);
+        Assert.False(viewModel.IsEncrypting);
+    }
+
+    [Fact]
+    public void PasswordMatchText_PromptsForTheConfirmationAndOnlyMismatchIsFlagged()
+    {
+        MainViewModel viewModel = CreateViewModel();
+        viewModel.Password = "short";
+        Assert.Equal(string.Empty, viewModel.PasswordMatchText); // too short: the strength line speaks, not this one
+
+        viewModel.Password = "blue river coffee lamp";
+        Assert.Equal("Type the password again to confirm it.", viewModel.PasswordMatchText);
+        Assert.False(viewModel.IsPasswordMismatch); // a prompt is not an error
+
+        viewModel.ConfirmPassword = "blue";
+        Assert.True(viewModel.IsPasswordMismatch);
+        viewModel.ConfirmPassword = "blue river coffee lamp";
+        Assert.False(viewModel.IsPasswordMismatch);
+        Assert.True(viewModel.PasswordsMatch);
     }
 
     [Fact]

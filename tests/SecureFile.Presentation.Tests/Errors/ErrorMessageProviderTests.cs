@@ -26,7 +26,7 @@ public sealed class ErrorMessageProviderTests
     }
 
     [Theory]
-    [InlineData(InvalidEncryptedFileReason.NotEncryptedFile, "This isn't a file encrypted by SecureFile. Choose a file that ends in .enc.")]
+    [InlineData(InvalidEncryptedFileReason.NotEncryptedFile, "This isn't a file encrypted by SecureFile, or its start is damaged. Choose the encrypted file you want to open.")]
     [InlineData(InvalidEncryptedFileReason.UnsupportedVersion, "This file was made by a newer version of SecureFile. Update the app to open it.")]
     [InlineData(InvalidEncryptedFileReason.Damaged, "This encrypted file is damaged or incomplete, so it can't be decrypted.")]
     public void InvalidEncryptedFile_MessageFollowsTheReason(InvalidEncryptedFileReason reason, string expected)

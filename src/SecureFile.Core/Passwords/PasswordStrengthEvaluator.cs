@@ -43,6 +43,11 @@ public static class PasswordStrengthEvaluator
             return PasswordStrength.TooShort;
         }
 
+        if (PasswordPatterns.IsPredictable(password))
+        {
+            return PasswordStrength.Weak; // long-looking but among the first guesses: repeats, runs, well-known words
+        }
+
         int points = (password.Length >= GoodLength ? 1 : 0)
             + (password.Length >= LongLength ? 1 : 0)
             + (CountCharacterKinds(password) >= VarietyForPoint ? 1 : 0);
