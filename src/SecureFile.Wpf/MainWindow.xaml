@@ -4,7 +4,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="SecureFile"
         Icon="Assets/SecureFile.ico"
-        Width="800" Height="860"
+        Width="800" Height="780"
         MaxHeight="{x:Static SystemParameters.MaximizedPrimaryScreenHeight}"
         MinWidth="640" MinHeight="480"
         WindowStartupLocation="CenterScreen"
@@ -125,8 +125,21 @@
                         </TextBox.InputBindings>
                     </TextBox>
                 </Grid>
+                <!-- Collapsed while empty, so an unused line does not leave a gap. -->
                 <TextBlock AutomationProperties.AutomationId="PasswordMatchText" Text="{Binding PasswordMatchText}"
-                           TextWrapping="Wrap" Margin="0,4,0,0" />
+                           TextWrapping="Wrap" Margin="0,4,0,0">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="FontSize" Value="14" />
+                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding PasswordMatchText}" Value="">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
             </StackPanel>
 
             <CheckBox x:Name="ShowPasswordCheck" AutomationProperties.AutomationId="ShowPasswordCheck"
