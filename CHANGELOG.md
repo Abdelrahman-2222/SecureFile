@@ -94,6 +94,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
   is shown only when a password is being chosen (a `.enc` file shows "enter the password that was used" instead); the
   Encrypt is greyed out for an encrypted file and Decrypt for a normal one; "encrypted" is decided by the file's
   content (its SecureFile signature), so a renamed encrypted file is still recognised.
+- The "if you forget this password" note is an amber caution box with a warning symbol and bold text while a password is
+  being chosen (not red: red is for errors).
 - Decryption reports invalid padding after a valid tag (only possible for a file another program wrote) as
   `InvalidEncryptedFileException(Damaged)` with the original `CryptographicException` inside, so callers handle one
   documented type (Step 1.7). New constructor `InvalidEncryptedFileException(message, reason, innerException)`.
