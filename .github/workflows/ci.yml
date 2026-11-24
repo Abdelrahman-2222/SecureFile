@@ -11,7 +11,7 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, 'feature/**'] # feature branches too, so every push is checked without a manual run
   pull_request:
     branches: [main]
   workflow_dispatch: # allows a manual run from the GitHub "Actions" tab

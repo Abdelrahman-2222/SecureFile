@@ -37,8 +37,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - `AesCbc` (internal): creates the AES-256-CBC/PKCS7 encryptor and decryptor for a file's key and IV, with both
   lengths checked; verified against NIST SP 800-38A F.2.5/F.2.6 and OpenSSL.
 
+- `SECURITY.md`: how to report a vulnerability privately, and what is in scope.
+
 ### Changed
 
+- CI also runs on every push to `feature/**` branches; the gitleaks scan allows only the published NIST test key.
 - File details of a symbolic link now report the size and change time of the file it points to (Windows reported
   0 bytes); a link to a missing file is reported as not found.
 - File sizes below 1 KB use the culture's thousands separator (`1,023 bytes`).
