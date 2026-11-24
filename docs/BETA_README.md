@@ -21,9 +21,9 @@ completely on your computer and needs no internet.
 | Your computer | In this beta |
 |---|---|
 | **Windows 10 or 11, 64-bit** | **Ready.** Follow "How to run it" below. |
-| **macOS** and **Linux** | **Not in this beta yet.** The window is built for Windows so far. The encryption engine itself is already tested on Ubuntu and macOS in the automated build, and a command-line version and a desktop version for both are planned. Your opinion on the idea still helps; tell me your system and I will send you the first build when it exists. |
+| **macOS** and **Linux** | **Command-line version only for now** (`securefile`, see its own README and the `securefile-...` archive for your system). There is no window yet; a desktop version is planned. The encryption engine is tested on Ubuntu and macOS in the automated build, and files are interchangeable between all systems. |
 
-When the macOS and Linux builds arrive, expect these one-time steps (they are not signed yet): on a Mac, right-click the app,
+The command-line archives also contain their own README with the one-time steps (they are not signed yet): on a Mac, right-click the app,
 choose **Open**, then **Open** again (or run `xattr -d com.apple.quarantine <file>` in Terminal); on Linux, mark the file as
 executable (`chmod +x securefile`) and run it from a terminal.
 

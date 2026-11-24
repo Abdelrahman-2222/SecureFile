@@ -770,9 +770,9 @@ What does a mutation score tell us that coverage does not?
 | 7.1 | Avalonia app reusing the same `MainViewModel`. | Same features as WPF. | ⬜ |
 | 7.2 | Avalonia service implementations (StorageProvider dialogs, launcher, clipboard). | Works on Windows. | ⬜ |
 | 7.3 | CI matrix on Windows, Ubuntu, macOS; cross-OS "golden file" tests (files encrypted on one OS decrypt on all). | All green. | ⬜ |
-| 7.4 | Publish `osx-arm64`, `osx-x64`, `linux-x64`, `linux-arm64`; test Linux in WSL2/WSLg; macOS on a Mac or VM. | Runs on each. | ⬜ |
+| 7.4 | Publish `osx-arm64`, `osx-x64`, `linux-x64`, `linux-arm64`; test Linux in WSL2/WSLg; macOS on a Mac or VM. | Runs on each. | 🟡 CLI archives for linux-x64, linux-arm64, osx-arm64, osx-x64 built by `scripts/publish-cli.ps1`; the Avalonia app is not built |
 | 7.5 | Size comparison: WPF (no trimming) vs Avalonia trimmed/AOT. | Numbers in the report. | ⬜ |
-| 7.6 | Optional `SecureFile.Cli`. | `securefile encrypt <in> <out>` works. | ⬜ |
+| 7.6 | Optional `SecureFile.Cli`. | `securefile encrypt <in> <out>` works. | ✅ built early (2026-11-24): `src/SecureFile.Cli` + 39 tests; Windows binary run by hand; Linux and macOS binaries built but only the Ubuntu/macOS CI test run exercises them |
 
 ### Stage 8 — Stakeholder suggestions (Phase 6) · ~2 hours
 

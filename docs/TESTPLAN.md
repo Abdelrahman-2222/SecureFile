@@ -106,6 +106,24 @@ Result column: ✅ pass · ❌ fail (write the bug id) · ➖ not applicable.
 | H2 | Check `%LOCALAPPDATA%\SecureFile\logs\securefile.log` after the failure tests. | Contains error types and times, never a passphrase or file content. | |
 | H3 | Check that no leftover `.~*.securefile-tmp` (hidden) or other partial files remain next to the sources after all tests, including after a cancel and after closing the window during an operation. | None. | |
 
+## J. Command-line version (`securefile`, any system)
+
+Use the archive for your system from `artifacts/cli` (see `docs/CLI_README.md` for the one-time steps on Linux and macOS).
+
+| # | Step | Expected | Result |
+|---|---|---|---|
+| J1 | `securefile --version`, `securefile --help`. | Version `0.1.0`; usage text on screen; exit code 0. | |
+| J2 | `securefile encrypt <file>` and type a password (nothing must appear), use Backspace once, Enter; type it again. | The password is never echoed; Backspace works; `<file>.enc` appears; original unchanged. | |
+| J3 | Type two different passwords. | "The two passwords are not the same"; no file written; exit code 1. | |
+| J4 | Type a 5-character password. | "too short"; no file written. Then `Password1234`: accepted with a note that it is weak. | |
+| J5 | `securefile decrypt <file>.enc -o restored` and the right password; compare with the original (`cmp` / `fc /b` / checksums). | Identical bytes. | |
+| J6 | Decrypt with a wrong password. | "Wrong password…"; exit code 1; no output file. | |
+| J7 | Encrypt again while `<file>.enc` exists; then add `--force`. | Refused with a hint; then replaced. | |
+| J8 | Press Ctrl+C at the password question, and again in the middle of a big file (about 1 GB). | Message "Cancelled. No file was written."; exit code 130; no partial or hidden temp file left. | |
+| J9 | `printf '%s\n' 'blue river coffee lamp' \| securefile encrypt <file> --password-stdin`, then without the flag in a pipe. | Works; without the flag it says how to pipe the password. | |
+| J10 | Lock a file on one system, copy it, unlock it on another (Windows ↔ macOS ↔ Linux). | Opens and is identical (same format everywhere). | |
+| J11 | Redirect output (`securefile encrypt f > out.txt 2> err.txt`). | `out.txt` has only the result line; the prompt, progress and errors are in `err.txt`. | |
+
 ## I. Exploratory session (30 minutes, T-44)
 
 Charter: "Try to make the app crash, lose a file, show a confusing message, or leak a passphrase." Take notes while

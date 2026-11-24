@@ -101,6 +101,20 @@ and the project uses [Semantic Versioning](https://semver.org/).
   confirmation box. No symbol/digit rules on purpose.
 - The window height now follows its content: it grows when text appears (match line, messages, the confirm box) and
   shrinks when it goes away, up to the screen height, after which it scrolls.
+- The line under the buttons is a live "next step": it follows the typed password and confirmation (for example "The two
+  passwords are not the same yet." or "Ready. Choose Encrypt file."), and typing clears an old error.
+- Friends build: `scripts/publish-beta.ps1` makes a self-contained single-file `win-x64` zip of the Windows app with
+  `docs/BETA_README.md` and a SHA-256 file (`artifacts/beta/`, not committed); the README has safety notes, a one-minute
+  try-out, a "Which computers" table and feedback questions.
+- `docs/SUGGESTIONS.md`: why there is one versioned encryption design (not user-chosen, not random), rules for any AI
+  feature, and a roadmap by area with priority and effort.
+- Command-line version `securefile` (plan Step 7.6, `src/SecureFile.Cli`): `encrypt` and `decrypt` with a hidden password
+  prompt (asked twice when encrypting), `--output`, `--force`, `--password-stdin` for scripts (no `--password` on purpose,
+  it would stay in the shell history), a progress line on a terminal, Ctrl+C cancels with no leftover file, exit codes
+  0, 1, 2 and 130. Same engine, password rules and messages as the Windows app, so files are interchangeable between
+  systems. `scripts/publish-cli.ps1` builds self-contained, trimmed single-file archives (about 6 MB each) for win-x64,
+  linux-x64, linux-arm64, osx-arm64 and osx-x64 with a `SHA256SUMS.txt`; `docs/CLI_README.md` ships inside each.
+  Tests: `SecureFile.Cli.Tests` (39), also in the Ubuntu/macOS CI job.
 - Review pass (product owner and tester review, see `docs/REVIEW_BACKLOG.md`): typed passwords no longer stay on screen after a  success with Show password on; closing the window during an operation asks first and cancels cleanly; the strength check  rates repeats, runs (`abcdefgh`, `12345678`) and common words (`Password1234`) as Weak; the confirm line prompts when empty,  and a mismatch is red; Cancel is a neutral message (no red banner, nothing logged); old progress text is cleared; a failed  Open folder keeps the success message; a `.enc` file with a damaged start explains itself and still allows Decrypt; focus  moves sensibly (Browse at start, password after a failure, Open folder after success); mnemonic Co_nfirm.
 - The confirm box, strength bar and the password warning appear only once a normal file is chosen (not with no file, not
   for an encrypted file); the strength and match texts are coloured to match their meaning; a visible password cannot be

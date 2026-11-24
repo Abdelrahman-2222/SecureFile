@@ -20,6 +20,10 @@ Files are protected with a password, and any tampering or wrong password is dete
 *Available from the first release:* download `SecureFile.exe` from the Releases page and double-click it.
 Nothing else needs to be installed.
 
+**Windows, macOS and Linux (command line):** `securefile encrypt <file>` and `securefile decrypt <file>.enc`, one small file per
+system, built with `pwsh scripts/publish-cli.ps1`. See [docs/CLI_README.md](docs/CLI_README.md). For the Windows window, build with
+`pwsh scripts/publish-beta.ps1` and read [docs/BETA_README.md](docs/BETA_README.md).
+
 ## Build it (developers)
 
 Requirements: Windows 10/11, [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (version pinned in `global.json`),
