@@ -750,6 +750,7 @@ responsive during a 4 GB encryption? Why do sizes/spacing follow a 4/8 px grid?
 | 5.3 | VS Code Metrics, VS Code Coverage, Stryker.NET mutation score. | Targets in §8 met. | ⬜ |
 | 5.4 | Security: analyzers, NuGet audit, SonarQube for IDE, CodeQL (if GitHub), gitleaks, threat model (STRIDE). | 0 open high issues; threat table written. | ⬜ |
 | 5.5 | Write `QUALITY_REPORT.md` (numbers + screenshots). | Done. | ⬜ |
+| 5.6 | Burn down `docs/REVIEW_BACKLOG.md` (items found by the independent review and afterwards, time-boxed: sections B1, B5, C1, C3 first), then re-run an independent review. | Fixed items ticked in the backlog and report; new findings recorded. | ⬜ |
 
 **Checkpoint 5:** What is p95 and why report it instead of only the average? Why does memory stay flat?
 What does a mutation score tell us that coverage does not?
