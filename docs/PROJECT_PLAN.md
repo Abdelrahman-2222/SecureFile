@@ -395,7 +395,7 @@ the bonus (Stage 7) comes after.
 | 0.4 | Create the solution and projects (§6). | Layers keep logic reusable and testable (E4). | `dotnet build` succeeds. | 🟨 done — checkpoint pending |
 | 0.5 | `Directory.Build.props`: `Nullable`, `AnalysisLevel=latest-all`, `TreatWarningsAsErrors`, `EnforceCodeStyleInBuild`, `GenerateDocumentationFile`. `Directory.Packages.props` for versions. | Quality rules apply to every project automatically; security analyzers (CA53xx) block weak crypto. | Build is clean with rules on. | 🟨 done — checkpoint pending |
 | 0.6 | `.editorconfig` + `dotnet format --verify-no-changes`. | One consistent style; checked automatically. | Command passes. | 🟨 done — checkpoint pending |
-| 0.7 | CI workflow (GitHub Actions) — **ask** whether to create a GitHub repo (public or private). | Every push is built and tested automatically. | CI green. | 🟨 local CI file done — waiting for GitHub sign-in |
+| 0.7 | CI workflow (GitHub Actions) — **ask** whether to create a GitHub repo (public or private). | Every push is built and tested automatically. | CI green. | 🟨 done — private repo Abdelrahman-2222/SecureFile, first CI run green on Windows/Ubuntu/macOS — checkpoint pending |
 | 0.8 | Move this plan to `docs/`; create `LEARNING_LOG.md` and `adr/`. | One home for all documents. | Files exist. | 🟨 done — checkpoint pending |
 
 **Checkpoint 0:** What does `global.json` do? What is the difference between `net10.0` and `net10.0-windows`?
