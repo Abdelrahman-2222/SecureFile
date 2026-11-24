@@ -1,6 +1,7 @@
 using SecureFile.Core.Cryptography;
 using SecureFile.Core.Files;
 using SecureFile.Presentation.Dialogs;
+using SecureFile.Presentation.Errors;
 
 namespace SecureFile.Presentation.Tests;
 
@@ -57,6 +58,17 @@ internal sealed class FakeFileEncryptionService : IFileEncryptionService
         {
             throw ExceptionToThrow;
         }
+    }
+}
+
+/// <summary>Collects the exceptions it is given instead of writing a log file.</summary>
+internal sealed class FakeErrorLog : IErrorLog
+{
+    public List<Exception> Exceptions { get; } = [];
+
+    public void Write(Exception exception)
+    {
+        Exceptions.Add(exception);
     }
 }
 

@@ -1,9 +1,11 @@
 using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using SecureFile.Core;
 using SecureFile.Core.Cryptography;
 using SecureFile.Core.Files;
 using SecureFile.Presentation.Dialogs;
+using SecureFile.Presentation.Errors;
 
 namespace SecureFile.Presentation.Main;
 
@@ -30,18 +32,22 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly IFileEncryptionService _encryptionService;
     private readonly IFileDetailsReader _fileDetailsReader;
     private readonly IFileDialogService _fileDialogs;
+    private readonly IErrorLog _errorLog;
 
     /// <summary>Creates the ViewModel with the services it uses (pure dependency injection, ADR-09).</summary>
     /// <param name="encryptionService">Encrypts and decrypts files.</param>
     /// <param name="fileDetailsReader">Reads the name and size of the chosen file.</param>
     /// <param name="fileDialogs">Shows the Open and Save dialogs.</param>
+    /// <param name="errorLog">Records the technical details of handled errors.</param>
     /// <exception cref="ArgumentNullException">A service is <see langword="null"/>.</exception>
-    public MainViewModel(IFileEncryptionService encryptionService, IFileDetailsReader fileDetailsReader, IFileDialogService fileDialogs)
+    public MainViewModel(IFileEncryptionService encryptionService, IFileDetailsReader fileDetailsReader, IFileDialogService fileDialogs, IErrorLog errorLog)
     {
         ArgumentNullException.ThrowIfNull(encryptionService);
         ArgumentNullException.ThrowIfNull(fileDetailsReader);
         ArgumentNullException.ThrowIfNull(fileDialogs);
+        ArgumentNullException.ThrowIfNull(errorLog);
 
+        _errorLog = errorLog;
         _encryptionService = encryptionService;
         _fileDetailsReader = fileDetailsReader;
         _fileDialogs = fileDialogs;
@@ -94,7 +100,14 @@ public sealed partial class MainViewModel : ObservableObject
     /// the window must not freeze meanwhile (PROJECT_PLAN §11.1).
     /// </remarks>
     [RelayCommand(CanExecute = nameof(CanBrowse))]
-    private async Task BrowseAsync()
+    private Task BrowseAsync()
+    {
+        return RunGuardedAsync(BrowseCoreAsync, clearSelectionOnFailure: true);
+    }
+
+    /// <summary>The Browse work itself, without the error handling around it.</summary>
+    /// <returns>A task that completes when the details are shown.</returns>
+    private async Task BrowseCoreAsync()
     {
         string? path = _fileDialogs.ShowOpenFileDialog();
         if (path is null)
@@ -114,7 +127,7 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanRunFileOperation))]
     private Task EncryptAsync()
     {
-        return RunFileOperationAsync(encrypt: true);
+        return RunGuardedAsync(() => RunFileOperationAsync(encrypt: true), clearSelectionOnFailure: false);
     }
 
     /// <summary>Decrypts the chosen file to a location the user picks (suggested: same folder, name without <c>.enc</c>).</summary>
@@ -122,7 +135,78 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanRunFileOperation))]
     private Task DecryptAsync()
     {
-        return RunFileOperationAsync(encrypt: false);
+        return RunGuardedAsync(() => RunFileOperationAsync(encrypt: false), clearSelectionOnFailure: false);
+    }
+
+    /// <summary>
+    /// Puts the window back to a usable idle state after the app's global safety net (ADR-13, Layer 3) handled an
+    /// unexpected error: no operation is shown as running, and the buttons follow the chosen file again.
+    /// </summary>
+    /// <remarks>
+    /// Safe because every file operation is atomic (ADR-07): an interrupted one leaves no half-written result.
+    /// </remarks>
+    public void ResetAfterUnexpectedError()
+    {
+        ProgressPercentage = 0;
+        State = SelectedFile is null ? MainViewState.NoFile : MainViewState.FileSelected;
+        StatusMessage = SelectedFile is null
+            ? "Choose a file to encrypt or decrypt."
+            : "Enter the password, then choose Encrypt or Decrypt.";
+    }
+
+    /// <summary>
+    /// Runs a user action and handles the <b>expected</b> failures (ADR-13, Layer 2): log the details, show a plain message.
+    /// </summary>
+    /// <param name="action">The Browse or Encrypt/Decrypt work.</param>
+    /// <param name="clearSelectionOnFailure">Whether a failure also forgets the chosen file (true for Browse, whose file could not be read).</param>
+    /// <returns>A task that completes when the action has ended, successfully or with a handled failure.</returns>
+    /// <remarks>
+    /// Only the specific types Core and the file system document are caught. <see cref="ArgumentException"/> (a
+    /// programming error) and <see cref="Exception"/> are deliberately not caught: they go to the global safety net.
+    /// <see cref="FileNotFoundException"/>, <see cref="DirectoryNotFoundException"/> and the like are covered by
+    /// <see cref="IOException"/>.
+    /// </remarks>
+    private async Task RunGuardedAsync(Func<Task> action, bool clearSelectionOnFailure)
+    {
+        try
+        {
+            await action().ConfigureAwait(true);
+        }
+        catch (OperationCanceledException exception)
+        {
+            Fail(exception, clearSelectionOnFailure);
+        }
+        catch (SecureFileException exception)
+        {
+            Fail(exception, clearSelectionOnFailure);
+        }
+        catch (IOException exception)
+        {
+            Fail(exception, clearSelectionOnFailure);
+        }
+        catch (UnauthorizedAccessException exception)
+        {
+            Fail(exception, clearSelectionOnFailure);
+        }
+        catch (NotSupportedException exception)
+        {
+            Fail(exception, clearSelectionOnFailure);
+        }
+    }
+
+    /// <summary>Logs a handled exception and shows its plain message.</summary>
+    /// <param name="exception">The expected exception.</param>
+    /// <param name="clearSelection">Whether to forget the chosen file.</param>
+    private void Fail(Exception exception, bool clearSelection)
+    {
+        _errorLog.Write(exception);
+        if (clearSelection)
+        {
+            SelectedFile = null;
+        }
+
+        State = MainViewState.Failed;
+        StatusMessage = ErrorMessageProvider.GetMessage(exception);
     }
 
     /// <summary>The shared flow of Encrypt and Decrypt: ask where to save, run the operation, report the result.</summary>

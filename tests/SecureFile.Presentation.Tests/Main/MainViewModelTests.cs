@@ -1,4 +1,5 @@
 using System.Globalization;
+using SecureFile.Core.Cryptography;
 using SecureFile.Core.Files;
 using SecureFile.Presentation.Main;
 
@@ -15,6 +16,7 @@ public sealed class MainViewModelTests
     private readonly FakeFileEncryptionService _encryption = new();
     private readonly FakeFileDialogService _dialogs = new();
     private readonly FakeFileDetailsReader _detailsReader = new();
+    private readonly FakeErrorLog _errorLog = new();
 
     // ---- Browse (Step 2.2) -----------------------------------------------------------------------------------------
 
@@ -170,14 +172,73 @@ public sealed class MainViewModelTests
     [Fact]
     public void Constructor_NullService_ThrowsArgumentNullException()
     {
-        Assert.Throws<ArgumentNullException>("encryptionService", () => new MainViewModel(null!, _detailsReader, _dialogs));
-        Assert.Throws<ArgumentNullException>("fileDetailsReader", () => new MainViewModel(_encryption, null!, _dialogs));
-        Assert.Throws<ArgumentNullException>("fileDialogs", () => new MainViewModel(_encryption, _detailsReader, null!));
+        Assert.Throws<ArgumentNullException>("encryptionService", () => new MainViewModel(null!, _detailsReader, _dialogs, _errorLog));
+        Assert.Throws<ArgumentNullException>("fileDetailsReader", () => new MainViewModel(_encryption, null!, _dialogs, _errorLog));
+        Assert.Throws<ArgumentNullException>("fileDialogs", () => new MainViewModel(_encryption, _detailsReader, null!, _errorLog));
+        Assert.Throws<ArgumentNullException>("errorLog", () => new MainViewModel(_encryption, _detailsReader, _dialogs, null!));
+    }
+
+    // ---- Errors (Step 2.6) -----------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task Encrypt_ExpectedFailure_LogsItAndShowsThePlainMessage()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        _dialogs.SaveResult = InputPath + ".enc";
+        var failure = new AuthenticationFailedException();
+        _encryption.ExceptionToThrow = failure;
+
+        await viewModel.EncryptCommand.ExecuteAsync(null);
+
+        Assert.Equal(MainViewState.Failed, viewModel.State);
+        Assert.Equal("Wrong password, or the file was changed or damaged.", viewModel.StatusMessage);
+        Assert.Same(failure, Assert.Single(_errorLog.Exceptions));
+        Assert.NotNull(viewModel.SelectedFile); // the user can fix the password and try again
+    }
+
+    [Fact]
+    public async Task Browse_ReadFails_ClearsTheSelectionAndShowsTheMessage()
+    {
+        MainViewModel viewModel = CreateViewModel();
+        _dialogs.OpenResult = InputPath;
+        _detailsReader.ExceptionToThrow = new FileNotFoundException();
+
+        await viewModel.BrowseCommand.ExecuteAsync(null);
+
+        Assert.Equal(MainViewState.Failed, viewModel.State);
+        Assert.Null(viewModel.SelectedFile);
+        Assert.Equal("The file or folder can't be found or opened.", viewModel.StatusMessage);
+        Assert.Single(_errorLog.Exceptions);
+    }
+
+    [Fact]
+    public async Task Encrypt_ProgrammingError_IsNotCaught()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        _dialogs.SaveResult = InputPath + ".enc";
+        _encryption.ExceptionToThrow = new ArgumentException("bug");
+
+        await Assert.ThrowsAsync<ArgumentException>(() => viewModel.EncryptCommand.ExecuteAsync(null));
+        Assert.Empty(_errorLog.Exceptions);
+    }
+
+    [Fact]
+    public async Task ResetAfterUnexpectedError_ReturnsToFileSelected()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        _dialogs.SaveResult = InputPath + ".enc";
+        _encryption.ExceptionToThrow = new IOException();
+        await viewModel.EncryptCommand.ExecuteAsync(null);
+
+        viewModel.ResetAfterUnexpectedError();
+
+        Assert.Equal(MainViewState.FileSelected, viewModel.State);
+        Assert.True(viewModel.EncryptCommand.CanExecute(null));
     }
 
     private MainViewModel CreateViewModel()
     {
-        return new MainViewModel(_encryption, _detailsReader, _dialogs);
+        return new MainViewModel(_encryption, _detailsReader, _dialogs, _errorLog);
     }
 
     /// <summary>A ViewModel with <paramref name="path"/> chosen and the password "secret" typed.</summary>
