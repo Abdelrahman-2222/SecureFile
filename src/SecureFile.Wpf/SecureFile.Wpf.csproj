@@ -13,6 +13,15 @@
     <NoWarn>$(NoWarn);WPF0001</NoWarn>
   </PropertyGroup>
 
+  <PropertyGroup>
+    <!-- The icon of SecureFile.exe in Explorer and the taskbar. The same file is also embedded for the window (below). -->
+    <ApplicationIcon>Assets\SecureFile.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\SecureFile.ico" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="..\SecureFile.Presentation\SecureFile.Presentation.csproj" />
     <ProjectReference Include="..\SecureFile.Core\SecureFile.Core.csproj" />

@@ -15,6 +15,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Main window (Steps 3.2–3.5): layout following the UX flow; Fluent theme that follows Windows light/dark; drop a
   file on the window; Ctrl+O to browse and Enter in the password box to encrypt or decrypt; progress with speed and
   time left; Cancel (Esc) that leaves no output file; "Open folder" after success; inputs locked while working.
+- App icon (padlock) for the executable and both windows, and an About dialog (button or F1) that shows the version
+  read from the assembly (`0.1.0`).
 - The wrong-password message now suggests checking Caps Lock, the keyboard language and spaces.
 - First integration test: the ViewModel with the real encryption service encrypts then decrypts a file; bytes equal.
 - File details for the selected file: name, extension, size in bytes, full path and last change time (UTC)
