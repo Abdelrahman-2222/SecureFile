@@ -86,6 +86,11 @@ jobs:
   secrets-scan:
     name: Secrets scan (gitleaks, full history)
     runs-on: ubuntu-latest
+    # On pull requests the gitleaks action lists the PR's commits through the GitHub API; without this read
+    # permission it fails with "403 Resource not accessible by integration" before scanning anything.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - name: Check out the code (full history)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
