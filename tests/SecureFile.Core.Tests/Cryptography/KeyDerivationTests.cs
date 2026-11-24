@@ -166,6 +166,43 @@ public sealed class KeyDerivationTests
         Assert.Equal("header", exception.ParamName);
     }
 
+    [Theory]
+    [InlineData("a")]
+    [InlineData("   ")]
+    [InlineData("café \U0001F600")] // a complete emoji is a valid surrogate PAIR
+    public void ThrowIfInvalidPassword_ValidPassword_DoesNotThrow(string password)
+    {
+        KeyDerivation.ThrowIfInvalidPassword(password);
+    }
+
+    [Fact]
+    public void ThrowIfInvalidPassword_LoneSurrogate_ThrowsArgumentException()
+    {
+        // Not [InlineData]: xUnit stores theory data as UTF-8, which turns a lone surrogate into U+FFFD (a valid char).
+        string[] invalidPasswords =
+        [
+            "\uD800",         // high surrogate alone
+            "abc\uD83D",      // high surrogate at the end (half an emoji)
+            "\uDE00abc",      // low surrogate first
+            "a\uDE00\uD83Db", // a pair in the wrong order
+        ];
+
+        foreach (string password in invalidPasswords)
+        {
+            ArgumentException exception = Assert.Throws<ArgumentException>(() => KeyDerivation.ThrowIfInvalidPassword(password));
+
+            Assert.Equal("password", exception.ParamName);
+            Assert.Contains("invalid Unicode", exception.Message, StringComparison.Ordinal);
+        }
+    }
+
+    [Fact]
+    public void ThrowIfInvalidPassword_NullOrEmpty_ThrowsTheMatchingGuardException()
+    {
+        Assert.Throws<ArgumentNullException>("password", () => KeyDerivation.ThrowIfInvalidPassword(null!));
+        Assert.Throws<ArgumentException>("password", () => KeyDerivation.ThrowIfInvalidPassword(string.Empty));
+    }
+
     [Fact]
     public void DeriveKeys_PasswordWithLoneSurrogate_ThrowsArgumentException()
     {

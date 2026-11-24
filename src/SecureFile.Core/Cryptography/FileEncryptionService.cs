@@ -125,9 +125,9 @@ public sealed class FileEncryptionService : IFileEncryptionService
     /// <returns>A task that completes when all plaintext is written.</returns>
     /// <exception cref="AuthenticationFailedException">The tag does not match: wrong password, or a changed file.</exception>
     /// <exception cref="EndOfStreamException">The file became shorter while it was read.</exception>
-    /// <exception cref="CryptographicException">
-    /// The tag matched but the padding is invalid: the file was made by another program that knows the password
-    /// (cannot happen for files this app wrote).
+    /// <exception cref="InvalidEncryptedFileException">
+    /// The tag matched but the padding is invalid (<see cref="InvalidEncryptedFileReason.Damaged"/>): the file was made
+    /// by another program that knows the password (cannot happen for files this app wrote).
     /// </exception>
     /// <remarks>Internal so a test can feed a stream that returns only a few bytes per read.</remarks>
     internal static async Task WriteDecryptedFileAsync(
@@ -163,14 +163,16 @@ public sealed class FileEncryptionService : IFileEncryptionService
     /// <param name="overwriteExisting">Whether an existing output file may be replaced.</param>
     /// <returns>The full input and output paths.</returns>
     /// <exception cref="ArgumentNullException">A path or the password is <see langword="null"/>.</exception>
-    /// <exception cref="ArgumentException">A path or the password is empty, or the output path is unusable.</exception>
+    /// <exception cref="ArgumentException">
+    /// A path or the password is empty, the password has invalid Unicode, or the output path is unusable.
+    /// </exception>
     /// <exception cref="IOException">The output file exists and may not be replaced.</exception>
     private static (string FullInputPath, string FullOutputPath) GetCheckedFullPaths(
         string inputFilePath, string outputFilePath, string password, bool overwriteExisting)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(inputFilePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputFilePath);
-        ArgumentException.ThrowIfNullOrEmpty(password);
+        KeyDerivation.ThrowIfInvalidPassword(password);
 
         string fullInputPath = Path.GetFullPath(inputFilePath);
         string fullOutputPath = Path.GetFullPath(outputFilePath);
@@ -383,10 +385,28 @@ public sealed class FileEncryptionService : IFileEncryptionService
     /// <param name="decryptor">The decryptor holding the last block.</param>
     /// <param name="cancellationToken">Cancels the write.</param>
     /// <returns>A task that completes when the last plaintext bytes are written.</returns>
-    /// <exception cref="CryptographicException">The padding is invalid (only possible for a file another program wrote).</exception>
+    /// <exception cref="InvalidEncryptedFileException">
+    /// The padding is invalid (<see cref="InvalidEncryptedFileReason.Damaged"/>; only possible for a file another
+    /// program wrote).
+    /// </exception>
+    /// <remarks>
+    /// The runtime reports bad padding as a <see cref="CryptographicException"/>. It is wrapped here, at the one place
+    /// where its meaning is certain, so callers handle one documented type for "this file cannot be decrypted" instead
+    /// of catching a broad crypto exception that could also mean something else (Step 1.7).
+    /// </remarks>
     private static async Task WriteLastBlockAsync(Stream output, ICryptoTransform decryptor, CancellationToken cancellationToken)
     {
-        byte[] lastPlaintext = decryptor.TransformFinalBlock([], 0, 0);
+        byte[] lastPlaintext;
+        try
+        {
+            lastPlaintext = decryptor.TransformFinalBlock([], 0, 0);
+        }
+        catch (CryptographicException exception)
+        {
+            throw new InvalidEncryptedFileException(
+                "The authentication tag matched, but the last block has invalid padding.", InvalidEncryptedFileReason.Damaged, exception);
+        }
+
         try
         {
             await output.WriteAsync(lastPlaintext, cancellationToken).ConfigureAwait(false);

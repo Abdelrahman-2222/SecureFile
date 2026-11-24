@@ -93,6 +93,33 @@ internal static class KeyDerivation
     }
 
     /// <summary>
+    /// Rejects a password that <see cref="DeriveKeys"/> would refuse, so the service can do it at the call instead of
+    /// when the task is awaited (fail fast, ADR-13; Step 1.7).
+    /// </summary>
+    /// <param name="password">The password as typed.</param>
+    /// <exception cref="ArgumentNullException"><paramref name="password"/> is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">
+    /// <paramref name="password"/> is empty, or contains a lone surrogate (half of a character such as an emoji).
+    /// </exception>
+    /// <remarks>Complexity: O(p) time for p characters, O(1) space.</remarks>
+    internal static void ThrowIfInvalidPassword(string password)
+    {
+        ArgumentException.ThrowIfNullOrEmpty(password);
+
+        // Walk the text one Unicode character (Rune) at a time; a lone surrogate cannot be decoded.
+        ReadOnlySpan<char> rest = password;
+        while (!rest.IsEmpty)
+        {
+            if (Rune.DecodeFromUtf16(rest, out _, out int charsConsumed) != System.Buffers.OperationStatus.Done)
+            {
+                throw new ArgumentException("The password contains invalid Unicode text.", nameof(password));
+            }
+
+            rest = rest[charsConsumed..];
+        }
+    }
+
+    /// <summary>
     /// Converts a password to bytes the same way on every OS: Unicode normalisation form C (NFC), then strict UTF-8.
     /// </summary>
     /// <param name="password">The password as typed.</param>

@@ -32,6 +32,40 @@ file itself (wrong password, tampering, not our format).
    `TaskScheduler.UnobservedTaskException` (log, `SetObserved()`).
 4. A local log file records technical details without secrets.
 
+## Failure map (Step 1.7)
+
+Every failure in the test catalog (PROJECT_PLAN §9) ends in exactly one documented exception type. "At the call"
+means the method throws before it returns a task; "on await" means the task fails.
+
+| Failure (test catalog) | Exception from Core | When | Layer 2 message (ADR-13 table) | Proven by |
+|---|---|---|---|---|
+| Wrong password (T-05) | `AuthenticationFailedException` | on await, after the whole file was read; temp file deleted | "Wrong password, or the file was changed or damaged." | `DecryptAsync_WrongPassword_…` |
+| Ciphertext or tag changed (T-06) | `AuthenticationFailedException` | on await; temp file deleted | same | `DecryptAsync_OneBitFlipped_…` |
+| Header changed (T-06): magic / version / iterations | `InvalidEncryptedFileException` (`NotEncryptedFile` / `UnsupportedVersion` / `Damaged`) | on await, before any key or file | Reason-specific | `DecryptAsync_OneBitFlipped_…` |
+| Cut short or extended (T-07) | `InvalidEncryptedFileException(Damaged)` (length not whole blocks) or `AuthenticationFailedException` (whole blocks) | on await | "damaged or incomplete" / "wrong password or changed" | `DecryptAsync_FileCutShortOrExtended_…` |
+| Not our file, empty file, future version (T-08) | `InvalidEncryptedFileException` (Reason) | on await, before any key or file | Reason-specific | `DecryptAsync_ThreeByteTextFile_…`, header tests |
+| **Valid tag, invalid padding** (only a foreign writer that knows the password) | `InvalidEncryptedFileException(Damaged)`, inner `CryptographicException` | on await; temp file deleted | "damaged or incomplete" | `DecryptAsync_ValidTagButInvalidPadding_IsDamaged…` |
+| **File shrank while it was read** | `EndOfStreamException` (an `IOException`) | on await; temp file deleted | generic `IOException` text ("couldn't be read or written…") | `WriteDecryptedFileAsync_InputShorterThan…` |
+| Empty password (T-09) | `ArgumentException` | at the call | not reached: the Encrypt/Decrypt buttons are disabled without a password | `…_EmptyArguments_…` |
+| **Password with a lone surrogate** (T-09, cannot be typed) | `ArgumentException` (`password`) | **at the call** (was: on await, before Step 1.7) | not caught in Layer 2 (an `ArgumentException` is a programming error) → Layer 3 safety net; Step 1.8 adds a ViewModel check | `…_PasswordWithLoneSurrogate_…` |
+| Cancel (T-10) | `OperationCanceledException` | on await; temp file deleted | "Cancelled. No file was written." | `…_Cancelled…` |
+| No permission (T-22) | `UnauthorizedAccessException` | on await; nothing left behind | "Access … was denied" | `DecryptAsync_ExistingOutputIsReadOnlyOnWindows_…`, `…_OutputFolderIsReadOnlyOnLinuxOrMacOS_…` |
+| Disk full (T-23) | `IOException` (HResult `0x80070070` / `ENOSPC`) | on await; temp file emptied and deleted | "not enough free space" | cleanup: `AtomicFileWriter` writer-throws tests; message: `ErrorMessageProvider` tests; real disk: Stage 4 |
+| Input is a device or pipe (`CON`) | `NotSupportedException` | on await | "This item can't be opened as a file. Choose a regular file." | ViewModel error test |
+
+**Decision — wrap `CryptographicException`:** bad padding after a valid tag is reported as
+`InvalidEncryptedFileException(Damaged)` with the original as `InnerException`. *Why:* it is wrapped at the one line
+where its meaning is certain (the final block, after the tag check), so the ViewModel handles one documented Core type
+instead of catching the broad `CryptographicException`, which elsewhere could mean a platform crypto failure (a bug,
+which must reach Layer 3). *Alternative:* catch `CryptographicException` in the ViewModel — rejected, too broad.
+
+**Decision — keep `EndOfStreamException` as it is:** it already is an `IOException`, and the generic disk message is
+right for it (a file that shrinks while it is read is a drive or sync problem). No new type (YAGNI).
+
+**Decision — check the password's Unicode at the call:** the lone-surrogate `ArgumentException` used to arrive only
+when the task was awaited (it came from the key derivation on a thread-pool thread). It is now checked with the other
+arguments, so every invalid argument fails at the call, as the interface documents.
+
 ## Consequences
 
 - Every expected failure has a specific, tested message.

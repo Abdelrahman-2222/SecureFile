@@ -499,14 +499,18 @@ Each command (Browse, Encrypt, Decrypt) has one `try/catch` with **specific** ca
 | `AuthenticationFailedException` | "Wrong password, or the file was changed or damaged." |
 | `InvalidEncryptedFileException`, `Reason = NotEncryptedFile` | "This isn't a file encrypted by SecureFile. Choose a file that ends in .enc." |
 | `InvalidEncryptedFileException`, `Reason = UnsupportedVersion` | "This file was made by a newer version of SecureFile. Update the app to open it." |
-| `InvalidEncryptedFileException`, `Reason = Damaged` | "This encrypted file is damaged or incomplete, so it can't be decrypted." |
+| `InvalidEncryptedFileException`, `Reason = Damaged` (also: valid tag but invalid padding, wrapped in Core — Step 1.7) | "This encrypted file is damaged or incomplete, so it can't be decrypted." |
+| `NotSupportedException` (the input is a device or pipe, e.g. `CON`) | "This item can't be opened as a file. Choose a regular file." |
 | `FileNotFoundException` / `DirectoryNotFoundException` | "The file or folder can't be found or opened." |
 | `UnauthorizedAccessException` | "Access to this file or folder was denied. Choose another folder or check its permissions." |
 | `PathTooLongException` | "The path is too long. Choose a shorter folder or name." |
 | `IOException` — the output file already exists (the ViewModel asks *before* calling, so this is only the safety net) | "A file with this name already exists. Choose another name or confirm replacing it." |
 | `IOException` — disk full (Windows HResult `0x80070070`, `ENOSPC` on Linux/macOS) | "There is not enough free space to save the file. Free up space or choose another drive." |
 | `IOException` — file in use (sharing violation `0x80070020`) | "The file is being used by another program. Close it and try again." |
-| `IOException` (any other) | "The file couldn't be read or written. Check that the drive is still connected and try again." |
+| `IOException` (any other, incl. `EndOfStreamException`: the file shrank while it was read) | "The file couldn't be read or written. Check that the drive is still connected and try again." |
+| `ArgumentException` (programming error; the only user-reachable case, a password with a lone surrogate, is refused at the call — Step 1.7) | Not caught here → Layer 3. Step 1.8 adds a ViewModel password check. |
+
+The full failure map (test catalog → exception → message → test) is in [adr/0013-exception-handling.md](adr/0013-exception-handling.md#failure-map-step-17).
 
 Messages are **fixed, plain text** — never the raw .NET message (it is technical, English-only, and can contain full
 paths with the user name). The technical details go to the log. Messages say *"access was denied"*, not *"Windows…"*,
@@ -691,7 +695,7 @@ Why does Core not reference WPF? What does `TreatWarningsAsErrors` buy us?
 | 1.4 | AES-CBC check against NIST: prove we call `Aes` correctly. | NIST SP 800-38A F.2.5/F.2.6 (CBC-AES256) vectors pass (with `PaddingMode.None` for the vector). | 🟨 done — through the production factory (`AesCbc.CreateEncryptor/CreateDecryptor`), quality gate passed, mutation 100 % — self-check pending |
 | 1.5 | `FileEncryptionService.EncryptAsync` (§5.3): streaming, HMAC, progress, cancel, temp + move. | Round-trip tests at 0, 1, 15, 16, 17 bytes, 1 MiB ± 1; same input → different output each time. Keys: `using FileKeys keys = await Task.Run(() => KeyDerivation.DeriveKeys(password, header), ct);` (off the UI thread; pass the `string`, a span cannot be captured; Review Board 1.3, R9). | 🟨 done — golden file (Python + OpenSSL), chunked = one-call reference, short-read stream; `AtomicFileWriter` + `PercentageProgress` for 1.6; quality gate passed (Review Board: 1 High fixed, all Medium fixed or decided), mutation 100 % — self-check pending |
 | 1.6 | `FileEncryptionService.DecryptAsync` (§5.4): verify-then-commit. | Wrong password and every tamper/truncation case fail **and leave no output file**. Header read with `ReadAtLeast(buffer, 41, throwOnEndOfStream: false)` and only the bytes read passed to `EncryptedFileHeader.Read`, **before** `GetCiphertextLength` (Review Board 1.2, R1); tests: a 3-byte text file → `NotEncryptedFile`, an 80-byte file starting with `SFEN` → `Damaged`. Decrypt with our own `TransformBlock` loop and call `TransformFinalBlock` only after `FixedTimeEquals` succeeds (§5.4, Review Board 1.4, R1); test that chunked and one-call results are equal (R5). | 🟨 done — round trip at all boundaries, every tamper/truncation/wrong-password/cancel case leaves nothing; hidden decrypt temp file on Windows; `AuthenticationFailedException` pulled forward from 1.7 — self-check pending |
-| 1.7 | Error model (ADR-13 Layer 1): `AuthenticationFailedException` with the three standard constructors (`SecureFileException` and `InvalidEncryptedFileException` were pulled forward into Step 1.2). | Every failure in §9 maps to one exception type; tests prove no partial output. | ⬜ |
+| 1.7 | Error model (ADR-13 Layer 1): `AuthenticationFailedException` with the three standard constructors (`SecureFileException` and `InvalidEncryptedFileException` were pulled forward into Step 1.2). | Every failure in §9 maps to one exception type; tests prove no partial output. | ✅ done — failure map in ADR-13; bad padding after a valid tag wrapped as `InvalidEncryptedFileException(Damaged)`; lone-surrogate password refused at the call; T-22 tests added |
 | 1.8 | `PasswordStrengthEvaluator` (simple rules: length + character variety) and `PasswordGenerator` (`RandomNumberGenerator`). | Tests for empty, short, long, Unicode passwords. A maximum length (e.g. 1,024 characters, also `PasswordBox.MaxLength`) so a pasted 100 MB text cannot waste memory (Review Board 1.3, R5). | ⬜ |
 
 **Checkpoint 1:** What is an IV and why must it be random for CBC? Why a salt? Why 600,000 iterations,

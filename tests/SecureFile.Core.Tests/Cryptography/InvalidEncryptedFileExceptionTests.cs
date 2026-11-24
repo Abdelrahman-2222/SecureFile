@@ -48,6 +48,25 @@ public sealed class InvalidEncryptedFileExceptionTests
     }
 
     [Fact]
+    public void ReasonAndInnerExceptionConstructor_KeepsAllThree()
+    {
+        System.Security.Cryptography.CryptographicException cause = new("bad padding");
+
+        InvalidEncryptedFileException exception = new("bad file", InvalidEncryptedFileReason.Damaged, cause);
+
+        Assert.Equal("bad file", exception.Message);
+        Assert.Equal(InvalidEncryptedFileReason.Damaged, exception.Reason);
+        Assert.Same(cause, exception.InnerException);
+    }
+
+    [Fact]
+    public void ReasonAndInnerExceptionConstructor_UndefinedReason_ThrowsArgumentOutOfRangeException()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            "reason", () => new InvalidEncryptedFileException("bad file", (InvalidEncryptedFileReason)99, new IOException()));
+    }
+
+    [Fact]
     public void ReasonConstructor_UndefinedReason_ThrowsArgumentOutOfRangeException()
     {
         ArgumentOutOfRangeException exception = Assert.Throws<ArgumentOutOfRangeException>(

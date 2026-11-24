@@ -33,8 +33,8 @@ public interface IFileEncryptionService
     /// <exception cref="ArgumentNullException">A path or the password is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">
     /// A path is empty, the output names a folder or contains characters a file name cannot have, both paths name the
-    /// same file, or the password is empty. A password with invalid Unicode (a lone surrogate, which no keyboard can
-    /// produce) also gives an <see cref="ArgumentException"/>, but only when the task is awaited.
+    /// same file, the password is empty, or the password has invalid Unicode (a lone surrogate, which no keyboard can
+    /// produce).
     /// </exception>
     /// <exception cref="FileNotFoundException">The input file does not exist.</exception>
     /// <exception cref="DirectoryNotFoundException">The input file's folder or the output folder does not exist.</exception>
@@ -79,18 +79,17 @@ public interface IFileEncryptionService
     /// <exception cref="ArgumentNullException">A path or the password is <see langword="null"/>.</exception>
     /// <exception cref="ArgumentException">
     /// A path is empty, the output names a folder or contains characters a file name cannot have, both paths name the
-    /// same file, or the password is empty. A password with invalid Unicode (a lone surrogate, which no keyboard can
-    /// produce) also gives an <see cref="ArgumentException"/>, but only when the task is awaited.
+    /// same file, the password is empty, or the password has invalid Unicode (a lone surrogate, which no keyboard can
+    /// produce).
     /// </exception>
     /// <exception cref="InvalidEncryptedFileException">
     /// The input is not a SecureFile file, was made by a newer version, or is damaged or cut short
-    /// (<see cref="InvalidEncryptedFileException.Reason"/>). Thrown before any output is created.
+    /// (<see cref="InvalidEncryptedFileException.Reason"/>); thrown before any output is created. Also
+    /// <see cref="InvalidEncryptedFileReason.Damaged"/> when the tag matched but the padding is invalid (a file written by
+    /// another program that knows the password); the temp file is then deleted.
     /// </exception>
     /// <exception cref="AuthenticationFailedException">
     /// The password is wrong, or the file was changed or damaged after it was encrypted.
-    /// </exception>
-    /// <exception cref="System.Security.Cryptography.CryptographicException">
-    /// The tag matched but the padding is invalid: the file was written by another program that knows the password.
     /// </exception>
     /// <exception cref="FileNotFoundException">The input file does not exist.</exception>
     /// <exception cref="DirectoryNotFoundException">The input file's folder or the output folder does not exist.</exception>

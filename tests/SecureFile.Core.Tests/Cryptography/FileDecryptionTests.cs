@@ -234,7 +234,7 @@ public sealed class FileDecryptionTests : IDisposable
     }
 
     [Fact]
-    public async Task DecryptAsync_ValidTagButInvalidPadding_ThrowsCryptographicExceptionAndLeavesNothing()
+    public async Task DecryptAsync_ValidTagButInvalidPadding_IsDamagedAndLeavesNothing()
     {
         // Only a program that knows the password can make this: a correct tag over a last block whose padding is wrong.
         var header = EncryptedFileHeader.CreateNew(TestIterations);
@@ -247,10 +247,57 @@ public sealed class FileDecryptionTests : IDisposable
         byte[] authenticated = [.. headerBytes, .. ciphertext];
         string input = WriteFile(EncryptedName, [.. authenticated, .. HMACSHA256.HashData(keys.AuthenticationKey, authenticated)]);
 
-        await Assert.ThrowsAnyAsync<CryptographicException>(
+        InvalidEncryptedFileException thrown = await Assert.ThrowsAsync<InvalidEncryptedFileException>(
             () => _service.DecryptAsync(input, OutputPath(), Password, overwriteExisting: false, cancellationToken: Ct));
 
+        // Wrapped at the source (Step 1.7): one documented type for the caller, the runtime's error kept for the log.
+        Assert.Equal(InvalidEncryptedFileReason.Damaged, thrown.Reason);
+        Assert.IsAssignableFrom<CryptographicException>(thrown.InnerException);
         Assert.Equal([EncryptedName], FileNamesInFolder());
+    }
+
+    // ---- No permission (T-22): a clear error, nothing left behind ---------------------------------------------------
+
+    [Fact]
+    public async Task DecryptAsync_ExistingOutputIsReadOnlyOnWindows_ThrowsUnauthorizedAccessAndKeepsIt()
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "Only Windows refuses to replace a read-only file.");
+        string encrypted = await EncryptAsync([1, 2, 3]);
+        await File.WriteAllTextAsync(OutputPath(), "keep me", Ct);
+        File.SetAttributes(OutputPath(), FileAttributes.ReadOnly);
+        try
+        {
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(
+                () => _service.DecryptAsync(encrypted, OutputPath(), Password, overwriteExisting: true, cancellationToken: Ct));
+
+            Assert.Equal("keep me", await File.ReadAllTextAsync(OutputPath(), Ct));
+            Assert.Equal(["output.bin", EncryptedName], FileNamesInFolder()); // no temp file left
+        }
+        finally
+        {
+            File.SetAttributes(OutputPath(), FileAttributes.Normal); // so Dispose can delete the folder
+        }
+    }
+
+    [Fact]
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")] // for the analyzer (CA1416); the skip below keeps it off Windows
+    public async Task DecryptAsync_OutputFolderIsReadOnlyOnLinuxOrMacOS_ThrowsUnauthorizedAccessAndLeavesNothing()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Windows has no Unix folder mode; covered by the read-only file test.");
+        string encrypted = await EncryptAsync([1, 2, 3]);
+        DirectoryInfo readOnlyFolder = _folder.CreateSubdirectory("read-only");
+        readOnlyFolder.UnixFileMode = UnixFileMode.UserRead | UnixFileMode.UserExecute;
+        try
+        {
+            await Assert.ThrowsAsync<UnauthorizedAccessException>(
+                () => _service.DecryptAsync(encrypted, Path.Combine(readOnlyFolder.FullName, "out.bin"), Password, false, cancellationToken: Ct));
+
+            Assert.Empty(readOnlyFolder.GetFiles());
+        }
+        finally
+        {
+            readOnlyFolder.UnixFileMode = UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.UserExecute;
+        }
     }
 
     // ---- Cancel: nothing is left behind ----------------------------------------------------------------------------
@@ -306,6 +353,9 @@ public sealed class FileDecryptionTests : IDisposable
 
         string input = WriteFile(EncryptedName, [1]);
         Assert.Throws<ArgumentException>("outputFilePath", () => { _ = _service.DecryptAsync(input, input, Password, false, cancellationToken: Ct); });
+
+        // A lone surrogate is refused at the call too, like every other bad argument (Step 1.7), not only when awaited.
+        Assert.Throws<ArgumentException>("password", () => { _ = _service.DecryptAsync(input, "b", "abc\uD800", false, cancellationToken: Ct); });
     }
 
     [Fact]

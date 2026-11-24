@@ -58,6 +58,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Decryption reports invalid padding after a valid tag (only possible for a file another program wrote) as
+  `InvalidEncryptedFileException(Damaged)` with the original `CryptographicException` inside, so callers handle one
+  documented type (Step 1.7). New constructor `InvalidEncryptedFileException(message, reason, innerException)`.
+- A password with invalid Unicode (a lone surrogate) is now refused when `EncryptAsync`/`DecryptAsync` is called, like
+  every other invalid argument, instead of when the task is awaited.
+- ADR-13 has a failure map: every failure in the test catalog, its exception, its message and its test.
 - Test code is exempt from the "async methods end in Async" naming rule (test names follow
   `Method_Condition_Result`).
 - CI also runs on every push to `feature/**` branches (Ubuntu only there; macOS runs for pull requests, `main` and

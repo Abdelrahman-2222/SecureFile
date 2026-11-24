@@ -262,6 +262,14 @@ public sealed class FileEncryptionServiceTests : IDisposable
     }
 
     [Fact]
+    public void EncryptAsync_PasswordWithLoneSurrogate_ThrowsArgumentExceptionAtOnce()
+    {
+        // At the call, like every other bad argument, not only when the task is awaited (Step 1.7). Not [InlineData]:
+        // xUnit stores theory data as UTF-8, which would turn the lone surrogate into a valid character.
+        Assert.Throws<ArgumentException>("password", () => { _ = CreateService().EncryptAsync("in.bin", "out.enc", "abc\uD800", false, cancellationToken: Ct); });
+    }
+
+    [Fact]
     public void EncryptAsync_OutputIsTheInputWithDifferentCase_ThrowsArgumentException()
     {
         string input = WriteInput([1]);
