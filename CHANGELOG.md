@@ -18,7 +18,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - App icon (padlock) for the executable and both windows, and an About dialog (button or F1) that shows the version
   read from the assembly (`0.1.0`).
 - UI tests with FlaUI (`tests/SecureFile.Wpf.UiTests`): the real app encrypts and decrypts a file, shows the friendly
-  wrong-password message, and every control has an accessible name. They run only with `SECUREFILE_UI_TESTS=1`.
+  wrong-password message, every control has an accessible name, and the About dialog opens with F1. They run only
+  with `SECUREFILE_UI_TESTS=1`. Accessibility Insights automated checks on the window: 0 failures.
 - The wrong-password message now suggests checking Caps Lock, the keyboard language and spaces.
 - First integration test: the ViewModel with the real encryption service encrypts then decrypts a file; bytes equal.
 - File details for the selected file: name, extension, size in bytes, full path and last change time (UTC)

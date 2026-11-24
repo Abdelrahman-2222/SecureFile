@@ -7,11 +7,12 @@
         Width="800" Height="560"
         MinWidth="640" MinHeight="480"
         WindowStartupLocation="CenterScreen"
-        KeyDown="OnWindowKeyDown">
+        PreviewKeyDown="OnWindowKeyDown">
     <Window.InputBindings>
         <!-- Ctrl+O = Browse (PROJECT_PLAN §11.2). Enter in the password box runs the primary action (below). -->
         <KeyBinding Key="O" Modifiers="Control" Command="{Binding BrowseCommand}" />
-        <KeyBinding Key="Escape" Command="{Binding CancelCommand}" />    </Window.InputBindings>
+        <KeyBinding Key="Escape" Command="{Binding CancelCommand}" />
+    </Window.InputBindings>
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
         <!-- 4/8 px grid; 14 px body text; 40 px high main actions (PROJECT_PLAN §11.2). Colours and the Fluent theme come in 3.3. -->

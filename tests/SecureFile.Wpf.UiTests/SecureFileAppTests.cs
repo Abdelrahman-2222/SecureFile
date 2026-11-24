@@ -47,6 +47,7 @@ public sealed class SecureFileAppTests : IDisposable
         WaitForStatus(window, "Encrypted copy saved");
 
         ChooseFile(window, encrypted);
+        EnterPassword(window, "ui-test-pass"); // not relying on the password box keeping its text
         RunWithSaveDialog(window, "DecryptButton", restored);
         WaitForStatus(window, "Decrypted file saved");
 
@@ -92,12 +93,51 @@ public sealed class SecureFileAppTests : IDisposable
         }
     }
 
+    /// <summary>Closes the app (killing it if a dialog keeps it open) and removes the temp folder without hiding a test failure.</summary>
+    [Fact]
+    public void AboutDialog_OpensWithF1_ShowsTheVersionAndHasAccessibleControls()
+    {
+        Assert.SkipUnless(IsEnabled(), "Set SECUREFILE_UI_TESTS=1 to run the UI tests.");
+        Window window = StartApp();
+
+        window.SetForeground();
+        Keyboard.Press(VirtualKeyShort.F1);
+
+        Window[] dialogs = Retry.WhileEmpty(() => window.ModalWindows, Timeout, TimeSpan.FromMilliseconds(200)).Result ?? [];
+        Assert.True(dialogs.Length > 0, "The About dialog did not open.");
+        AutomationElement version = Find(dialogs[0], "AboutVersion");
+        Assert.StartsWith("Version ", version.Name, StringComparison.Ordinal);
+        AutomationElement[] buttons = dialogs[0].FindAllDescendants(cf => cf.ByControlType(ControlType.Button));
+        Assert.All(buttons, button => Assert.False(string.IsNullOrWhiteSpace(button.Name)));
+        Keyboard.Press(VirtualKeyShort.ESCAPE);
+    }
+
+    /// <summary>Closes the app (killing it if a dialog keeps it open) and removes the temp folder without hiding a test failure.</summary>
     public void Dispose()
     {
-        _app?.Close();
+        if (_app is not null)
+        {
+            if (!_app.Close())
+            {
+                _app.Kill();
+            }
+
+            _app.Dispose();
+        }
+
         _automation?.Dispose();
-        _app?.Dispose();
-        Directory.Delete(_folder, recursive: true);
+        try
+        {
+            Directory.Delete(_folder, recursive: true);
+        }
+        catch (IOException)
+        {
+            // A file may still be held for a moment; a leftover temp folder must not turn into a test failure.
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // Same: cleanup is best effort.
+        }
     }
 
     private static bool IsEnabled()
@@ -117,7 +157,8 @@ public sealed class SecureFileAppTests : IDisposable
             root = Path.GetDirectoryName(root) ?? throw new InvalidOperationException("Repository root not found.");
         }
 
-        return Path.Combine(root, "src", "SecureFile.Wpf", "bin", configuration, "net10.0-windows", "SecureFile.exe");
+        string exe = Path.Combine(root, "src", "SecureFile.Wpf", "bin", configuration, "net10.0-windows", "SecureFile.exe");
+        return File.Exists(exe) ? exe : throw new FileNotFoundException($"SecureFile.exe was not built at '{exe}'. Build the solution in the same configuration first.");
     }
 
     private Window StartApp()
@@ -160,21 +201,38 @@ public sealed class SecureFileAppTests : IDisposable
         TypeInDialog(window, outputPath);
     }
 
+    /// <summary>
+    /// Waits for the Open/Save dialog, brings it to the front, and only then types the path and Enter. If the dialog
+    /// never appears, the test fails at once instead of typing into the main window (where Enter and Esc have meaning).
+    /// </summary>
     private static void TypeInDialog(Window window, string path)
     {
-        Retry.WhileEmpty(() => window.ModalWindows, Timeout, TimeSpan.FromMilliseconds(200));
-        Thread.Sleep(500); // the dialog needs a moment before it accepts keys
+        Window[] dialogs = Retry.WhileEmpty(() => window.ModalWindows, Timeout, TimeSpan.FromMilliseconds(200)).Result ?? [];
+        Assert.True(dialogs.Length > 0, "The file dialog did not open within the time limit.");
+        Window dialog = dialogs[0];
+        dialog.SetForeground();
+        AutomationElement? fileNameBox = Retry.WhileNull(
+            () => dialog.FindFirstDescendant(cf => cf.ByControlType(ControlType.Edit)),
+            Timeout,
+            TimeSpan.FromMilliseconds(200)).Result;
+        Assert.NotNull(fileNameBox); // the dialog is ready for keys once its edit controls exist; it focuses the file name itself
         Keyboard.Type(path);
         Keyboard.Press(VirtualKeyShort.ENTER);
     }
 
+    /// <summary>Waits until the status text starts with the expected words; the element is looked up again each time.</summary>
     private static void WaitForStatus(Window window, string expectedStart)
     {
-        AutomationElement status = Find(window, "StatusMessage");
+        string last = string.Empty;
         RetryResult<bool> result = Retry.WhileFalse(
-            () => status.Name.StartsWith(expectedStart, StringComparison.Ordinal),
+            () =>
+            {
+                last = Find(window, "StatusMessage").Name;
+                return last.StartsWith(expectedStart, StringComparison.Ordinal);
+            },
             Timeout,
-            TimeSpan.FromMilliseconds(200));
-        Assert.True(result.Result, $"Expected the status to start with \"{expectedStart}\" but it was \"{status.Name}\".");
+            TimeSpan.FromMilliseconds(200),
+            ignoreException: true);
+        Assert.True(result.Result, $"Expected the status to start with \"{expectedStart}\" but it was \"{last}\".");
     }
 }

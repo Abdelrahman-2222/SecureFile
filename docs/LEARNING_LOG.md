@@ -1750,3 +1750,45 @@ Ctrl+Shift+F12: friendly dialog, app keeps running, exception line in the log: p
 3. Why are the safety nets registered before `base.OnStartup`, and when must the app close instead of continue?
 4. Why is `overwriteExisting: true` safe in the ViewModel?
 5. Why can `ResetAfterUnexpectedError` not simply set the state when an operation is Working?
+
+---
+
+## Stage 3 — WPF window (Steps 3.1–3.7) — 2026-11-24
+
+**Built.** Composition root and safety nets (3.1, in PR #1); layout following the UX flow (3.2); Fluent theme that follows
+Windows light/dark (3.3); drop a file, Ctrl+O, Enter, F1 (3.4); progress with speed and time left, Cancel (Esc), Open
+folder, locked inputs (3.5); padlock icon and About with the assembly version (3.6); FlaUI UI tests (3.7).
+
+**Decisions.** Speed and time left are computed in the ViewModel from percentage + file size + clock, so Core's API
+stays a plain `IProgress<int>`. `IFolderOpener` is its own small interface and returns `bool` (a file manager that will
+not start deserves a hint, not an error dialog). `Application.ThemeMode="System"` (experimental WPF0001, allowed on
+purpose) instead of hand-made colours. UI tests are skipped unless `SECUREFILE_UI_TESTS=1`: they take over the keyboard
+and need an unlocked desktop, so they are a local/manual check, not part of the gate or CI.
+
+**Review (Sonnet, §1.8 roles, Stage 3 diff).**
+
+| Finding | Severity | Action |
+|---|---|---|
+| UI tests typed into the main window if a dialog never opened | High | Fixed: assert the dialog exists, bring it to front, then type |
+| Typing was global input with no focus check | High | Mitigated: `SetForeground` + readiness wait (a UIA Value-pattern set was not used: the dialog's combo box does not support it) |
+| Dispose could throw or leave the app running | Medium | Fixed: kill if it will not close, best-effort folder delete |
+| Runner parallelism could break shared-keyboard tests | Medium | Fixed: `parallelizeTestCollections: false` |
+| `FindExe` gave a raw error, tests order-dependent | Medium | Fixed: clear message; password re-entered before decrypt |
+| UI tests never run in gate/CI | Medium | Accepted and documented (see above) |
+| F1 could be swallowed by a focused control | Low | Fixed: `PreviewKeyDown` |
+| About dialog had no test | Low | Fixed: new F1/About test |
+| Explorer argument string, XML docs on test helpers, About fixed width at large text scale | Low | Explorer remark added; others deferred |
+
+**Results.** Gate: build (warnings = errors) and 389 tests pass. UI tests: 4 pass locally (encrypt/decrypt round trip,
+wrong password, accessible names, About). Accessibility Insights FastPass, automated checks on the SecureFile window:
+**0 failures**. Not verified by hand: FastPass Tab Stops, Narrator, dark mode, 150%/200% scaling, a real drag-and-drop
+from Explorer, the Open folder click. Known flaky test (cleanup race, name saved in the project notes):
+`FileDecryptionTests.DecryptAsync_CancelledFromTheProgressReport_ThrowsAndLeavesNothing(length: 3145728)` failed once in
+`Dispose()` because a temp file was still open.
+
+**Questions to be able to answer.**
+1. Why compute speed and time left in the ViewModel instead of changing Core's progress API?
+2. Why does Cancel leave no output file? (Atomic write, ADR-07: temp file + move.)
+3. Why are the UI tests skipped by default, and what would it take to run them in CI?
+4. Why is `ResetAfterUnexpectedError` a no-op while an operation is running, yet the `finally` in `RunGuardedAsync` resets?
+5. What does "0 failures" in Accessibility Insights automated checks prove, and what does it not prove?
