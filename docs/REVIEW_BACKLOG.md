@@ -81,6 +81,10 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 | C10 | 2.5 coverage target (Presentation ≥ 85 %) has not been measured | Plan row 2.5 |
 | C11 | CLI: `tar.gz` archives built on Windows may not carry the executable bit (README tells users `chmod +x`); no `--quiet`/`--json` mode; no folder or multi-file support | CLI polish |
 | C12 | Original findings that stay as documented limits: no secure delete (SSDs cannot guarantee it); AES-CBC+HMAC format v1 only | See `docs/SUGGESTIONS.md` |
+| C14 | On Linux/macOS a directory symlink or case alias of the input can pass the same-file check and the rename replaces the input (Windows is safe) | Security review R2; needs a file-identity comparison (platform code) |
+| C15 | No deterministic test of `AtomicFileWriter.TryDeleteFile` retry; no Core test of the same-file branch of `ThrowIfOutputPathIsUnusable` | Security review R4 |
+| C16 | Windows temp file and result inherit the folder ACL; manifest does not state `requestedExecutionLevel asInvoker` | Security review R5, row 20 |
+| C17 | `--password-stdin` from Windows PowerShell 5.1 turns non-ASCII into `?`; the file is locked with a password nobody can retype | Security review R6: read stdin as UTF-8 bytes and document |
 | C13 | Encrypt/decrypt do not overlap CPU work with the final disk flush: 100 MB takes about CPU time + disk time (1.4 s) instead of the larger of the two (about 0.9 s on the HDD) | Measured in Step 5.1; fix means a write-behind or periodic flush in the crash-safe path, so it needs its own design and tests |
 
 ## D. How to burn this down
