@@ -41,7 +41,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
-- CI also runs on every push to `feature/**` branches; the gitleaks scan allows only the published NIST test key.
+- CI also runs on every push to `feature/**` branches (Ubuntu only there; macOS runs for pull requests, `main` and
+  manual runs); the gitleaks scan allows only the published NIST test key.
 - File details of a symbolic link now report the size and change time of the file it points to (Windows reported
   0 bytes); a link to a missing file is reported as not found.
 - File sizes below 1 KB use the culture's thousands separator (`1,023 bytes`).

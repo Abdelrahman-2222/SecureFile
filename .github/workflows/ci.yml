@@ -62,7 +62,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest]
+        # macOS minutes cost 10x on a private repo, so a push to a feature branch runs Ubuntu only. Pull requests,
+        # pushes to main and manual runs test both systems.
+        os: ${{ fromJSON(github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feature/') && '["ubuntu-latest"]' || '["ubuntu-latest", "macos-latest"]') }}
     runs-on: ${{ matrix.os }}
     steps:
       - name: Check out the code
