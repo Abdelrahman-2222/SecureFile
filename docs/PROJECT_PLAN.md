@@ -737,7 +737,7 @@ responsive during a 4 GB encryption? Why do sizes/spacing follow a 4/8 px grid?
 | Step | Goal | Done when | Status |
 |---|---|---|---|
 | 4.1 | Integration tests on the real file system (§9.2). | All pass. | ✅ |
-| 4.2 | Large-file runs: 1 GB and >4 GB (manual or nightly, not every commit). | Round-trip OK, memory stays flat. | ⬜ |
+| 4.2 | Large-file runs: 1 GB and >4 GB (manual or nightly, not every commit). | Round-trip OK, memory stays flat. | 🟡 1 GiB done (46 MB peak); 4.5 GiB blocked: Kaspersky kills the test exe (2026-11-24), rerun elsewhere |
 | 4.3 | `TESTPLAN.md` manual script + exploratory session. | Every item ticked, bugs fixed. | ⬜ |
 | 4.4 | Short usability check with 2–3 non-technical people (task success, time to first encryption; SUS questionnaire optional). | All complete the task unaided; findings fixed or recorded. | ⬜ |
 

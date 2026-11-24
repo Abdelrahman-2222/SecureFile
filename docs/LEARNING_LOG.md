@@ -1792,3 +1792,29 @@ from Explorer, the Open folder click. Known flaky test (cleanup race, name saved
 3. Why are the UI tests skipped by default, and what would it take to run them in CI?
 4. Why is `ResetAfterUnexpectedError` a no-op while an operation is running, yet the `finally` in `RunGuardedAsync` resets?
 5. What does "0 failures" in Accessibility Insights automated checks prove, and what does it not prove?
+
+## Stage 4 — testing
+
+### Step 4.2 — large-file runs (T-27), 2026-11-24
+
+Run with `scripts/large-file-check.ps1` (work folder on D:, deleted afterwards; the folder was empty at the end).
+
+| Size | Encrypt | Decrypt | Peak working set | Result |
+|---|---|---|---|---|
+| 1 GiB (1024 MB) | 10.6 s (96 MB/s) | 10.3 s (100 MB/s) | 46 MB | passed, hash equal, limit 400 MB |
+| 4.5 GiB (4608 MB) | not measured | not measured | not measured | **blocked** (see below) |
+
+**Finding: the 4.5 GiB run was blocked by antivirus, not by the app.** Kaspersky Premium's System Watcher flagged
+`SecureFile.Integration.Tests.exe` as `PDM:Trojan.Win32.Generic` about 35 s into the run, terminated the process
+(a behavioral heuristic: a program writing gigabytes of random data and then encrypting it looks like ransomware) and
+deleted the exe the first time. Two attempts gave the same result; both died while the 4.5 GiB file was being written
+(555 MB written in the first). The memory assertion never ran for this size, so nothing is known about the app's
+behavior above 4 GB yet. We could not add an exclusion, and we did not change the antivirus settings.
+
+**To do:** run the 4.5 GiB case on a machine or CI runner without this heuristic (or after the user excludes the test
+output folder), then fill in the row above.
+
+**Questions to be able to answer.**
+1. Why is the peak working set a valid proof that the file is streamed? (A loading version needs at least the file size.)
+2. Why is a 4.5 GiB file used and not 4 GiB? (More than 2^32 bytes, so any 32-bit size or offset breaks.)
+3. Why do we not raise the memory limit or skip the case silently when it cannot run?

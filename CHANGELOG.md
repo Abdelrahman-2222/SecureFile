@@ -20,6 +20,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Integration tests on real files (Step 4.1): overwrite replaces atomically, locked source, source deleted after
   selection, wrong password, plain text given to Decrypt, double encryption, and a committed golden `.enc` file that
   must always decrypt (protects the file format).
+- Opt-in large-file round trip (Step 4.2, `scripts/large-file-check.ps1`): 1 GiB passes with a 46 MB peak working
+  set; the 4.5 GiB case is still to be run on a machine whose antivirus does not stop the test program.
 - The pre-push hook now also refuses pushes straight to main, branch deletions and force-pushes (a local stand-in for
   branch protection, which GitHub does not enforce on private repositories without a paid plan).
 - UI tests with FlaUI (`tests/SecureFile.Wpf.UiTests`): the real app encrypts and decrypts a file, shows the friendly
