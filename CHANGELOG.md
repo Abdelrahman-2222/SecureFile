@@ -34,6 +34,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
   authentication keys. Temporary copies are pinned and wiped.
 - `FileKeys` (internal): holds the two keys and overwrites them with zeros when disposed.
 - Known-answer tests from RFC 7914 and RFC 5869, plus independently computed golden keys (accents, Arabic, emoji).
+- `AesCbc` (internal): creates the AES-256-CBC/PKCS7 encryptor and decryptor for a file's key and IV, with both
+  lengths checked; verified against NIST SP 800-38A F.2.5/F.2.6 and OpenSSL.
 
 ### Changed
 
@@ -41,6 +43,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
   0 bytes); a link to a missing file is reported as not found.
 - File sizes below 1 KB use the culture's thousands separator (`1,023 bytes`).
 - Architecture tests check referenced assemblies (UI frameworks, network) instead of namespace prefixes.
+- ADR-06 revised: file data is processed with our own `TransformBlock` loop instead of a decrypting `CryptoStream`,
+  so padding is only checked after the authentication tag matches.
 - Quality gate: multi-line pattern checks without comments, fail-closed coverage and git-grep handling, JSON-based
   vulnerability audit, broader secret patterns; commit-msg hook checks the whole first line and allows `fixup!`.
 - Solution `SecureFile.slnx` with projects `SecureFile.Core`, `SecureFile.Presentation`, `SecureFile.Wpf`
