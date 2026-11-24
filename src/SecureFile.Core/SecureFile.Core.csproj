@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Core: encryption, file format and file details. No UI references, so it runs on every OS. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>SecureFile.Core</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Lets the unit tests reach "internal" helpers without making them public. -->
+    <InternalsVisibleTo Include="SecureFile.Core.Tests" />
+  </ItemGroup>
+
+</Project>

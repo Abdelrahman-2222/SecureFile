@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Integration tests: real files in temporary folders (permissions, overwrite, cancel, golden files). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SecureFile.Core\SecureFile.Core.csproj" />
+  </ItemGroup>
+
+</Project>

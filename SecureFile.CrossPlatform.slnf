@@ -1,0 +1,13 @@
+{
+  "solution": {
+    "path": "SecureFile.slnx",
+    "projects": [
+      "src\\SecureFile.Core\\SecureFile.Core.csproj",
+      "src\\SecureFile.Presentation\\SecureFile.Presentation.csproj",
+      "tests\\SecureFile.Architecture.Tests\\SecureFile.Architecture.Tests.csproj",
+      "tests\\SecureFile.Core.Tests\\SecureFile.Core.Tests.csproj",
+      "tests\\SecureFile.Integration.Tests\\SecureFile.Integration.Tests.csproj",
+      "tests\\SecureFile.Presentation.Tests\\SecureFile.Presentation.Tests.csproj"
+    ]
+  }
+}

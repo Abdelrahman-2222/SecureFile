@@ -1,0 +1,33 @@
+<!--
+  Directory.Packages.props — Central Package Management.
+  Every NuGet package VERSION used anywhere in the solution is declared here, once.
+  Projects only say which package they use (<PackageReference Include="..."/>), never the version.
+  Benefit: no two projects can end up on different versions of the same package.
+-->
+<Project>
+
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <!-- Indirect (transitive) dependencies are also pinned to the versions listed here when they appear below. -->
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+
+  <!-- Application packages. -->
+  <ItemGroup>
+    <!-- MVVM helpers from Microsoft (ADR-08): ObservableObject, RelayCommand, source generators. -->
+    <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+  </ItemGroup>
+
+  <!-- Test packages. -->
+  <ItemGroup>
+    <!-- xUnit v3 test framework running on Microsoft.Testing.Platform (ADR-10). -->
+    <PackageVersion Include="xunit.v3.mtp-v2" Version="4.0.3" />
+    <!-- Microsoft code coverage for Microsoft.Testing.Platform (dotnet test - -coverage). -->
+    <PackageVersion Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.12.0" />
+    <!-- Architecture rules as unit tests, e.g. "Core must not reference WPF" (Phase 1 modularity). -->
+    <PackageVersion Include="NetArchTest.Rules" Version="1.3.2" />
+    <!-- Property-based testing: generates thousands of random inputs (Phase 2). -->
+    <PackageVersion Include="CsCheck" Version="5.0.1" />
+  </ItemGroup>
+
+</Project>

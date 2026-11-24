@@ -1,0 +1,13 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SecureFile.Core/SecureFile.Core.csproj" />
+    <Project Path="src/SecureFile.Presentation/SecureFile.Presentation.csproj" />
+    <Project Path="src/SecureFile.Wpf/SecureFile.Wpf.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SecureFile.Architecture.Tests/SecureFile.Architecture.Tests.csproj" />
+    <Project Path="tests/SecureFile.Core.Tests/SecureFile.Core.Tests.csproj" />
+    <Project Path="tests/SecureFile.Integration.Tests/SecureFile.Integration.Tests.csproj" />
+    <Project Path="tests/SecureFile.Presentation.Tests/SecureFile.Presentation.Tests.csproj" />
+  </Folder>
+</Solution>

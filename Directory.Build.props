@@ -1,0 +1,56 @@
+<!--
+  Directory.Build.props
+  MSBuild imports this file automatically into EVERY project below this folder.
+  Settings placed here apply to the whole solution, so each .csproj stays short
+  and no project can silently opt out of the quality rules.
+-->
+<Project>
+
+  <!-- Product information: stamped into every compiled assembly (file properties in Explorer). -->
+  <PropertyGroup>
+    <Product>SecureFile</Product>
+    <Company>Abdelrahman H. Atta</Company>
+    <Authors>Abdelrahman H. Atta</Authors>
+    <Copyright>Copyright © 2026 Abdelrahman H. Atta</Copyright>
+    <Version>0.1.0</Version>
+    <NeutralLanguage>en</NeutralLanguage>
+  </PropertyGroup>
+
+  <!-- C# language settings. -->
+  <PropertyGroup>
+    <!-- Use the newest C# version supported by the installed SDK. -->
+    <LangVersion>latest</LangVersion>
+    <!-- Nullable reference types: the compiler warns when a value might be null. -->
+    <Nullable>enable</Nullable>
+    <!-- Common namespaces (System, System.IO, ...) are imported automatically. -->
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <!-- Code quality and security analysis (Phase 1). -->
+  <PropertyGroup>
+    <!-- Turn on ALL built-in .NET analyzer rules, including the CA53xx security rules. -->
+    <AnalysisLevel>latest-all</AnalysisLevel>
+    <!-- Check the code-style rules from .editorconfig during every build, not only in the editor. -->
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <!-- Any warning stops the build, so problems are fixed immediately instead of piling up. -->
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <!-- Produce the XML documentation file; missing /// docs on public members become errors (CS1591). -->
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <!-- Build reproducibility. -->
+  <PropertyGroup>
+    <!-- Same source code always produces the same binary. -->
+    <Deterministic>true</Deterministic>
+    <!-- On GitHub Actions, normalise file paths inside the binaries (no local machine paths leak). -->
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <!-- NuGet security: check every package (including indirect ones) against known vulnerabilities on restore. -->
+  <PropertyGroup>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+  </PropertyGroup>
+
+</Project>

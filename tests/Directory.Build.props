@@ -1,0 +1,40 @@
+<!--
+  tests/Directory.Build.props
+  Extra settings shared by every test project.
+  MSBuild only picks the CLOSEST Directory.Build.props, so this file first imports the root one
+  (the line below) and then adds the test-only settings.
+-->
+<Project>
+
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <PropertyGroup>
+    <!-- xUnit v3 test projects are small executables that run their own tests. -->
+    <OutputType>Exe</OutputType>
+    <!-- Test projects are never published as NuGet packages. -->
+    <IsPackable>false</IsPackable>
+    <!--
+      CS1591: test classes do not need /// XML docs; a test's NAME is its documentation
+              (e.g. Decrypt_WithWrongPassword_ThrowsAuthenticationFailedException).
+      CA1707: allow underscores in test method names for that readable naming style.
+    -->
+    <NoWarn>$(NoWarn);CS1591;CA1707</NoWarn>
+    <!--
+      Exit code 8 = "zero tests ran". Ignored ONLY while the test projects are still empty (Stage 0).
+      Remove this line in Stage 1.1 when the first real tests are added.
+    -->
+    <TestingPlatformCommandLineArguments>$(TestingPlatformCommandLineArguments) --ignore-exit-code 8</TestingPlatformCommandLineArguments>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Every test file can use [Fact], [Theory], Assert, ... without a "using Xunit;" line. -->
+    <Using Include="Xunit" />
+    <Content Include="xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="xunit.v3.mtp-v2" />
+    <PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- The Windows desktop app (required track). net10.0-windows = .NET 10 plus Windows-only APIs such as WPF. -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>SecureFile.Wpf</RootNamespace>
+    <AssemblyName>SecureFile</AssemblyName>
+    <!-- Per-monitor DPI awareness and long-path support are declared in app.manifest. -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SecureFile.Presentation\SecureFile.Presentation.csproj" />
+    <ProjectReference Include="..\SecureFile.Core\SecureFile.Core.csproj" />
+  </ItemGroup>
+
+</Project>
