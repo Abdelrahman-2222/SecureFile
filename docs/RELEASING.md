@@ -23,8 +23,8 @@ pwsh scripts/publish-cli.ps1                   # command line for win-x64, linux
 | System | Window | Command line |
 |---|---|---|
 | Windows 10/11 x64 | `SecureFile-<v>-<label>-win-x64.zip` | `securefile-<v>-<label>-win-x64.zip` |
-| Linux x64 and arm64 | not built yet (Avalonia, plan Step 7.1) | `...-linux-x64.tar.gz`, `...-linux-arm64.tar.gz` |
-| macOS Apple silicon and Intel | not built yet (Avalonia, plan Step 7.1) | `...-osx-arm64.tar.gz`, `...-osx-x64.tar.gz` |
+| Linux x64 and arm64 | not built yet (Avalonia, plan Step 7.1) | built, **held back from releases** until the window exists (Steps 7.1 and 7.2) |
+| macOS Apple silicon and Intel | not built yet (Avalonia, plan Step 7.1) | built, **held back from releases** until the window exists (Steps 7.1 and 7.2) |
 
 Each script prints SHA-256 hashes (`artifacts/cli/SHA256SUMS.txt`, `artifacts/beta/*.sha256`). Send them with the files.
 None of the programs is code-signed or notarized yet, so Windows SmartScreen and macOS Gatekeeper warn; the READMEs inside
@@ -62,3 +62,9 @@ deleting the branch on the website. What exists instead:
 - The **tag** is a second pointer to the same commit, and a GitHub Release with the programs attached keeps the binaries.
 - To make it permanent: make the repository public, or upgrade the plan and add a branch ruleset for `release/*` that blocks
   deletion and force-pushes, and a tag ruleset for `v*`.
+
+## Release history
+
+| Release | Contents | Notes |
+|---|---|---|
+| `v0.1.0-beta1` (branch `release/v0.1.0-beta1`) | **Windows app only** (`SecureFile-0.1.0-beta1-win-x64.zip` and its SHA-256) | Decision of 2026-11-24: nothing for macOS and Linux is released until the desktop windows exist (plan Steps 7.1 and 7.2). The command-line archives were built and tried (Windows) but are not attached. The zip's README was reworded after the tag was cut (macOS/Linux row) and the zip rebuilt from the release branch; the program itself is the same. GitHub treats asset names as case-insensitive, so `SecureFile-...` and `securefile-...` zips cannot share a release: name command-line zips `securefile-cli-...`. |

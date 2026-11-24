@@ -115,6 +115,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
   systems. `scripts/publish-cli.ps1` builds self-contained, trimmed single-file archives (about 6 MB each) for win-x64,
   linux-x64, linux-arm64, osx-arm64 and osx-x64 with a `SHA256SUMS.txt`; `docs/CLI_README.md` ships inside each.
   Tests: `SecureFile.Cli.Tests` (39), also in the Ubuntu/macOS CI job.
+- Release `v0.1.0-beta1` (GitHub pre-release) contains the **Windows app only**; the command-line archives for Linux and macOS are not
+  released until the Avalonia windows exist (plan Steps 7.1 and 7.2). `docs/RELEASING.md` has the process and the history.
 - Review pass (product owner and tester review, see `docs/REVIEW_BACKLOG.md`): typed passwords no longer stay on screen after a  success with Show password on; closing the window during an operation asks first and cancels cleanly; the strength check  rates repeats, runs (`abcdefgh`, `12345678`) and common words (`Password1234`) as Weak; the confirm line prompts when empty,  and a mismatch is red; Cancel is a neutral message (no red banner, nothing logged); old progress text is cleared; a failed  Open folder keeps the success message; a `.enc` file with a damaged start explains itself and still allows Decrypt; focus  moves sensibly (Browse at start, password after a failure, Open folder after success); mnemonic Co_nfirm.
 - The confirm box, strength bar and the password warning appear only once a normal file is chosen (not with no file, not
   for an encrypted file); the strength and match texts are coloured to match their meaning; a visible password cannot be

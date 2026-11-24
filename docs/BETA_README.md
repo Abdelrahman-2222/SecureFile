@@ -21,11 +21,7 @@ completely on your computer and needs no internet.
 | Your computer | In this beta |
 |---|---|
 | **Windows 10 or 11, 64-bit** | **Ready.** Follow "How to run it" below. |
-| **macOS** and **Linux** | **Command-line version only for now** (`securefile`, see its own README and the `securefile-...` archive for your system). There is no window yet; a desktop version is planned. The encryption engine is tested on Ubuntu and macOS in the automated build, and files are interchangeable between all systems. |
-
-The command-line archives also contain their own README with the one-time steps (they are not signed yet): on a Mac, right-click the app,
-choose **Open**, then **Open** again (or run `xattr -d com.apple.quarantine <file>` in Terminal); on Linux, mark the file as
-executable (`chmod +x securefile`) and run it from a terminal.
+| **macOS** and **Linux** | **Not in this release.** A desktop version for both is planned as the next step (a window, like the Windows one). Tell me your system and I will send you the first build when it exists. Your opinion on the idea still helps. |
 
 ## How to run it
 
@@ -57,7 +53,7 @@ Please answer as honestly as you like, short answers are great. Reply to the per
 5. Did the password rules (8 characters, confirm box) feel right, too strict, or too loose?
 6. Would you use it for real files? What is missing?
 7. Your computer: Windows, macOS or Linux (and which version), screen size, light or dark mode; and what files you tried
-   (types and sizes). If you are on macOS or Linux, would you use a command-line version, or do you need a window?
+   (types and sizes). If you are on macOS or Linux: what would you need from a version for your system?
 8. A score from 1 (bad) to 10 (great), and one sentence why.
 
 Things I especially want to try: a very large file (over 1 GB), a file with an Arabic or emoji name, a USB stick or network
