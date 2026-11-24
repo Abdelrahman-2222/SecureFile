@@ -92,6 +92,7 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 | C15 | No deterministic test of `AtomicFileWriter.TryDeleteFile` retry; no Core test of the same-file branch of `ThrowIfOutputPathIsUnusable` | Security review R4 |
 | C16 | Windows temp file and result inherit the folder ACL; manifest does not state `requestedExecutionLevel asInvoker` | Security review R5, row 20 |
 | C17 | `--password-stdin` from Windows PowerShell 5.1 turns non-ASCII into `?`; the file is locked with a password nobody can retype | Security review R6: read stdin as UTF-8 bytes and document |
+| C18 | `MainViewModel` progress throttle is not testable at its 100 ms boundary (`Stopwatch` is not injectable); Stryker is not run on Presentation | Second review R4 |
 | C13 | Encrypt/decrypt do not overlap CPU work with the final disk flush: 100 MB takes about CPU time + disk time (1.4 s) instead of the larger of the two (about 0.9 s on the HDD) | Measured in Step 5.1; fix means a write-behind or periodic flush in the crash-safe path, so it needs its own design and tests |
 
 ## D. How to burn this down
@@ -101,3 +102,16 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 3. B3 with a person and a screen reader; C2, C6 and C8 need other people or other machines.
 4. B4 and C5, C7, C9 are decisions: write each into `docs/SUGGESTIONS.md` or an ADR before building.
 5. Finish by re-running an independent review (same brief as the first) and update the report with the new findings.
+
+## E. Second independent review (Step 5.6, product owner + tester, read-only, changed areas only)
+
+No High findings. Fixed straight away: **R1** (Medium: a failed Browse or drop kept the old file beside an error that did not
+name the new one; the message now reads `Couldn't open "x". ...`, test `OpenFile_BadDropAfterAGoodFile_KeepsThePreviousSelection`),
+**R3** (a trailing separator in `--output` is refused, test extended), **R6** (the 100 % mutation score now says how many
+mutants are disabled). Answered or recorded:
+
+| # | Sev | Finding | Decision |
+|---|---|---|---|
+| R2 | Low | Cancelling Save reset the state even after a success | Fixed: only a `Failed` state is reset (after a success the file is cleared, so the case cannot be reached from the screen) |
+| R4 | Low | The throttle test covers the first report, skipped reports and the 100 % bypass, not the 100 ms boundary, a second operation or a late report; `Stopwatch` is not injectable and Stryker runs only on Core | **Open (C18):** inject a `TimeProvider` into `MainViewModel`, add the three tests, consider Stryker on Presentation |
+| R5 | Info | The bar can lag a few percent during a long final flush | Accepted (cosmetic; 100 % is always shown) |

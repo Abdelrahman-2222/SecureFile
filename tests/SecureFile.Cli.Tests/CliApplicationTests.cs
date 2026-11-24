@@ -146,6 +146,8 @@ public sealed class CliApplicationTests : IDisposable
 
         Assert.Equal(ExitCodes.Failure, toFolder.Code);
         Assert.Contains("--output", toFolder.Err, StringComparison.Ordinal);
+        RunResult missingFolder = await RunAsync(["encrypt", original, "-o", Path.Combine(folder, "missing") + Path.DirectorySeparatorChar, "--password-stdin"], stdin: Phrase + "\n");
+        Assert.Equal(ExitCodes.Failure, missingFolder.Code); // a trailing separator means "a folder": there is no file name
         Assert.Equal(ExitCodes.Failure, badName.Code);
         Assert.Contains("not a valid file name", badName.Err, StringComparison.Ordinal);
     }

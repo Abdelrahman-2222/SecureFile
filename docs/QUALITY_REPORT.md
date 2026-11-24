@@ -141,7 +141,7 @@ from that folder: `dotnet dotnet-stryker -O ../../artifacts/stryker`; raw `docs/
 | Run | Tested | Killed | Survived | Score |
 |---|---|---|---|---|
 | First run of Stage 5 | 384 | 367 (+1 timeout) | 16 (+2 no coverage) | 95.34 % |
-| After this step | 379 | 378 (+1 timeout) | 0 | **100 %** (target >= 80 %) |
+| After this step | 379 (207 disabled not counted) | 378 (+1 timeout) | 0 | **100 %** of tested mutants (target >= 80 %) |
 
 The survivors, and what was done:
 - **Killed with new tests (13 of 19):** strength rating needs exactly three kinds (`aB3kqzvm` and two more), a run that
@@ -192,7 +192,7 @@ before the rename. That is now written down as "verify-then-commit"; an extra HM
 | 10 | Complexity / maintainability (5.3) | <= 10 / >= 60 | worst 7 / lowest 60 (Core) | Met |
 | 11 | Coverage Core (5.3) | >= 90 % lines, >= 85 % branches | 98.7 % / 98.6 % | Met |
 | 12 | Coverage Presentation (5.3) | >= 85 % | 95.8 % lines, about 91 % branches | Met |
-| 13 | Mutation score Core (5.3) | >= 80 % (goal 100 %) | 100 % (207 disabled mutants, each with a reason) | Met |
+| 13 | Mutation score Core (5.3) | >= 80 % (goal 100 %) | 100 % of the 379 tested mutants; 207 further mutants are disabled, each with a written reason (35 % of all 586 generated), one timeout counts as killed | Met |
 | 14 | NuGet vulnerabilities (5.4) | 0 | 0 | Met |
 | 15 | Analyzer warnings / secrets (5.4) | 0 | 0 / none | Met |
 | 16 | Threat model (5.4) | every threat has a mitigation or a stated limit | 20 threats, all covered | Met |

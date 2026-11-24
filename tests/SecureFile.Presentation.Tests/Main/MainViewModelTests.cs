@@ -424,7 +424,7 @@ public sealed class MainViewModelTests
 
         Assert.Equal(MainViewState.Failed, viewModel.State);
         Assert.Null(viewModel.SelectedFile);
-        Assert.Equal("The file or folder can't be found or opened.", viewModel.StatusMessage);
+        Assert.Equal("Couldn't open \"" + Path.GetFileName(InputPath) + "\". The file or folder can't be found or opened.", viewModel.StatusMessage);
         Assert.Single(_errorLog.Exceptions);
     }
 
@@ -438,6 +438,7 @@ public sealed class MainViewModelTests
 
         Assert.Equal(MainViewState.Failed, viewModel.State);
         Assert.Equal(InputPath, viewModel.SelectedFile?.FullPath); // the good file stays, with the message about the bad drop
+        Assert.Contains("\"gone.bin\"", viewModel.StatusMessage, StringComparison.Ordinal); // and the message names the bad one
         Assert.Equal(ValidPassword, viewModel.Password);
     }
 

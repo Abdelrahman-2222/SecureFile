@@ -48,6 +48,9 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>When (on <see cref="_operationClock"/>) the progress was last shown; used by the throttle.</summary>
     private TimeSpan _lastProgressUpdate;
 
+    /// <summary>The name of the file being read by Browse or drop; <see langword="null"/> when no read is running.</summary>
+    private string? _loadingFileName;
+
     /// <summary>Lets Cancel stop the running operation; <see langword="null"/> when none is running (a file read is not cancellable).</summary>
     private CancellationTokenSource? _operationCts;
 
@@ -271,7 +274,9 @@ public sealed partial class MainViewModel : ObservableObject
         ClearProgress();
         State = MainViewState.Working;
         StatusMessage = "Reading the file details…";
+        _loadingFileName = Path.GetFileName(path);
         SelectedFile = await Task.Run(() => _fileDetailsReader.Read(path)).ConfigureAwait(true);
+        _loadingFileName = null;
         State = MainViewState.FileSelected;
         StatusMessage = GuidanceMessage();
     }
@@ -523,7 +528,12 @@ public sealed partial class MainViewModel : ObservableObject
         _errorLog.Write(exception);
         ClearProgress();
         State = MainViewState.Failed;
-        StatusMessage = ErrorMessageProvider.GetMessage(exception);
+        string message = ErrorMessageProvider.GetMessage(exception);
+
+        // A failed Browse or drop leaves the previous file selected, so the message must name the file that failed
+        // (second review R1): otherwise the old card beside an unnamed error looks like the new file.
+        StatusMessage = _loadingFileName is null ? message : $"Couldn't open \"{_loadingFileName}\". {message}";
+        _loadingFileName = null;
     }
 
     /// <summary>The shared flow of Encrypt and Decrypt: ask where to save, run the operation, report the result.</summary>
@@ -725,7 +735,7 @@ public sealed partial class MainViewModel : ObservableObject
             return null;
         }
 
-        if (outputPath is null)
+        if (outputPath is null && State == MainViewState.Failed)
         {
             // Cancelling the Save dialog is the user's choice, not an error: an old red message from an earlier try must go
             // (backlog B1 item 20); the password and the file stay so a second try is one click.
