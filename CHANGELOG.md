@@ -96,7 +96,7 @@ and the project uses [Semantic Versioning](https://semver.org/).
   left is shown as "2 h 5 min" from one hour on.
 - Cancelling the Save dialog clears an old error message; a bad drop or Browse keeps the previous good file.
 - The command-line program refuses a folder or an invalid name as `--output` with a plain message instead of crashing.
-- Mutation score of Core is 100 % (13 new killing tests; 6 equivalent mutants disabled with reasons).
+- Mutation score of Core is 100 % (new killing tests; 7 equivalent or untestable mutants disabled with written reasons).
 - Found in the manual test run (Step 4.3): after a successful Encrypt or Decrypt the chosen file and the password are
   cleared (the result message and "Open folder" stay); the result is a green banner and an error a red one; the Save
   dialog's "Save as type" lists the file type and all files; a "Show password" check box reveals the typed password;

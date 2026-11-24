@@ -15,12 +15,13 @@
   Give up on one launch after this many seconds (default 20).
 #>
 param(
-    [string]$ExePath = 'src/SecureFile.Wpf/bin/Release/net10.0-windows/SecureFile.exe',
+    [string]$ExePath = (Join-Path (Split-Path $PSScriptRoot -Parent) 'src/SecureFile.Wpf/bin/Release/net10.0-windows/SecureFile.exe'),
     [int]$Runs = 10,
     [int]$TimeoutSeconds = 20
 )
 
 $ErrorActionPreference = 'Stop'
+if (-not (Test-Path $ExePath)) { throw "Not found: $ExePath. Build first: dotnet build SecureFile.slnx -c Release" }
 $exe = (Resolve-Path $ExePath).Path
 $times = New-Object System.Collections.Generic.List[double]
 

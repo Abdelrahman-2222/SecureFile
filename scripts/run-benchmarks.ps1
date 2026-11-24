@@ -36,4 +36,9 @@ try {
         Copy-Item -Destination $target -Force
     Write-Host "Results copied to $target"
 }
-finally { Pop-Location }
+finally {
+    Pop-Location
+    # If the benchmark process was killed (an antivirus can do that), its own clean-up never ran: remove what it left.
+    Get-ChildItem $env:SECUREFILE_BENCH_DIR -Directory -Filter 'SecureFile-bench-*' -ErrorAction SilentlyContinue |
+        Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
+}

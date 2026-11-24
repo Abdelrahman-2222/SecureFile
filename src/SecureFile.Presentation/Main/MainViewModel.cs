@@ -489,6 +489,9 @@ public sealed partial class MainViewModel : ObservableObject
         }
         finally
         {
+            // A read that ended in an exception nobody here catches must not leave its file name behind for the next failure.
+            _loadingFileName = null;
+
             // An unexpected exception (not caught above) ends the action while State is still Working; the global safety
             // net shows the dialog, and here the window is made usable again, because the operation is over.
             if (State == MainViewState.Working)

@@ -16,10 +16,11 @@
 param(
     [string]$WorkFolder = [IO.Path]::GetTempPath(),
     [int[]]$SizesMb = @(1, 100, 1024),
-    [string]$ExePath = 'src/SecureFile.Cli/bin/Release/net10.0/securefile.exe'
+    [string]$ExePath = (Join-Path (Split-Path $PSScriptRoot -Parent) 'src/SecureFile.Cli/bin/Release/net10.0/securefile.exe')
 )
 
 $ErrorActionPreference = 'Stop'
+if (-not (Test-Path $ExePath)) { throw "Not found: $ExePath. Build first: dotnet build SecureFile.slnx -c Release" }
 $exe = (Resolve-Path $ExePath).Path
 $work = Join-Path $WorkFolder ('SecureFile-mem-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force $work | Out-Null
@@ -37,7 +38,9 @@ function Invoke-Measured([string]$verb, [string]$file, [string]$output) {
     $stdout = $process.StandardOutput.ReadToEndAsync(); $stderr = $process.StandardError.ReadToEndAsync()
     $peak = 0
     while (-not $process.HasExited) {
-        $process.Refresh(); $peak = [math]::Max($peak, $process.PeakWorkingSet64); Start-Sleep -Milliseconds 20
+        try { $process.Refresh(); $peak = [math]::Max($peak, $process.PeakWorkingSet64) }
+        catch [System.InvalidOperationException] { break }   # the process ended between the check and the read
+        Start-Sleep -Milliseconds 20
     }
     $process.WaitForExit()
     if ($process.ExitCode -ne 0) { throw "$verb failed ($($process.ExitCode)): $($stderr.Result)" }

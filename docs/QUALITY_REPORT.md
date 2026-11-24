@@ -31,9 +31,9 @@ after 1 warm-up, work folder on the D: HDD). Raw output: `docs/quality/benchmark
 | 100 MB | 53 ms (1,880 MB/s) | 946 ms (106 MB/s) | 518 ms (193 MB/s) | 1,785 ms (56 MB/s) | 1,728 ms (58 MB/s) | 1,422 ms (70 MB/s) |
 | 1 GiB | not rerun here (switch `-Include1GB`); `large-file-check.ps1` earlier: 96 / 100 MB/s encrypt / decrypt, 46 MB peak | | | | | |
 
-**Key derivation** (PBKDF2-SHA256, 600,000 iterations + HKDF split): median 363.2 ms, p95 365.6 ms, 1.31 KB allocated.
+**Key derivation** (PBKDF2-SHA256, 600,000 iterations + HKDF split): median 363.9 ms, p95 374.6 ms (mean 365.3 ms), 1.31 KB allocated.
 
-**Allocations:** `Encrypt` allocates 6.5 KB for 1 MB and 21.5 KB for 100 MB, i.e. about 150 bytes per 1 MiB chunk
+**Allocations:** `Encrypt` allocates 6.5 KB for 1 MB and 21.5 KB for 100 MB, i.e. about 150 bytes per 1 MiB chunk (`Decrypt` stays flat at 6.7-6.9 KB)
 (async bookkeeping). No per-chunk buffer: one 1 MiB buffer is reused (a per-chunk buffer would show up as megabytes).
 
 **Verdicts**
@@ -50,7 +50,7 @@ after 1 warm-up, work folder on the D: HDD). Raw output: `docs/quality/benchmark
   speed, but adds complexity to the crash-safety path. Decision: not changed in Stage 5 (the plan says profile before
   changing, and the safety path must not be touched late); recorded as backlog item C13 in `REVIEW_BACKLOG.md`.
 - Decrypt shows the same shape (verify pass, then decrypt pass, then fsync).
-- Caveat: one machine, a spinning disk, Kaspersky scanning writes. On the NVMe the numbers would differ.
+- Caveat: one machine, a spinning disk, Kaspersky scanning writes. The 1 MB rows use one invocation per iteration (0.8-6 ms): their timings are noisy (see the error column); only the 100 MB rows carry the verdicts. On the NVMe the numbers would differ.
 
 ## 5.2 Startup, memory, UI
 
@@ -140,16 +140,16 @@ from that folder: `dotnet dotnet-stryker -O ../../artifacts/stryker`; raw `docs/
 
 | Run | Tested | Killed | Survived | Score |
 |---|---|---|---|---|
-| First run of Stage 5 | 384 | 367 (+1 timeout) | 16 (+2 no coverage) | 95.34 % |
+| First run of Stage 5 | 386 (384 reported by Stryker before 2 uncovered mutants) | 367 (+1 timeout) | 16 (+2 no coverage) | 95.34 % |
 | After this step | 379 (207 disabled not counted) | 378 (+1 timeout) | 0 | **100 %** of tested mutants (target >= 80 %) |
 
 The survivors, and what was done:
-- **Killed with new tests (13 of 19):** strength rating needs exactly three kinds (`aB3kqzvm` and two more), a run that
+- **Killed with new tests (12 of 19, 18 non-killed mutants plus the timeout):** strength rating needs exactly three kinds (`aB3kqzvm` and two more), a run that
   covers exactly half is predictable (`kqabcdeQ7z`), a zig-zag walk is not a run, four different characters repeated are
   predictable, an even number of one kind does not cancel it (the `|=` to `^=` mutant), every word of the common-word list
   is recognised (one theory case per word, 49 mutants), the padding error message, and a file another program holds open
   for writing is still recognised as encrypted.
-- **Disabled with `// Stryker disable once` and a written reason (6):** the retry loop bounds and the last pause in
+- **Disabled with `// Stryker disable once` and a written reason (7 comments, equivalent or not testable):** the retry loop bounds and the last pause in
   `AtomicFileWriter.TryDeleteFile` (only observable with a scanner that lets go at an exact moment; backlog C15), the
   `SetLength` failure branch in `TryEmpty`, the `UnauthorizedAccessException` branch of `StartsWithSignature` (needs a file
   that can be listed but not read), and `throwOnEndOfStream` (equivalent: `EndOfStreamException` is an `IOException`
@@ -181,7 +181,7 @@ before the rename. That is now written down as "verify-then-commit"; an extra HM
 | # | Metric (plan §8) | Target | Measured | Verdict |
 |---|---|---|---|---|
 | 1 | Throughput vs plain copy (5.1) | >= 70 % of a plain copy | 3 % of the OS-cache copy; 53 % of an fsync copy (66 % without the KDF) on a HDD | **Not met**; explained (copy measures RAM; encrypt = CPU time + disk time, no overlap); backlog C13 |
-| 2 | Key derivation p50 / p95 (5.1) | reported, about 0.3-1 s | 363 / 366 ms | Met |
+| 2 | Key derivation p50 / p95 (5.1) | reported, about 0.3-1 s | 364 / 375 ms | Met |
 | 3 | Allocations per operation (5.1) | no per-chunk buffer | about 150 B per 1 MiB chunk (bookkeeping), no buffer | Met |
 | 4 | Time to first window, warm (5.2) | < 0.5 s | 643 ms build, 707 ms published single file | **Not met** (+0.14 to +0.21 s) |
 | 5 | Time to first window, cold (5.2) | < 1.5 s | first run 1.86 s build, 2.64 s published; true cold after reboot not measured | **Not met / not measured** (user checklist) |

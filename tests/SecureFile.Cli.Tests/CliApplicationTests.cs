@@ -142,7 +142,9 @@ public sealed class CliApplicationTests : IDisposable
         string folder = Path.GetDirectoryName(original)!;
 
         RunResult toFolder = await RunAsync(["encrypt", original, "-o", folder, "--force", "--password-stdin"], stdin: Phrase + "\n");
-        RunResult badName = await RunAsync(["encrypt", original, "-o", Path.Combine(folder, "bad|name"), "--password-stdin"], stdin: Phrase + "\n");
+        // "|" is an invalid file-name character on Windows only; on Linux and macOS only "/" and NUL are, so use a NUL there.
+        string badFileName = OperatingSystem.IsWindows() ? "bad|name" : "bad\0name";
+        RunResult badName = await RunAsync(["encrypt", original, "-o", Path.Combine(folder, badFileName), "--password-stdin"], stdin: Phrase + "\n");
 
         Assert.Equal(ExitCodes.Failure, toFolder.Code);
         Assert.Contains("--output", toFolder.Err, StringComparison.Ordinal);
@@ -150,6 +152,7 @@ public sealed class CliApplicationTests : IDisposable
         Assert.Equal(ExitCodes.Failure, missingFolder.Code); // a trailing separator means "a folder": there is no file name
         Assert.Equal(ExitCodes.Failure, badName.Code);
         Assert.Contains("not a valid file name", badName.Err, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(folder, badFileName))); // nothing was created
     }
 
     [Fact]
