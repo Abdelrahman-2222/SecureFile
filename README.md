@@ -3,7 +3,7 @@
 A desktop application that encrypts and decrypts files with **AES-256-CBC**, built with **C# / .NET 10** and **WPF**.
 Files are protected with a password, and any tampering or wrong password is detected (HMAC-SHA256).
 
-> **Status:** 🚧 Stage 1 (Core library) in progress — Step 1.1 (file details) done and reviewed.
+> **Status:** 🚧 Stage 1 (Core library) in progress — Steps 1.1 (file details) and 1.2 (encrypted file header) done and reviewed.
 > See [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md).
 
 ## Features (planned for v1.0)

@@ -709,3 +709,279 @@ users create symbolic links in Developer Mode; GitHub's Windows, Linux and macOS
 4. Why do error messages show fixed text instead of the exception's own message?
 5. What is the trade-off in decrypting to a temp file in one pass, and how is the risk reduced?
 6. Why is "organise by feature" compatible with Interface Segregation and Dependency Inversion?
+
+## Step 1.2 — The encrypted file header (requirements R3, R4, D2) · 2026-11-24
+
+**Decision first:** you chose **"slice first"**. After Step 1.7 we build the thinnest app that really encrypts and
+decrypts a file end to end, before Step 1.8 and the UI polish (PROJECT_PLAN §7).
+
+### Lesson 1.2 — the concepts used in this step
+
+**1. What a file header is, and why we need one.**
+An encrypted file is unreadable bytes. To decrypt it later, the app must know *how* it was made: which method, how
+many password rounds, and the random values used. These go in a small, fixed block at the start of the file: the
+**header**. Ours is 41 bytes. *Analogy:* the label on a medicine bottle. The contents are useless if you don't know
+what they are and how to use them.
+
+**2. The signature (also called a "magic number").**
+The first 4 bytes are always the letters `SFEN` ("SecureFile ENcrypted"). Many formats do this: PDF files start with
+`%PDF` and ZIP files with `PK`. *Why:* in one fast check, without a password, the app can tell "this is our file"
+from "this is a photo". The UI will use it to suggest Decrypt or Encrypt (Step 2.4).
+
+**3. The version byte.**
+Byte 5 is the format version (`1`). If a future version changes the layout (for example to AES-GCM), it writes `2`.
+This app then says *"made by a newer version"* instead of producing garbage. *Why it matters:* without a version, a
+format can never change without breaking every old file.
+
+**4. Bytes, numbers and byte order (endianness).**
+A file holds bytes (0–255). The iteration count 600,000 needs 4 bytes. The order of those 4 bytes is called
+**endianness**. *Little-endian* puts the smallest part first: 600,000 = `0x000927C0` is stored as `C0 27 09 00`.
+We fix the order in the format and use `BinaryPrimitives.WriteInt32LittleEndian`, which writes the same bytes on
+every computer.
+- `BitConverter.GetBytes` uses the computer's own order. That is little-endian on today's PCs and Macs, but it is
+  not guaranteed by the format, and it allocates a new array every call. ❌
+- `BinaryWriter` needs a stream and is meant for writing many values to a stream. That is too heavy for 41 fixed bytes. ❌
+- `BinaryPrimitives` gives the exact byte order, works on a span, and allocates nothing. ✅
+
+**5. `Span<T>`, `ReadOnlySpan<T>`, `stackalloc`, `u8` and `ReadOnlyMemory<T>`.**
+- A **span** is a *window* onto existing memory, such as an array or part of one. Slicing it (`source[5..]` or
+  `source.Slice(9, 16)`) creates a new window onto the same bytes. Nothing is copied.
+- `ReadOnlySpan<byte>` is the same window, but read-only.
+- `stackalloc byte[16]` reserves 16 bytes on the *stack* (fast, temporary memory that is freed automatically when
+  the method ends). The garbage collector never sees it.
+- `"SFEN"u8` is a C# string written directly as UTF-8 bytes, stored inside the program. Reading it allocates nothing.
+- A span cannot be kept in a field or across an `await`. To keep bytes in an object, we store a private array and
+  hand out a **`ReadOnlyMemory<byte>`**: a read-only handle that *can* be stored and used in async code (needed in
+  Steps 1.5–1.6).
+
+**6. Salt and IV: random, unique, but not secret.**
+- **Salt** (16 bytes): mixed into the password-to-key function. The same password gives a *different* key for every
+  file, so an attacker cannot use one pre-computed table for everyone.
+- **IV** (initialisation vector, 16 bytes = one AES block): the random starting block for CBC mode. The same file
+  encrypted twice gives different output, so nobody can see that two files are the same.
+- Both are stored openly in the header. That is safe and standard: security depends only on the password and the
+  keys.
+- They come from **`RandomNumberGenerator`**, the operating system's cryptographic random generator. `System.Random`
+  is predictable (its output can be guessed) and is banned by our quality gate (G8) and by analyzer CA5394.
+
+**7. Untrusted input: "validate at the boundary".**
+When decrypting, the header comes from a file that anyone could have edited. So `Read` checks every value before
+using it:
+- **Iteration count range 100,000 to 10,000,000.** *Too high:* a crafted file with 2 billion rounds would freeze
+  the app for hours before the password could even be checked. This is a denial-of-service attack, and the upper
+  limit is the real protection. *Too low:* this app never writes fewer than 600,000, so a low value means damage or
+  another program wrote the file. Refusing it is a sanity check (defence in depth). It is **not** what protects
+  integrity: a tampered value would also fail the HMAC check (corrected after the Review Board, finding R3).
+- **The order of checks gives the most useful answer:** first "is it our file?" (signature), then "can this version
+  read it?" (version), then "are the values possible?" (length and range).
+- **Fail closed:** anything unexpected is rejected. Nothing is "guessed" or repaired.
+- *Is it safe to check before the password/HMAC check?* Yes. These checks look only at public, non-secret values,
+  and they only *reject*. A file that passes still has to pass the HMAC check (Step 1.6) before any output is kept.
+
+**8. Custom exceptions (Microsoft guidance) and the `Reason` value.**
+- Microsoft: create your own exception type **only when callers need to react differently**. Here, the UI must show
+  "this is not an encrypted file" instead of a generic disk error. So we create `InvalidEncryptedFileException`.
+- **The three standard constructors** (no arguments, a message, a message plus the inner exception) are expected
+  of every exception type. Analyzer CA1032 enforces them.
+- **One exception type with a `Reason` value, not three types:** the cause is the same ("this file can't be
+  accepted"), and only the *message* differs. One type plus an enum is simpler for the caller (one `catch`, then a
+  `switch`) than three types.
+- **`SecureFileException` is an `abstract` base:** it lets the command-line bonus catch "any SecureFile error" in
+  one place. It is abstract because "a SecureFile error" on its own describes nothing.
+- Both were planned for Step 1.7. They moved here because the header is their first user.
+
+**9. Immutability and the defensive copy.**
+The constructor *copies* the salt and IV (`salt.ToArray()`). If it only kept the caller's array, the caller could
+change it later. The bytes written to the file, the bytes in the HMAC, and the bytes used for the key could then
+differ: a hard-to-find bug. Copying 32 bytes is very cheap compared to the safety it buys.
+
+**10. `public` vs `internal`.**
+`internal` = visible only inside `SecureFile.Core`. The header is internal because only the encryption service
+(also in Core) uses it. The UI never needs it. A smaller public API means fewer things that can be misused and
+fewer things we must keep stable. The tests can still see internal types through `InternalsVisibleTo` (set up in
+Stage 0).
+
+**11. Three test techniques new in this step.**
+- **Golden bytes:** write a header with known values and compare it to an exact, hand-checked hex string. This
+  proves the byte order and the positions, and it fails if anyone changes the format by accident.
+- **Boundary values:** test exactly at each limit and one step past it (99,999 / 100,000 / 10,000,000 / 10,000,001).
+  Most bugs live at the edges (`>` written instead of `>=`).
+- **Fuzzing:** feed thousands of random byte arrays to `Read` and assert that it *only* ever returns a header or
+  throws our one documented exception. It must never crash with `IndexOutOfRangeException`. This is the
+  "impossible input" test that Phase 2 asks for.
+
+### Design review before coding (§1.10)
+
+| Principle | Answer for this step |
+|---|---|
+| Single responsibility | `EncryptedFileFormat` = *what the layout is* (constants and length rules). `EncryptedFileHeader` = *one header's values*, plus turning them into bytes and back. The exception = *how a rejection is reported*. |
+| Open/closed | A v2 format gets a new version number and its own reader. Version 1 code is not edited. |
+| DRY | Every size and offset is written once. Offsets are *calculated* from the previous field (`SaltOffset = IterationsOffset + sizeof(int)`), so they cannot disagree. |
+| KISS / YAGNI | No interface for the header: there is nothing to swap or fake. Pure byte work is tested directly. No `GetEncryptedLength` yet: Step 1.5 adds it when it needs it. |
+| Encapsulation | Private arrays exposed only as `ReadOnlyMemory<byte>`. The type is `internal`. |
+| Fail fast / secure by design | Guard clauses in the constructor; `Read` validates every value from the file. |
+| Algorithms and data structures | Fixed 41 bytes, so every operation is O(1) time and space. Spans avoid copies; `stackalloc` avoids heap memory. |
+| Pattern | **Factory method** (`CreateNew`, `Read`): each named way of creating a header has its own entry point and rules. |
+
+### Alternatives we compared
+
+| Choice | Alternative | Why ours |
+|---|---|---|
+| Binary header, fixed 41 bytes | JSON or text header | Binary is exact, compact and quick to validate. Text needs a parser, which means more code, more ways to fail and more attack surface. |
+| `BinaryPrimitives` (little-endian) | `BitConverter`, `BinaryWriter` | Fixed byte order on every OS and no allocation (see concept 4). |
+| `sealed class` with private arrays | `record`, `struct` | A `record` compares arrays by *reference*, so its equality would mislead. A `struct` holding arrays is copied by value but shares the arrays, which is confusing. A class with private copies is simple and safe. |
+| One exception + `Reason` enum | Three exception types; returning `bool` or `null` | One `catch` covers it, and the reason drives the message. Returning `null` loses *why*. "Is it our file?" without an exception is still available: `HasSignature`. |
+| Rejecting version 0 as *Damaged* | Treating every other version as "unsupported" | Version 0 was never written by any app. Telling the user to "update the app" would be wrong advice. |
+
+### Walkthrough — `src/SecureFile.Core/`
+
+**`SecureFileException.cs`**
+
+| Code | Meaning |
+|---|---|
+| `public abstract class SecureFileException : Exception` | The base of our own errors. `abstract` = cannot be created on its own, only through a concrete error type. |
+| `protected SecureFileException(...)` (3×) | The three standard constructors. `protected` because only derived types call them. |
+
+**`Cryptography/InvalidEncryptedFileReason.cs`**
+
+| Code | Meaning |
+|---|---|
+| `NotEncryptedFile = 0` | No signature. It is also the default when no reason is given (an enum's default is always its `0` value). |
+| `UnsupportedVersion = 1` | Made by a newer app. The user should update. |
+| `Damaged = 2` | Our file, but impossible values or cut short. |
+
+**`Cryptography/InvalidEncryptedFileException.cs`**
+
+| Code | Meaning |
+|---|---|
+| `public sealed class InvalidEncryptedFileException : SecureFileException` | The concrete error. `sealed`, like all Core classes. |
+| Three standard constructors | Required by convention and CA1032. They leave `Reason` at its default (`NotEncryptedFile`). |
+| `(string message, InvalidEncryptedFileReason reason)` | The constructor our code uses. |
+| `if (!Enum.IsDefined(reason)) throw …` | An enum can hold *any* number, for example `(InvalidEncryptedFileReason)99`. This guard stops a value no message exists for. |
+| `public InvalidEncryptedFileReason Reason { get; }` | Read-only: set once in the constructor. |
+
+**`Cryptography/EncryptedFileFormat.cs`**
+
+| Code | Meaning |
+|---|---|
+| `public const string FileExtension = ".enc";` | Public: the UI suggests `report.pdf.enc`. |
+| `internal const int VersionOffset = SignatureLength;` … | Each position is built from the one before it, so the layout reads like the table in §5.1. |
+| `internal const int HeaderLength = IvOffset + IvLength;` | = 25 + 16 = **41**. |
+| `internal const int MinimumFileLength = HeaderLength + AesBlockLength + AuthenticationTagLength;` | = 41 + 16 + 32 = **89**. An empty file still produces one 16-byte block, because PKCS7 padding always adds at least 1 byte. |
+| `internal static ReadOnlySpan<byte> Signature => "SFEN"u8;` | The 4 signature bytes, with no allocation. |
+| `HasSignature(...)`: `fileStart.StartsWith(Signature)` | Byte-by-byte comparison of the start. Returns `false` for data shorter than 4 bytes. It never throws. |
+| `iterations is >= MinimumIterations and <= MaximumIterations` | C# *pattern*: "between the two limits, both included". |
+| `GetCiphertextLength`: `encryptedFileLength - HeaderLength - AuthenticationTagLength` | What is left is the ciphertext. It must be at least one block and a whole number of 16-byte blocks. Otherwise the file was cut or extended. |
+| `long` everywhere for lengths | Files can be larger than 2 GB. `int` would overflow. |
+
+**`Cryptography/EncryptedFileHeader.cs`**
+
+| Code | Meaning |
+|---|---|
+| `internal sealed class EncryptedFileHeader` | Only Core uses it. |
+| `private readonly byte[] _salt; _iv;` | Our private copies. `readonly` = the field always points to the same array. |
+| `ArgumentOutOfRangeException.ThrowIfLessThan(iterations, …MinimumIterations)` / `ThrowIfGreaterThan` | .NET throw helpers. The parameter name `iterations` is filled in automatically. |
+| `RequireLength(salt, SaltLength, nameof(salt))` | A small helper used twice (salt, IV), so the rule is written once. |
+| `_salt = salt.ToArray();` | The defensive copy (concept 9). |
+| `public ReadOnlyMemory<byte> Salt => _salt;` | Read-only view of the copy. |
+| `CreateNew`: `stackalloc` + `RandomNumberGenerator.Fill` | Fresh cryptographic random salt and IV, in temporary stack memory. Then the constructor copies them and checks the iterations. |
+| `Read`: `if (!HasSignature(source)) throw … NotEncryptedFile` | Check 1: is it ours? |
+| `if (source.Length > VersionOffset) ThrowIfVersionIsNotCurrent(source[VersionOffset]);` | Check 2: the version, judged as soon as the byte exists. Even 5 bytes of a newer file give "newer version". |
+| `if (source.Length < HeaderLength) throw … Damaged` | Check 3: the whole header must be there. |
+| `BinaryPrimitives.ReadInt32LittleEndian(source[IterationsOffset..])` | Read 4 bytes as a number, smallest byte first. |
+| `if (!IsSupportedIterationCount(iterations)) throw … Damaged` | Check 4: refuse weak or denial-of-service counts. |
+| `return new EncryptedFileHeader(iterations, source.Slice(SaltOffset, SaltLength), …)` | Spans point into the input, and the constructor copies them. Validation was already done, so the constructor's guards cannot fail here. |
+| `WriteTo(Span<byte> destination)` | Checks there is room, then copies: signature, version, iterations (little-endian), salt, IV. It writes *into the caller's buffer* (no allocation). |
+| `ThrowIfVersionIsNotCurrent` | `> 1` → newer app (`UnsupportedVersion`). `< 1` (0) → never existed (`Damaged`). |
+
+### Walkthrough — the tests (`tests/SecureFile.Core.Tests/Cryptography/`)
+
+| Test | What it proves |
+|---|---|
+| `Layout_Version1_MatchesTheDocumentedFormat` / `Iterations_…` / `Signature_…` | Every format value is pinned. Changing one breaks old files, so it must fail a test. |
+| `HasSignature_VariousStarts_…` (7 rows) | Exact bytes at the very start: case-sensitive, never throws on short or empty data. |
+| `IsSupportedIterationCount_Boundaries_…` (9 rows) | Both limits and one past each, plus 0, -1, `int.MinValue`, `int.MaxValue`. |
+| `GetCiphertextLength_…` (11 rows + negative) | 89 → 16, two blocks, 1 MiB, 64 GiB (no `int` overflow). 0, 41, 73, 88, 90, 104 and `long.MaxValue` are rejected as *Damaged*. |
+| `WriteTo_KnownValues_ProducesExactlyTheDocumentedBytes` | **Golden bytes**: the exact 41-byte hex, including `C0 27 09 00` for 600,000. |
+| `Read_KnownBytes_…` / `Read_DataLongerThanHeader_…` | Reading the golden bytes gives back the values. Extra bytes after the header are ignored. |
+| `WriteTo_LargerDestination_…` / `WriteTo_DestinationTooShort_…` | Writes exactly 41 bytes. A short buffer is refused *before* anything is written. |
+| `CreateNew_TwoHeaders_…` | Salt and IV are random, filled, different each time, and different from each other. |
+| `Constructor_…` (limits, wrong salt or IV length, caller changes array) | Guard clauses and the defensive copy. |
+| `Read_NoSignature_…` (5) / `Read_NewerVersion_…` (2 + short data) / `Read_VersionZero_…` / `Read_HeaderCutShort_…` (4) / `Read_IterationsOutOfRange_…` (6) / `Read_IterationsAtLimits_…` | Every rejection reason, with the right `Reason` and a non-empty log message. |
+| `WriteThenRead_AnyValidValues_…` | Property test (2,000 random cases): writing then reading loses nothing. |
+| `Read_RandomBytes_…` / `Read_SignatureFollowedByRandomBytes_…` | **Fuzzing** (5,000 cases each): `Read` never fails in an undocumented way. |
+| `InvalidEncryptedFileExceptionTests` (7) | The standard constructors, the reason, the base type, and the guard against undefined reasons. |
+| `ReadThenWrite_AnyValidHeaderBytes_…` (added after review) | Property test (2,000 cases): reading valid bytes and writing them again gives **the same bytes**. The format is canonical, so the bytes the HMAC covers are exactly the header we use. |
+
+### Step 1.2 — Review Board report (2026-11-24)
+
+One reviewer agent covered all eight roles (§1.8). It read the code fresh, ran the tests, and mutated the code by
+hand (operators flipped, guards removed, IV fill removed). Every one of those hand mutations was caught by an
+existing test. **No High findings.**
+
+| ID | Role | Severity | Finding | Decision |
+|---|---|---|---|---|
+| R1 | Architect / QA | Medium | A trap for Step 1.6. If the decrypt service reads the header with `ReadExactly(41)`, a 3-byte text file gives a *disk error* (`EndOfStreamException`) instead of "not an encrypted file". Calling `GetCiphertextLength` first would also call a short `.txt` file "damaged". | **Fixed:** `Read`'s docs say how to call it (`ReadAtLeast(…, throwOnEndOfStream: false)`, and before `GetCiphertextLength`). The Step 1.6 row lists the two tests that prove it. |
+| R2 | PM / End user | Medium | The plan still showed one message for `InvalidEncryptedFileException`, and Step 1.7 still said it would create these types. | **Fixed:** ADR-13 has one message per `Reason`. The Step 1.7 row says what moved to Step 1.2. |
+| R3 | Security / Critic | Low | The reason given for the *minimum* iterations was overstated. A lowered count in a tampered file only produces a wrong key, and the HMAC then fails. | **Fixed:** the docs, §5.1 and lesson concept 7 now say "sanity check, defence in depth". The upper limit is the real protection (against denial of service). |
+| R4 | QA | Low | The tests proved write → read, but not read → write gives the same bytes. The HMAC design relies on that. | **Fixed:** new property test `ReadThenWrite_AnyValidHeaderBytes_GivesBackTheSameBytes`. |
+| R5 | QA | Low | The test docs cited catalog T-02 (round-trip sizes); the right IDs are T-06 to T-08. | **Fixed.** |
+| R6 | Critic | Low | The standard constructors leave `Reason` as `NotEncryptedFile` (the enum's `0` value). | **Kept:** CA1032 requires those constructors and CA1008 requires a `0` value. Our code always passes a reason. An extra `Unknown` value would be dead code. |
+| R7 | Critic | Low | `Enum.IsDefined` in an exception constructor is close to ceremony, because every caller passes a constant. | **Kept:** it costs one line and is tested. It stops a future `(Reason)99` from reaching the message mapper with no message. |
+| R8 | Architect | Note | `HasSignature` takes bytes, so the UI would have to read the file itself. | **Recorded** in the Step 2.4 row: a Core method takes the path, so the ViewModel never reads file bytes. |
+| R9–R13 | Several | Note | `ReadOnlyMemory` is right for an internal type. Everything is O(1). Checking the header before the HMAC is standard and unavoidable (the HMAC key needs the salt and iterations). The exception design follows Microsoft guidance. Version 0 → *Damaged* is sensible. | No change. These are good presentation material. |
+
+**Team Lead questions the reviewer would ask (with short answers):**
+1. *"You parse untrusted bytes before checking the MAC?"* There is no other way: the MAC key needs the salt and
+   iterations from that header. The parse is fixed-size and checks every length. It is fuzzed with 10,000 random
+   inputs, and only safe ranges are accepted. Anything tampered but in range is then rejected by the HMAC, which
+   covers all 41 header bytes. age, LUKS and WinZip-AES work the same way.
+2. *"Why cap iterations at 10 million?"* The key derivation runs before we know whether the file is genuine. Without
+   a cap, a crafted file could freeze the app for hours. 10M is about 17× our default: room to grow, but still only
+   seconds.
+3. *"Why a `Reason` instead of three exception classes?"* Microsoft: a new type only when the caller *handles* it
+   differently. Here the handling is the same (stop, write nothing) and only the message differs. .NET does the
+   same with `SocketException.SocketErrorCode`.
+4. *"How do you know old files will still open?"* The golden-bytes and layout tests pin every byte, and
+   `BinaryPrimitives` writes the same bytes on every OS. A new layout gets a new version byte.
+
+#### Complexity summary (G17)
+
+| Operation | Time | Space |
+|---|---|---|
+| `EncryptedFileFormat.HasSignature` / `IsSupportedIterationCount` / `GetCiphertextLength` | O(1) | O(1), no allocation |
+| `EncryptedFileHeader.CreateNew` | O(1): 32 random bytes | O(1): 32 stack bytes + the header (2 × 16-byte arrays) |
+| `EncryptedFileHeader.Read` | O(1): fixed 41 bytes, no copies except the two 16-byte arrays kept | O(1) |
+| `EncryptedFileHeader.WriteTo` | O(1): 41 bytes into the caller's buffer | O(1), no allocation |
+
+#### Quality gate — Step 1.2
+
+| # | Check | Result |
+|---|---|---|
+| G1 | Step 1.2 "Done when": round-trip, wrong magic, unknown version, iterations out of range, file too short | ✅ all tested, plus golden bytes and fuzzing |
+| G2–G3 | Format, build with all analyzers | ✅ 0 warnings |
+| G4 | Tests | ✅ 134 passed (80 new), 0 failed, 0 skipped |
+| G5 | Core coverage | ✅ 100 % lines, 100 % branches |
+| G6–G8 | Vulnerable packages, secrets, forbidden patterns | ✅ none / none / clean |
+| G9 | Exceptions documented, no secrets in messages (ADR-13) | ✅ every `throw` has an `<exception>` entry; messages hold only format facts |
+| G10 | Architecture | ✅ new classes are sealed, or the abstract base; no new references |
+| G11 | Complexity ≤ 10, Maintainability Index ≥ 60 | ✅ build-enforced |
+| G12 | Mutation score | ✅ **100 %** (64/64). The first run gave 95.3 %. 3 survivors replaced an argument exception's message with `""`. They survived because .NET adds *"(Parameter 'x')"*, so a blank message still looked non-empty. The tests now check that each message states the rule ("41 bytes", "exactly 16 bytes", "defined value"). |
+| G13 | Performance | ✅ fixed-size work, no allocation in `WriteTo` and the checks |
+| G14 | Docs | ✅ XML docs, CHANGELOG, plan status, this lesson |
+| G15 | Git | ✅ hooks + CI |
+| G16 | System design | ✅ Review Board (Architect) |
+| G17 | Complexity stated | ✅ `<remarks>` on every type, and the table above |
+| G18 | Review Board | ✅ 13 findings: 7 fixed or recorded, 6 notes |
+
+### Self-check 1.2 (open book)
+
+1. What is the signature (`SFEN`) for? Name two other file formats that use one.
+2. Why is the iteration count stored *little-endian*, and why `BinaryPrimitives` instead of `BitConverter`?
+3. The salt and IV are stored in plain view. Why is that safe? What would go wrong if the IV were always the same?
+4. Why is there an *upper* limit on the iteration count? Which attack does it stop?
+5. Why does `Read` check the version **before** the header length? Give the example.
+6. Why does the constructor copy the salt and IV instead of keeping the caller's arrays?
+7. Why one exception type with a `Reason`, and not three exception types?
+8. What does the fuzz test prove that the example tests cannot?
+9. Why did three mutants survive the first Stryker run, and how did the tests change?

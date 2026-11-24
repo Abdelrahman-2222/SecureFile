@@ -447,7 +447,7 @@ and never hides a real failure (no "swallowed" exceptions).
 |---|---|
 | Validate inputs first with throw helpers | `ArgumentNullException.ThrowIfNull`, `ArgumentException.ThrowIfNullOrWhiteSpace`, `ArgumentOutOfRangeException.ThrowIfNegative`… |
 | Use predefined exception types | `ArgumentException` family, `FileNotFoundException`, `IOException`, `InvalidOperationException`, `OperationCanceledException`. |
-| Custom exceptions only when the caller must react differently | `SecureFileException` (base) → `InvalidEncryptedFileException` (not our file / damaged header), `AuthenticationFailedException` (wrong password or tampered). Names end in `Exception`; the three standard constructors. (Step 1.7) |
+| Custom exceptions only when the caller must react differently | `SecureFileException` (base) → `InvalidEncryptedFileException` (not our file / damaged header), `AuthenticationFailedException` (wrong password or tampered). Names end in `Exception`; the three standard constructors. The base and `InvalidEncryptedFileException` (with a `Reason`: not our file / newer version / damaged) were built in Step 1.2; `AuthenticationFailedException` in Step 1.7. |
 | If you can't recover, don't catch | Core never catches `Exception`. It catches only to clean up and rethrow with `throw;` (keeps the stack trace). |
 | Clean up with `using` / `finally`; restore state | Streams in `using`; key buffers wiped in `finally`; temp file deleted on any failure → **no side effects after an exception** (ADR-07). |
 | Document every exception | `<exception cref="…">` on every public member (§1.4). |
@@ -462,7 +462,9 @@ Each command (Browse, Encrypt, Decrypt) has one `try/catch` with **specific** ca
 |---|---|
 | `OperationCanceledException` | "Cancelled. No file was written." |
 | `AuthenticationFailedException` | "Wrong password, or the file was changed or damaged." |
-| `InvalidEncryptedFileException` | "This is not a SecureFile encrypted file, or it is damaged." |
+| `InvalidEncryptedFileException`, `Reason = NotEncryptedFile` | "This isn't a file encrypted by SecureFile. Choose a file that ends in .enc." |
+| `InvalidEncryptedFileException`, `Reason = UnsupportedVersion` | "This file was made by a newer version of SecureFile. Update the app to open it." |
+| `InvalidEncryptedFileException`, `Reason = Damaged` | "This encrypted file is damaged or incomplete, so it can't be decrypted." |
 | `FileNotFoundException` / `DirectoryNotFoundException` | "The file or folder can't be found or opened." |
 | `UnauthorizedAccessException` | "Access to this file or folder was denied. Choose another folder or check its permissions." |
 | `PathTooLongException` | "The path is too long. Choose a shorter folder or name." |
@@ -514,7 +516,7 @@ All numbers are **little-endian** (written with `BinaryPrimitives`, so the file 
 |---:|---:|---|---|
 | 0 | 4 | `Magic` | ASCII `SFEN` — "this is our file" |
 | 4 | 1 | `FormatVersion` | `1` = PBKDF2-SHA256 → HKDF → AES-256-CBC/PKCS7 + HMAC-SHA256 |
-| 5 | 4 | `Pbkdf2Iterations` | 600,000 when writing (OWASP Password Storage Cheat Sheet: *"PBKDF2-HMAC-SHA256: 600,000 iterations"*, verified 2026-11-24). On read it must be between **100,000** and **10,000,000**: lower values are refused as too weak (a tampered header must not force a weak key), higher values are refused so a crafted file cannot freeze the app for minutes (denial of service). |
+| 5 | 4 | `Pbkdf2Iterations` | 600,000 when writing (OWASP Password Storage Cheat Sheet: *"PBKDF2-HMAC-SHA256: 600,000 iterations"*, verified 2026-11-24). On read it must be between **100,000** and **10,000,000**: lower values are refused because this app never writes them, so they mean damage or a foreign writer (defence in depth: a tampered value would also fail the HMAC check, so this is a sanity check, not the integrity control), higher values are refused so a crafted file cannot freeze the app for minutes (denial of service). |
 | 9 | 16 | `Salt` | random per file; makes the same password give a different key per file |
 | 25 | 16 | `Iv` | random per file; the CBC starting block |
 | 41 | n | `Ciphertext` | AES-256-CBC output; n is a multiple of 16 and at least 16 |
@@ -614,7 +616,11 @@ track**, with the bonus (Stage 7) after that. To keep the required app safe what
 
 - the automated gate runs on every commit; the full Review Board runs per step but in a lighter form for very small steps;
 - a working **end-to-end vertical slice** (Core crypto → minimal ViewModel → plain window that encrypts and decrypts)
-  is the first milestone after Step 1.7, before any UI polish (decision pending — see §19);
+  is the first milestone after Step 1.7, before any UI polish (**decided 2026-11-24: slice first**). The slice is
+  Steps 1.2–1.7 → 2.1–2.3 and 2.6 in their simplest form → 3.1 with a plain window (pick file, password, Encrypt,
+  Decrypt, message). Only when it encrypts and decrypts a real file end to end do we continue with Step 1.8, 2.4–2.5
+  and the Stage 3 UI polish. *Why:* the riskiest parts (crypto, file I/O, error handling, wiring) are proven together
+  early, and a working app exists at every point after that;
 - items marked *Could* (§13) are time-boxed and are the first to be cut.
 
 ### Stage 0 — Setup (Phase 1 tooling) · ~½ day
@@ -638,12 +644,12 @@ Why does Core not reference WPF? What does `TreatWarningsAsErrors` buy us?
 | Step | Goal | Done when | Status |
 |---|---|---|---|
 | 1.1 | `FileDetails` (name, size in bytes, extension, last modified) + `FileSizeFormatter` (`1.5 MB`). | Unit tests for 0 B, 1023 B, 1 KB, >4 GB, no extension, `.tar.gz`, `.bashrc`. | 🟨 done — quality gate passed (G1–G15, mutation 100 %) — self-check pending |
-| 1.2 | `EncryptedFileFormat` constants + `EncryptedFileHeader` (write/read/validate). | Tests: round-trip, wrong magic, unknown version, iterations out of range, file too short. | ⬜ |
+| 1.2 | `EncryptedFileFormat` constants + `EncryptedFileHeader` (write/read/validate). | Tests: round-trip, wrong magic, unknown version, iterations out of range, file too short. | 🟨 done — quality gate passed (Review Board: 0 High, 2 Medium fixed), mutation 100 % — self-check pending |
 | 1.3 | `KeyDerivation`: PBKDF2 → HKDF (§5.2), NFC normalization, key wiping. | Known-answer tests: RFC 7914 §11 (PBKDF2-HMAC-SHA256), RFC 5869 test case 1 (HKDF-SHA256). | ⬜ |
 | 1.4 | AES-CBC check against NIST: prove we call `Aes` correctly. | NIST SP 800-38A F.2.5/F.2.6 (CBC-AES256) vectors pass (with `PaddingMode.None` for the vector). | ⬜ |
 | 1.5 | `FileEncryptionService.EncryptAsync` (§5.3): streaming, HMAC, progress, cancel, temp + move. | Round-trip tests at 0, 1, 15, 16, 17 bytes, 1 MiB ± 1; same input → different output each time. | ⬜ |
-| 1.6 | `FileEncryptionService.DecryptAsync` (§5.4): verify-then-commit. | Wrong password and every tamper/truncation case fail **and leave no output file**. | ⬜ |
-| 1.7 | Error model (ADR-13 Layer 1): `SecureFileException` + `InvalidEncryptedFileException`, `AuthenticationFailedException` with the three standard constructors. | Every failure in §9 maps to one exception type; tests prove no partial output. | ⬜ |
+| 1.6 | `FileEncryptionService.DecryptAsync` (§5.4): verify-then-commit. | Wrong password and every tamper/truncation case fail **and leave no output file**. Header read with `ReadAtLeast(buffer, 41, throwOnEndOfStream: false)` and only the bytes read passed to `EncryptedFileHeader.Read`, **before** `GetCiphertextLength` (Review Board 1.2, R1); tests: a 3-byte text file → `NotEncryptedFile`, an 80-byte file starting with `SFEN` → `Damaged`. | ⬜ |
+| 1.7 | Error model (ADR-13 Layer 1): `AuthenticationFailedException` with the three standard constructors (`SecureFileException` and `InvalidEncryptedFileException` were pulled forward into Step 1.2). | Every failure in §9 maps to one exception type; tests prove no partial output. | ⬜ |
 | 1.8 | `PasswordStrengthEvaluator` (simple rules: length + character variety) and `PasswordGenerator` (`RandomNumberGenerator`). | Tests for empty, short, long, Unicode passwords. | ⬜ |
 
 **Checkpoint 1:** What is an IV and why must it be random for CBC? Why a salt? Why 600,000 iterations,
@@ -658,7 +664,7 @@ Why `FixedTimeEquals` instead of `==`? Why HKDF instead of 64 bytes from PBKDF2?
 | 2.1 | Service interfaces: `IFileDialogService`, `IMessageService`, `IShellService` (open folder), `IClipboardService`. | Interfaces documented. | ⬜ |
 | 2.2 | `MainViewModel` with clear states: *No file → File selected → Working → Succeeded / Failed*. | State diagram in `LEARNING_LOG.md`. | ⬜ |
 | 2.3 | Commands: Browse, Encrypt, Decrypt, Cancel, Generate password, Open folder; `CanExecute` rules. | Buttons enable/disable correctly in tests. | ⬜ |
-| 2.4 | Auto-detect: if the file starts with `SFEN`, suggest Decrypt; otherwise Encrypt. | Tests for both cases. | ⬜ |
+| 2.4 | Auto-detect: if the file starts with `SFEN`, suggest Decrypt; otherwise Encrypt. A small Core method takes the path and returns `true`/`false` (built on `EncryptedFileFormat.HasSignature`), so the ViewModel never reads file bytes itself (Review Board 1.2, R8). | Tests for both cases. | ⬜ |
 | 2.5 | ViewModel tests with fake services (no window needed). | Presentation coverage ≥ 85%. | ⬜ |
 | 2.6 | `ErrorMessageProvider` + per-command `try/catch` with specific catches (ADR-13 Layer 2). | Every exception in the ADR-13 table gives its message; unexpected exceptions are **not** caught here. | ⬜ |
 
@@ -1136,3 +1142,5 @@ whether the WPF Fluent `ThemeMode` API is still marked experimental in .NET 10, 
 | 2026-11-24 | Step 1.1 | FileDetails, IFileDetailsReader, FileDetailsReader, FileSizeFormatter + 31 tests (incl. property-based), 100 % coverage. Style rules refined: interface members, static readonly naming. |
 | 2026-11-24 | Step 1.1 revision | ADR-13 exception strategy; quality gate §1.7 with verify.ps1, Git hooks, metric limits (CA1502/CA1505), architecture tests; Stryker mutation score 100 %. |
 | 2026-11-24 | Step 1.1 Review Board | 3 reviewer agents, 48 findings fixed or recorded; §1.8–1.10 principles, ADR-14, honest re-baseline; symlink support; CI runs the gate + gitleaks. Gate passed, mutation 100 %. |
+| 2026-11-24 | Decision | Vertical slice first: after Step 1.7, build the thinnest end-to-end app before Step 1.8 and UI polish (§7). |
+| 2026-11-24 | Step 1.2 | Encrypted file header: format constants, header write/read/validate, `SecureFileException` + `InvalidEncryptedFileException` (with `Reason`), 80 tests incl. golden bytes and fuzzing. Review Board: 0 High, 2 Medium + 3 Low fixed. Gate passed. |
