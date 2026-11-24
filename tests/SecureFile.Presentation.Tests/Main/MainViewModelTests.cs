@@ -119,6 +119,17 @@ public sealed class MainViewModelTests
         Assert.StartsWith(expectedStart, viewModel.PasswordHint, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("report.pdf", true)]
+    [InlineData("report.pdf.enc", false)]
+    public async Task IsEncryptOffered_IsOffForAnAlreadyEncryptedFile(string name, bool expected)
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(Path.Combine(Path.GetTempPath(), name));
+
+        Assert.Equal(expected, viewModel.IsEncryptOffered);
+        Assert.True(viewModel.EncryptCommand.CanExecute(null)); // the command itself stays available (T-26)
+    }
+
     [Fact]
     public async Task Encrypt_OnFailure_KeepsFileAndPasswordAndMarksTheMessageAsFailed()
     {

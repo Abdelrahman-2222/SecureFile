@@ -28,7 +28,7 @@ Result column: ✅ pass · ❌ fail (write the bug id) · ➖ not applicable.
 | A9 | Repeat with `عربي.txt` and with `with spaces and (brackets).txt`. | Names are shown correctly; round trip works. | |
 | A10 | Decrypt with a wrong passphrase. | Plain message ("wrong password or damaged file"), no output file, no crash, app stays usable. | |
 | A11 | Encrypt when the output file already exists. | The app asks before replacing; "No" keeps the old file; "Yes" replaces it. | |
-| A12 | Encrypt the `.enc` file again, then decrypt twice. | Allowed; two decryptions give back the original (T-26). | |
+| A12 | Select a `.enc` file and look at the buttons. | Encrypt is greyed out (tooltip explains), Decrypt works; double encryption is covered by the integration test (T-26). | |
 
 ## B. Keyboard only (T-41) — do not touch the mouse
 

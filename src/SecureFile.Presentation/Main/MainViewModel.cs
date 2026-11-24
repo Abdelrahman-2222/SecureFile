@@ -79,9 +79,17 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Gets the details of the chosen file, or <see langword="null"/> when no file is chosen.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(FileSummary), nameof(PasswordHint))]
+    [NotifyPropertyChangedFor(nameof(FileSummary), nameof(PasswordHint), nameof(IsEncryptOffered))]
     [NotifyCanExecuteChangedFor(nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand))]
     public partial FileDetails? SelectedFile { get; private set; }
+
+    /// <summary>Gets a value indicating whether the window offers the Encrypt button: not for a file that is already encrypted.</summary>
+    /// <remarks>
+    /// Only the button is switched off; the command itself still works, because encrypting an encrypted file is
+    /// allowed by the design (T-26) and is tested through the command. Decrypt stays on for every file, so a renamed
+    /// encrypted file can still be opened.
+    /// </remarks>
+    public bool IsEncryptOffered => !IsEncryptedFileSelected();
 
     /// <summary>Gets the note under the password box: a warning when a password is being chosen, a reminder when decrypting.</summary>
     /// <remarks>
