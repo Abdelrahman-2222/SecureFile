@@ -434,6 +434,27 @@ public sealed class MainViewModelTests
         Assert.True(viewModel.EncryptCommand.CanExecute(null));
     }
 
+    [Fact]
+    public async Task Progress_ManyReportsInstantly_ShowsTheFirstAndAlwaysTheFinalOne()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        _dialogs.SaveResult = InputPath + ".enc";
+        var release = new TaskCompletionSource();
+        _encryption.WaitFor = release.Task;
+        Task running = viewModel.EncryptCommand.ExecuteAsync(null);
+
+        viewModel.OnProgress(5);
+        viewModel.OnProgress(6); // less than 100 ms later: skipped
+        viewModel.OnProgress(7);
+        Assert.Equal(5, viewModel.ProgressPercentage);
+
+        viewModel.OnProgress(100); // the end is never skipped
+        Assert.Equal(100, viewModel.ProgressPercentage);
+
+        release.SetResult();
+        await running;
+    }
+
     // ---- Cancel, Open folder, locked inputs (Step 3.5) -------------------------------------------------------------
 
     [Fact]

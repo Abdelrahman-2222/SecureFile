@@ -39,6 +39,15 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly IFolderOpener _folderOpener;
     private readonly Stopwatch _operationClock = new();
 
+    /// <summary>The shortest time between two screen updates of the progress bar (10 per second).</summary>
+    private static readonly TimeSpan MinimumProgressInterval = TimeSpan.FromMilliseconds(100);
+
+    /// <summary>The percentage at which the throttle never skips an update.</summary>
+    private const int ProgressComplete = 100;
+
+    /// <summary>When (on <see cref="_operationClock"/>) the progress was last shown; used by the throttle.</summary>
+    private TimeSpan _lastProgressUpdate;
+
     /// <summary>Lets Cancel stop the running operation; <see langword="null"/> when none is running (a file read is not cancellable).</summary>
     private CancellationTokenSource? _operationCts;
 
@@ -592,6 +601,7 @@ public sealed partial class MainViewModel : ObservableObject
         _operationCts = cancellation;
         CancelCommand.NotifyCanExecuteChanged();
         _operationClock.Restart();
+        _lastProgressUpdate = TimeSpan.FromMilliseconds(-1) - MinimumProgressInterval; // the first report always shows
         State = MainViewState.Working;
         ProgressPercentage = 0;
         ProgressText = string.Empty;
@@ -609,13 +619,24 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Shows the percentage, speed and time left; a late report that arrives after the end is ignored.</summary>
     /// <param name="percentage">How much is done, 0–100.</param>
-    private void OnProgress(int percentage)
+    /// <remarks>
+    /// The engine reports every whole percent, which on a fast disk is about 70 per second for a 100 MB file. The screen
+    /// is updated at most once per <see cref="MinimumProgressInterval"/> (10 per second, plan §8.2); 100 % always shows.
+    /// </remarks>
+    internal void OnProgress(int percentage)
     {
         if (_operationCts is null)
         {
             return;
         }
 
+        TimeSpan now = _operationClock.Elapsed;
+        if (percentage < ProgressComplete && now - _lastProgressUpdate < MinimumProgressInterval)
+        {
+            return;
+        }
+
+        _lastProgressUpdate = now;
         ProgressPercentage = percentage;
         ProgressText = ProgressTextFormatter.Format(percentage, SelectedFile?.SizeInBytes ?? 0, _operationClock.Elapsed, CultureInfo.CurrentCulture);
     }
