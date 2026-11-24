@@ -38,26 +38,40 @@ internal sealed class FakeFileEncryptionService : IFileEncryptionService
 
     public Task EncryptAsync(string inputFilePath, string outputFilePath, string password, bool overwriteExisting, IProgress<int>? progress = null, CancellationToken cancellationToken = default)
     {
-        return RunAsync("Encrypt", inputFilePath, outputFilePath, password, overwriteExisting);
+        return RunAsync("Encrypt", inputFilePath, outputFilePath, password, overwriteExisting, cancellationToken);
     }
 
     public Task DecryptAsync(string inputFilePath, string outputFilePath, string password, bool overwriteExisting, IProgress<int>? progress = null, CancellationToken cancellationToken = default)
     {
-        return RunAsync("Decrypt", inputFilePath, outputFilePath, password, overwriteExisting);
+        return RunAsync("Decrypt", inputFilePath, outputFilePath, password, overwriteExisting, cancellationToken);
     }
 
-    private async Task RunAsync(string operation, string input, string output, string password, bool overwrite)
+    private async Task RunAsync(string operation, string input, string output, string password, bool overwrite, CancellationToken cancellationToken)
     {
         Calls.Add((operation, input, output, password, overwrite));
         if (WaitFor is not null)
         {
-            await WaitFor;
+            await WaitFor.WaitAsync(cancellationToken);
         }
 
         if (ExceptionToThrow is not null)
         {
             throw ExceptionToThrow;
         }
+    }
+}
+
+/// <summary>Remembers the path it was asked to show; returns a prepared answer.</summary>
+internal sealed class FakeFolderOpener : IFolderOpener
+{
+    public bool Result { get; set; } = true;
+
+    public string? OpenedPath { get; private set; }
+
+    public bool OpenContainingFolder(string filePath)
+    {
+        OpenedPath = filePath;
+        return Result;
     }
 }
 

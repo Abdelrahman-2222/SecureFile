@@ -57,7 +57,7 @@ public static class ErrorMessageProvider
         return exception switch
         {
             OperationCanceledException => "Cancelled. No file was written.",
-            AuthenticationFailedException => "Wrong password, or the file was changed or damaged.",
+            AuthenticationFailedException => "Wrong password, or the file was changed or damaged. Check Caps Lock, the keyboard language and spaces at the start or end.",
             InvalidEncryptedFileException invalidFile => GetInvalidFileMessage(invalidFile.Reason),
             _ => GetFileSystemMessage(exception),
         };

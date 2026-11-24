@@ -725,7 +725,7 @@ Why `FixedTimeEquals` instead of `==`? Why HKDF instead of 64 bytes from PBKDF2?
 | 3.2 | Main window layout per §11 (drop zone, file card, password, output, actions, progress, status). | Matches the UX spec screenshot. | ✅ |
 | 3.3 | Fluent theme, light/dark following Windows, consistent spacing and sizes. | Looks right at 100%, 150%, 200% scaling. | ✅ |
 | 3.4 | Drag-and-drop, native Open/Save dialogs, keyboard shortcuts, `AutomationProperties.Name` on all controls. | Full flow possible with keyboard only. | ✅ |
-| 3.5 | Progress (%, MB/s, time left), Cancel, success panel (Open folder), friendly errors. | Manual flow test passes. | ⬜ |
+| 3.5 | Progress (%, MB/s, time left), Cancel, success panel (Open folder), friendly errors. | Manual flow test passes. | ✅ |
 | 3.6 | App icon, title, About (version), minimum window size. | Done. | ⬜ |
 | 3.7 | FlaUI smoke test + Accessibility Insights FastPass. | 0 accessibility failures. | ⬜ |
 

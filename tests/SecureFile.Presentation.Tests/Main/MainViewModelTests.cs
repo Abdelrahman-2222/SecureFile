@@ -17,6 +17,7 @@ public sealed class MainViewModelTests
     private readonly FakeFileDialogService _dialogs = new();
     private readonly FakeFileDetailsReader _detailsReader = new();
     private readonly FakeErrorLog _errorLog = new();
+    private readonly FakeFolderOpener _folderOpener = new();
 
     // ---- Browse (Step 2.2) -----------------------------------------------------------------------------------------
 
@@ -172,10 +173,11 @@ public sealed class MainViewModelTests
     [Fact]
     public void Constructor_NullService_ThrowsArgumentNullException()
     {
-        Assert.Throws<ArgumentNullException>("encryptionService", () => new MainViewModel(null!, _detailsReader, _dialogs, _errorLog));
-        Assert.Throws<ArgumentNullException>("fileDetailsReader", () => new MainViewModel(_encryption, null!, _dialogs, _errorLog));
-        Assert.Throws<ArgumentNullException>("fileDialogs", () => new MainViewModel(_encryption, _detailsReader, null!, _errorLog));
-        Assert.Throws<ArgumentNullException>("errorLog", () => new MainViewModel(_encryption, _detailsReader, _dialogs, null!));
+        Assert.Throws<ArgumentNullException>("encryptionService", () => new MainViewModel(null!, _detailsReader, _dialogs, _errorLog, _folderOpener));
+        Assert.Throws<ArgumentNullException>("fileDetailsReader", () => new MainViewModel(_encryption, null!, _dialogs, _errorLog, _folderOpener));
+        Assert.Throws<ArgumentNullException>("fileDialogs", () => new MainViewModel(_encryption, _detailsReader, null!, _errorLog, _folderOpener));
+        Assert.Throws<ArgumentNullException>("errorLog", () => new MainViewModel(_encryption, _detailsReader, _dialogs, null!, _folderOpener));
+        Assert.Throws<ArgumentNullException>("folderOpener", () => new MainViewModel(_encryption, _detailsReader, _dialogs, _errorLog, null!));
     }
 
     // ---- Errors (Step 2.6) -----------------------------------------------------------------------------------------
@@ -191,7 +193,7 @@ public sealed class MainViewModelTests
         await viewModel.EncryptCommand.ExecuteAsync(null);
 
         Assert.Equal(MainViewState.Failed, viewModel.State);
-        Assert.Equal("Wrong password, or the file was changed or damaged.", viewModel.StatusMessage);
+        Assert.Equal("Wrong password, or the file was changed or damaged. Check Caps Lock, the keyboard language and spaces at the start or end.", viewModel.StatusMessage);
         Assert.Same(failure, Assert.Single(_errorLog.Exceptions));
         Assert.NotNull(viewModel.SelectedFile); // the user can fix the password and try again
     }
@@ -234,6 +236,63 @@ public sealed class MainViewModelTests
 
         Assert.Equal(MainViewState.FileSelected, viewModel.State);
         Assert.True(viewModel.EncryptCommand.CanExecute(null));
+    }
+
+    // ---- Cancel, Open folder, locked inputs (Step 3.5) -------------------------------------------------------------
+
+    [Fact]
+    public async Task Cancel_WhileRunning_StopsTheOperationAndSaysNothingWasWritten()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        _dialogs.SaveResult = InputPath + ".enc";
+        _encryption.WaitFor = new TaskCompletionSource().Task; // never completes: only Cancel ends it
+        Task running = viewModel.EncryptCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.IsBusy);
+        Assert.False(viewModel.CanEditInputs);
+        Assert.True(viewModel.CancelCommand.CanExecute(null));
+        viewModel.CancelCommand.Execute(null);
+        await running;
+
+        Assert.Equal(MainViewState.Failed, viewModel.State);
+        Assert.Equal("Cancelled. No file was written.", viewModel.StatusMessage);
+        Assert.False(viewModel.CancelCommand.CanExecute(null));
+        Assert.True(viewModel.CanEditInputs);
+    }
+
+    [Fact]
+    public void Cancel_WhenNothingRuns_IsNotAvailable()
+    {
+        Assert.False(CreateViewModel().CancelCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task OpenFolder_AfterSuccess_ShowsTheResultFile()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        string output = InputPath + ".enc";
+        _dialogs.SaveResult = output;
+        Assert.False(viewModel.OpenFolderCommand.CanExecute(null));
+
+        await viewModel.EncryptCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.IsSucceeded);
+        Assert.True(viewModel.OpenFolderCommand.CanExecute(null));
+        viewModel.OpenFolderCommand.Execute(null);
+        Assert.Equal(output, _folderOpener.OpenedPath);
+    }
+
+    [Fact]
+    public async Task OpenFolder_FileManagerFails_ShowsAHint()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        _dialogs.SaveResult = InputPath + ".enc";
+        _folderOpener.Result = false;
+        await viewModel.EncryptCommand.ExecuteAsync(null);
+
+        viewModel.OpenFolderCommand.Execute(null);
+
+        Assert.Contains("couldn't be opened", viewModel.StatusMessage, StringComparison.Ordinal);
     }
 
     // ---- Drop and primary action (Step 3.4) ------------------------------------------------------------------------
@@ -322,7 +381,7 @@ public sealed class MainViewModelTests
 
     private MainViewModel CreateViewModel()
     {
-        return new MainViewModel(_encryption, _detailsReader, _dialogs, _errorLog);
+        return new MainViewModel(_encryption, _detailsReader, _dialogs, _errorLog, _folderOpener);
     }
 
     /// <summary>A ViewModel with <paramref name="path"/> chosen and the password "secret" typed.</summary>

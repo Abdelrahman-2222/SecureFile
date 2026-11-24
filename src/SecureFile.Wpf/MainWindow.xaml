@@ -9,6 +9,7 @@
     <Window.InputBindings>
         <!-- Ctrl+O = Browse (PROJECT_PLAN §11.2). Enter in the password box runs the primary action (below). -->
         <KeyBinding Key="O" Modifiers="Control" Command="{Binding BrowseCommand}" />
+        <KeyBinding Key="Escape" Command="{Binding CancelCommand}" />
     </Window.InputBindings>
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
@@ -52,6 +53,7 @@
             <PasswordBox x:Name="PasswordInput" AutomationProperties.AutomationId="PasswordInput"
                          AutomationProperties.Name="Password"
                          MinHeight="32" FontSize="14" VerticalContentAlignment="Center"
+                         IsEnabled="{Binding CanEditInputs}"
                          MaxLength="1024" PasswordChanged="OnPasswordChanged">
                 <PasswordBox.InputBindings>
                     <KeyBinding Key="Return" Command="{Binding RunPrimaryCommand}" />
@@ -71,15 +73,32 @@
             </StackPanel>
 
             <!-- 7. Progress: shown only while an operation or a file read is running -->
-            <ProgressBar x:Name="OperationProgress" AutomationProperties.AutomationId="OperationProgress"
-                         AutomationProperties.Name="Progress"
-                         Value="{Binding ProgressPercentage, Mode=OneWay}" Minimum="0" Maximum="100" Height="12" Margin="0,16,0,0"
-                         Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}" />
+            <Grid Margin="0,16,0,0" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <ProgressBar x:Name="OperationProgress" AutomationProperties.AutomationId="OperationProgress"
+                                 AutomationProperties.Name="Progress"
+                                 Value="{Binding ProgressPercentage, Mode=OneWay}" Minimum="0" Maximum="100" Height="12"
+                                 IsIndeterminate="{Binding IsProgressIndeterminate, Mode=OneWay}" />
+                    <TextBlock x:Name="ProgressDetailText" AutomationProperties.AutomationId="ProgressText"
+                               Text="{Binding ProgressText}" Margin="0,8,0,0" />
+                </StackPanel>
+                <Button x:Name="CancelButton" Grid.Column="1" AutomationProperties.AutomationId="CancelButton"
+                        AutomationProperties.Name="Cancel"
+                        Content="Cancel" ToolTip="Cancel (Esc)" Command="{Binding CancelCommand}" Margin="16,0,0,0" />
+            </Grid>
 
             <!-- 8. Result / status -->
             <TextBlock x:Name="StatusText" AutomationProperties.AutomationId="StatusMessage"
                        AutomationProperties.LiveSetting="Polite"
                        Text="{Binding StatusMessage}" TextWrapping="Wrap" Margin="0,16,0,0" />
+            <Button x:Name="OpenFolderButton" AutomationProperties.AutomationId="OpenFolderButton"
+                    AutomationProperties.Name="Open folder"
+                    Content="Open _folder" Command="{Binding OpenFolderCommand}" HorizontalAlignment="Left" Margin="0,12,0,0"
+                    Visibility="{Binding IsSucceeded, Converter={StaticResource BoolToVisibility}}" />
         </StackPanel>
     </ScrollViewer>
 </Window>

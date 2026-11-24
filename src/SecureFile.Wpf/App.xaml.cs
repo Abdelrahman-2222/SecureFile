@@ -46,7 +46,7 @@ internal sealed partial class App : Application
 
         base.OnStartup(e);
 
-        _viewModel = new MainViewModel(new FileEncryptionService(), new FileDetailsReader(), new WpfFileDialogService(), _errorLog);
+        _viewModel = new MainViewModel(new FileEncryptionService(), new FileDetailsReader(), new WpfFileDialogService(), _errorLog, new ExplorerFolderOpener());
         MainWindow mainWindow = new(_viewModel);
         mainWindow.Show();
     }

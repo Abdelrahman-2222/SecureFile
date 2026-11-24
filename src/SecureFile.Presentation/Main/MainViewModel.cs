@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -34,20 +35,36 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly IFileDetailsReader _fileDetailsReader;
     private readonly IFileDialogService _fileDialogs;
     private readonly IErrorLog _errorLog;
+    private readonly IFolderOpener _folderOpener;
+    private readonly Stopwatch _operationClock = new();
+
+    /// <summary>Lets Cancel stop the running operation; <see langword="null"/> when none is running (a file read is not cancellable).</summary>
+    private CancellationTokenSource? _operationCts;
+
+    /// <summary>The file the last successful operation wrote, for "Open folder".</summary>
+    private string? _lastOutputPath;
 
     /// <summary>Creates the ViewModel with the services it uses (pure dependency injection, ADR-09).</summary>
     /// <param name="encryptionService">Encrypts and decrypts files.</param>
     /// <param name="fileDetailsReader">Reads the name and size of the chosen file.</param>
     /// <param name="fileDialogs">Shows the Open and Save dialogs.</param>
     /// <param name="errorLog">Records the technical details of handled errors.</param>
+    /// <param name="folderOpener">Shows the result in the file manager.</param>
     /// <exception cref="ArgumentNullException">A service is <see langword="null"/>.</exception>
-    public MainViewModel(IFileEncryptionService encryptionService, IFileDetailsReader fileDetailsReader, IFileDialogService fileDialogs, IErrorLog errorLog)
+    public MainViewModel(
+        IFileEncryptionService encryptionService,
+        IFileDetailsReader fileDetailsReader,
+        IFileDialogService fileDialogs,
+        IErrorLog errorLog,
+        IFolderOpener folderOpener)
     {
         ArgumentNullException.ThrowIfNull(encryptionService);
         ArgumentNullException.ThrowIfNull(fileDetailsReader);
         ArgumentNullException.ThrowIfNull(fileDialogs);
         ArgumentNullException.ThrowIfNull(errorLog);
+        ArgumentNullException.ThrowIfNull(folderOpener);
 
+        _folderOpener = folderOpener;
         _errorLog = errorLog;
         _encryptionService = encryptionService;
         _fileDetailsReader = fileDetailsReader;
@@ -56,8 +73,8 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Gets the current state; it decides which commands can run (see <see cref="MainViewState"/>).</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsBusy))]
-    [NotifyCanExecuteChangedFor(nameof(BrowseCommand), nameof(OpenFileCommand), nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand))]
+    [NotifyPropertyChangedFor(nameof(IsBusy), nameof(CanEditInputs), nameof(IsSucceeded), nameof(IsProgressIndeterminate))]
+    [NotifyCanExecuteChangedFor(nameof(BrowseCommand), nameof(OpenFileCommand), nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand), nameof(OpenFolderCommand))]
     public partial MainViewState State { get; private set; } = MainViewState.NoFile;
 
     /// <summary>Gets the details of the chosen file, or <see langword="null"/> when no file is chosen.</summary>
@@ -79,6 +96,19 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Gets how much of the running operation is done, 0–100.</summary>
     [ObservableProperty]
     public partial int ProgressPercentage { get; private set; }
+
+    /// <summary>Gets the progress line: percentage, speed and time left (see <see cref="ProgressTextFormatter"/>).</summary>
+    [ObservableProperty]
+    public partial string ProgressText { get; private set; } = string.Empty;
+
+    /// <summary>Gets a value indicating whether the inputs (password, file choice) accept changes; they are locked while working.</summary>
+    public bool CanEditInputs => !IsBusy;
+
+    /// <summary>Gets a value indicating whether the last operation succeeded (the window shows the result panel).</summary>
+    public bool IsSucceeded => State == MainViewState.Succeeded;
+
+    /// <summary>Gets a value indicating whether the progress bar should only animate: busy, but with no percentage (reading a file).</summary>
+    public bool IsProgressIndeterminate => IsBusy && _operationCts is null;
 
     /// <summary>Gets the message that tells the user what happened and what to do next.</summary>
     [ObservableProperty]
@@ -150,6 +180,37 @@ public sealed partial class MainViewModel : ObservableObject
         SelectedFile = await Task.Run(() => _fileDetailsReader.Read(path)).ConfigureAwait(true);
         State = MainViewState.FileSelected;
         StatusMessage = "Enter the password, then choose Encrypt or Decrypt.";
+    }
+
+    /// <summary>Stops the running encryption or decryption; the output file is not created (atomic write, ADR-07).</summary>
+    [RelayCommand(CanExecute = nameof(CanCancel))]
+    private void Cancel()
+    {
+        _operationCts?.Cancel();
+    }
+
+    /// <summary>Cancel is available only while an operation (not a file read) is running.</summary>
+    /// <returns><see langword="true"/> when there is something to cancel.</returns>
+    private bool CanCancel()
+    {
+        return _operationCts is not null;
+    }
+
+    /// <summary>Shows the last result in the file manager; if that fails, says how to find it.</summary>
+    [RelayCommand(CanExecute = nameof(CanOpenFolder))]
+    private void OpenFolder()
+    {
+        if (!_folderOpener.OpenContainingFolder(_lastOutputPath!))
+        {
+            StatusMessage = "The folder couldn't be opened. Open it yourself in File Explorer.";
+        }
+    }
+
+    /// <summary>Open folder is available after a successful operation.</summary>
+    /// <returns><see langword="true"/> when there is a result to show.</returns>
+    private bool CanOpenFolder()
+    {
+        return State == MainViewState.Succeeded && _lastOutputPath is not null;
     }
 
     /// <summary>Encrypts the chosen file to a location the user picks (suggested: same folder, name + <c>.enc</c>).</summary>
@@ -282,13 +343,66 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
-        State = MainViewState.Working;
-        ProgressPercentage = 0;
-        StatusMessage = encrypt ? "Encrypting…" : "Decrypting…";
-        await StartOperation(encrypt, inputPath, outputPath).ConfigureAwait(true);
+        await ExecuteOperationAsync(encrypt, inputPath, outputPath).ConfigureAwait(true);
 
+        _lastOutputPath = outputPath;
         State = MainViewState.Succeeded;
         StatusMessage = SuccessMessage(encrypt, Path.GetFileName(outputPath));
+    }
+
+    /// <summary>Runs the operation with a cancellation token and a clock for the progress line.</summary>
+    /// <param name="encrypt"><see langword="true"/> to encrypt, <see langword="false"/> to decrypt.</param>
+    /// <param name="inputPath">The chosen file.</param>
+    /// <param name="outputPath">Where the result goes.</param>
+    /// <returns>A task that completes when the operation has ended; throws <see cref="OperationCanceledException"/> after Cancel.</returns>
+    private async Task ExecuteOperationAsync(bool encrypt, string inputPath, string outputPath)
+    {
+        using var cancellation = new CancellationTokenSource();
+        BeginOperation(encrypt, cancellation);
+        try
+        {
+            await StartOperation(encrypt, inputPath, outputPath, cancellation.Token).ConfigureAwait(true);
+        }
+        finally
+        {
+            EndOperation();
+        }
+    }
+
+    /// <summary>Switches to the Working state for a cancellable operation and starts the clock.</summary>
+    /// <param name="encrypt">Whether the operation is encryption (decides the status text).</param>
+    /// <param name="cancellation">The source that Cancel uses.</param>
+    private void BeginOperation(bool encrypt, CancellationTokenSource cancellation)
+    {
+        _operationCts = cancellation;
+        CancelCommand.NotifyCanExecuteChanged();
+        _operationClock.Restart();
+        State = MainViewState.Working;
+        ProgressPercentage = 0;
+        ProgressText = string.Empty;
+        StatusMessage = encrypt ? "Encrypting…" : "Decrypting…";
+    }
+
+    /// <summary>Stops the clock and makes Cancel unavailable again; runs on success, failure and cancellation.</summary>
+    private void EndOperation()
+    {
+        _operationCts = null;
+        _operationClock.Stop();
+        OnPropertyChanged(nameof(IsProgressIndeterminate));
+        CancelCommand.NotifyCanExecuteChanged();
+    }
+
+    /// <summary>Shows the percentage, speed and time left; a late report that arrives after the end is ignored.</summary>
+    /// <param name="percentage">How much is done, 0–100.</param>
+    private void OnProgress(int percentage)
+    {
+        if (_operationCts is null)
+        {
+            return;
+        }
+
+        ProgressPercentage = percentage;
+        ProgressText = ProgressTextFormatter.Format(percentage, SelectedFile?.SizeInBytes ?? 0, _operationClock.Elapsed, CultureInfo.CurrentCulture);
     }
 
     /// <summary>Fails the action with a message when the password cannot be used.</summary>
@@ -329,13 +443,14 @@ public sealed partial class MainViewModel : ObservableObject
     /// <param name="encrypt"><see langword="true"/> to encrypt, <see langword="false"/> to decrypt.</param>
     /// <param name="inputPath">The chosen file.</param>
     /// <param name="outputPath">Where the result goes (the user confirmed replacing it if it exists).</param>
+    /// <param name="cancellationToken">Cancelled when the user chooses Cancel.</param>
     /// <returns>The running operation.</returns>
-    private Task StartOperation(bool encrypt, string inputPath, string outputPath)
+    private Task StartOperation(bool encrypt, string inputPath, string outputPath, CancellationToken cancellationToken)
     {
-        var progress = new Progress<int>(percentage => ProgressPercentage = percentage);
+        var progress = new Progress<int>(OnProgress);
         return encrypt
-            ? _encryptionService.EncryptAsync(inputPath, outputPath, Password, overwriteExisting: true, progress)
-            : _encryptionService.DecryptAsync(inputPath, outputPath, Password, overwriteExisting: true, progress);
+            ? _encryptionService.EncryptAsync(inputPath, outputPath, Password, overwriteExisting: true, progress, cancellationToken)
+            : _encryptionService.DecryptAsync(inputPath, outputPath, Password, overwriteExisting: true, progress, cancellationToken);
     }
 
     /// <summary>Shows the Save dialog with a suggestion and refuses the input itself as the output.</summary>

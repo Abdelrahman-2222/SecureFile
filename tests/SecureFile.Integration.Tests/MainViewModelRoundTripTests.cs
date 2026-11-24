@@ -31,7 +31,7 @@ public sealed class MainViewModelRoundTripTests : IDisposable
         await File.WriteAllBytesAsync(original, content, TestContext.Current.CancellationToken);
 
         var dialogs = new ScriptedDialogs();
-        var viewModel = new MainViewModel(new FileEncryptionService(), new FileDetailsReader(), dialogs, new IgnoringErrorLog());
+        var viewModel = new MainViewModel(new FileEncryptionService(), new FileDetailsReader(), dialogs, new IgnoringErrorLog(), new NoFolderOpener());
 
         dialogs.Open = original;
         await viewModel.BrowseCommand.ExecuteAsync(null);
@@ -68,6 +68,14 @@ public sealed class MainViewModelRoundTripTests : IDisposable
         public string? ShowSaveFileDialog(string suggestedFilePath)
         {
             return Save;
+        }
+    }
+
+    private sealed class NoFolderOpener : IFolderOpener
+    {
+        public bool OpenContainingFolder(string filePath)
+        {
+            return true;
         }
     }
 

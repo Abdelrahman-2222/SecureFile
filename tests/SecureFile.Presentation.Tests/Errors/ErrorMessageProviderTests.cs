@@ -21,7 +21,7 @@ public sealed class ErrorMessageProviderTests
     public void WrongPassword_SaysPasswordOrChanged()
     {
         Assert.Equal(
-            "Wrong password, or the file was changed or damaged.",
+            "Wrong password, or the file was changed or damaged. Check Caps Lock, the keyboard language and spaces at the start or end.",
             ErrorMessageProvider.GetMessage(new AuthenticationFailedException()));
     }
 
