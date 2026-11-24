@@ -6,6 +6,24 @@
         Width="800" Height="560"
         MinWidth="640" MinHeight="480"
         WindowStartupLocation="CenterScreen">
-    <!-- The real layout (drop zone, file card, password, output, actions) is built in Stage 3.2. -->
-    <Grid />
+    <!-- Plain vertical-slice layout; the real design (drop zone, file card, theme) is built in Stage 3.2/3.3. -->
+    <StackPanel Margin="24">
+        <Button x:Name="BrowseButton" AutomationProperties.AutomationId="BrowseButton"
+                Content="Browse…" Command="{Binding BrowseCommand}" Padding="12,6" HorizontalAlignment="Left" />
+        <TextBlock x:Name="FileSummaryText" AutomationProperties.AutomationId="FileSummary"
+                   Text="{Binding FileSummary}" Margin="0,12,0,0" />
+        <Label Content="Password" Target="{Binding ElementName=PasswordInput}" Margin="0,12,0,0" Padding="0" />
+        <PasswordBox x:Name="PasswordInput" AutomationProperties.AutomationId="PasswordInput"
+                     PasswordChanged="OnPasswordChanged" />
+        <StackPanel Orientation="Horizontal" Margin="0,12,0,0">
+            <Button x:Name="EncryptButton" AutomationProperties.AutomationId="EncryptButton"
+                    Content="Encrypt" Command="{Binding EncryptCommand}" Padding="12,6" Margin="0,0,8,0" />
+            <Button x:Name="DecryptButton" AutomationProperties.AutomationId="DecryptButton"
+                    Content="Decrypt" Command="{Binding DecryptCommand}" Padding="12,6" />
+        </StackPanel>
+        <ProgressBar x:Name="OperationProgress" AutomationProperties.AutomationId="OperationProgress"
+                     Value="{Binding ProgressPercentage, Mode=OneWay}" Minimum="0" Maximum="100" Height="12" Margin="0,12,0,0" />
+        <TextBlock x:Name="StatusText" AutomationProperties.AutomationId="StatusMessage"
+                   Text="{Binding StatusMessage}" TextWrapping="Wrap" Margin="0,12,0,0" />
+    </StackPanel>
 </Window>
