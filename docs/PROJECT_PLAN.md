@@ -47,8 +47,9 @@ So the code is written to be *read*, and every step follows the same loop.
 | 1 | **Lesson first.** Before any code, a beginner-friendly lesson on every concept the step uses: plain definition, an everyday analogy, why we need it, and the alternatives. | "Lesson" section in `docs/LEARNING_LOG.md` + summary in chat |
 | 2 | **Small code.** One step = one small, focused piece (aim ≤ ~150 lines incl. tests). | Code + tests |
 | 3 | **Walkthrough.** Line-by-line explanation of the new code: every type, method, variable name, and why it is there. | Entry in `docs/LEARNING_LOG.md` |
-| 4 | **Self-check (not an exam).** Open-book questions *after* the lesson; you answer in your own words, and any unclear answer just shows which part to explain again. | ✅ when the concepts are clear to you |
-| 5 | **Green.** Tests pass, analyzers clean. | Commit |
+| 4 | **Review Board (§1.8).** Independent reviewers (Architect, Performance, Security, QA, Critic, PM, End user, Team Lead) review the step; every finding is fixed or answered. | Review report in `docs/LEARNING_LOG.md` |
+| 5 | **Self-check (not an exam).** Open-book questions *after* the lesson; you answer in your own words, and any unclear answer just shows which part to explain again. | ✅ when the concepts are clear to you |
+| 6 | **Green.** Tests pass, analyzers clean. | Commit |
 
 ### 1.2 Code-readability rules (so every line is understandable)
 
@@ -120,7 +121,9 @@ becomes required for it.
 ### 1.7 Quality gate — checked before EVERY commit and push (mandatory)
 
 No step is committed, pushed or marked done until **every** item below is checked. Automated items run with one
-command, and the `pre-push` Git hook runs them by itself, so a failing push is impossible:
+command. Locally, the `pre-push` Git hook runs it and blocks a failing push by default (hooks must be enabled once
+per clone and can be bypassed with `--no-verify`); **the real gate is CI**, which runs the same script on every push
+and pull request and cannot be skipped:
 
 ```powershell
 pwsh -File scripts/verify.ps1
@@ -143,11 +146,96 @@ pwsh -File scripts/verify.ps1
 | G13 | Performance | No whole-file loading; no needless allocations in loops; measured when the step is performance-relevant | Review + quick measurement / BenchmarkDotNet (Stage 5) | Manual |
 | G14 | Documentation | XML docs on all public members (build-enforced); CHANGELOG; LEARNING_LOG lesson + walkthrough; plan status | Build (CS1591) + review | Partly |
 | G15 | Git | Conventional Commit message; **no AI attribution**; one logical change per commit | `commit-msg` hook + verify.ps1 | ✅ hooks |
+| G16 | System design / patterns | The design fits §1.9 (responsibilities, dependencies, patterns chosen *for a reason*, no over-engineering) | Review Board: Architect | Manual |
+| G17 | Algorithms & data structures | Time and space complexity of every public operation stated and justified; no avoidable work; best-fit data structure | Review Board: Performance engineer + `<remarks>` "Complexity:" line | Manual |
+| G18 | Independent review | Review Board (§1.8) ran; every finding is fixed or answered with a recorded decision | Review Board report in `LEARNING_LOG.md` | Manual |
 
 **One-time setup per clone:** `git config core.hooksPath .githooks` (enables the `commit-msg` and `pre-push` hooks).
 
-The results of the manual items (G1, G9, G11–G13) are written in the step's "Quality gate" table in
+The results of the manual items (G1, G9, G11–G13, G16–G18) are written in the step's "Quality gate" table in
 `docs/LEARNING_LOG.md`.
+
+### 1.8 Review Board — independent reviewers for every step
+
+**Goal:** production-ready code that would impress a Team Lead, a senior engineer and an end user. One author
+checking their own work misses things, so every step is reviewed by **independent reviewers with different
+viewpoints** (run as separate AI reviewer agents that read the code fresh and only report — they never edit).
+The author then fixes each finding or records why not.
+
+**When:** (1) a short **design review before coding** (Architect, PM, End user) — is this the right thing, built the right way?
+(2) a full **code review after the step is green**, before the step is committed as done.
+
+| Role | Looks at | Key questions |
+|---|---|---|
+| **Software Architect** | System design, layering, responsibilities, design patterns, extensibility | Is each class doing one job (SRP)? Are dependencies pointing the right way (DIP)? Is each pattern justified — or is it ceremony? Will the next steps (crypto, UI, CLI, Avalonia) fit without rewrites? |
+| **Performance & Algorithms Engineer** | Time and space complexity, data structures, allocations, I/O patterns, scalability with file size | What is the Big-O in time and memory? Is there a faster or leaner standard approach? Any hidden allocations, copies, repeated I/O or blocking calls? Does it scale from 0 B to 100 GB? |
+| **Security Engineer** | Threats (STRIDE), input validation, crypto use, secrets in memory/logs/messages, file-system attacks | What can a malicious file, path or user do? Is anything sensitive leaked? Is every input validated at the boundary? |
+| **QA / Test Engineer** | Test completeness and strength | Which cases are missing (normal, edge, invalid, "impossible", cross-OS)? Would a subtle bug survive the tests? |
+| **Critic (devil's advocate)** | Weak points, hidden assumptions, over- and under-engineering, naming | What is the weakest part? What will break first? What would a harsh senior reviewer say in a code review? |
+| **Senior Project Manager / Product Owner** | Requirement fit, scope, risk, value, documentation | Does this serve the task's requirements and grading criteria? Is anything gold-plated or missing? Is the story clear for the presentation? |
+| **End User (non-technical)** | Behaviour visible to people: wording, units, messages, predictability | Would a normal person understand what they see? Are messages calm, clear and actionable? |
+| **Team Lead (presentation audience)** | Defensibility | Which question would I ask, and does the author have a clear answer? |
+
+**Report format** (stored in the step's section of `LEARNING_LOG.md`):
+
+| ID | Role | Severity | Finding | Decision (fix / keep, with reason) |
+|---|---|---|---|---|
+
+Severity: **High** (bug, security issue, or requirement miss — must fix), **Medium** (real weakness — fix now unless
+there is a recorded reason), **Low** (polish — fix if cheap), **Note** (no change; worth knowing or presenting).
+
+### 1.9 Design, pattern and algorithm standards
+
+| Area | Standard |
+|---|---|
+| **SOLID** | **S**ingle responsibility per class · **O**pen for extension (new formats/UIs added without editing Core) · **L**iskov (implementations honour their interface contract, incl. exceptions) · **I**nterfaces small and focused · **D**ependencies on abstractions at the boundaries (file system, dialogs, clock) |
+| **Patterns — only with a reason** | Use a pattern when it removes a real problem, name it in the XML `<remarks>`, and record the alternative. Planned: **Strategy** (the cipher behind `IFileEncryptionService`, so a v2 AES-GCM format can be added), **MVVM** (UI), **Composition Root / pure DI** (wiring), **Template-free value objects / records** (data), **Guard clauses** (validation), **Result mapping** at the UI boundary (ADR-13). Avoided unless needed: service locator, singletons with state, inheritance hierarchies, generic repositories. |
+| **KISS / YAGNI** | The simplest design that meets the requirement and the next known step. No abstraction "for the future" without a planned step that uses it. |
+| **Algorithms & data structures** | Every public operation documents **time and space complexity** in a `<remarks>` "Complexity:" line. Streaming algorithms for file data: **O(n) time, O(1) extra memory** (fixed buffer) regardless of file size. Pick the data structure for the access pattern (array for fixed lookups, `Span<T>`/pooled buffers for byte work, no LINQ in hot loops). |
+| **Performance hygiene** | No repeated I/O for the same data; no blocking the UI thread; async for I/O; buffers reused (`ArrayPool`); measure before and after optimising (BenchmarkDotNet). |
+| **Immutability & state** | Data passed between layers is immutable (records); mutable state only inside the ViewModel and short-lived local variables. |
+| **Production readiness** | Deterministic, documented, Core tested on 3 OS (the WPF app is Windows-only by nature), observable (local logs), secure by default, no telemetry, graceful failure (ADR-13), versioned file format. |
+
+### 1.10 Engineering principles — checked BEFORE writing any code (mandatory)
+
+Before each step's code is written, the design is checked against this list (Review Board design review, §1.8).
+The answers are written in the step's lesson in `LEARNING_LOG.md`. Each principle is a tool, not a religion: when two
+conflict (e.g. DRY vs. clarity, OCP vs. YAGNI), the step records which one wins and why.
+
+| Principle | Question we answer before coding | In this project |
+|---|---|---|
+| **S — Single Responsibility** | Does each class have exactly one reason to change? | `FileDetailsReader` reads metadata; `FileSizeFormatter` formats; neither does both. |
+| **O — Open/Closed** | Can we add behaviour by adding code instead of editing working code? | A future AES-GCM format = a new cipher class behind the same interface (Strategy), not edits to v1. |
+| **L — Liskov Substitution** | Can every implementation replace its interface without surprises (same inputs, results, exceptions)? | Fakes in ViewModel tests honour the documented exceptions of `IFileDetailsReader`. |
+| **I — Interface Segregation** | Is every interface small and specific to one client need? | One method per interface where possible (`Read`); no "god" service interface. |
+| **D — Dependency Inversion** | Do high-level parts depend on abstractions at the boundaries (disk, dialogs, clock), wired in one place? | ViewModels receive interfaces; `App.OnStartup` is the only place that chooses implementations. |
+| **DRY** | Is each piece of *knowledge* (a rule, a constant, a format) written once? | Header layout constants in one class; error messages in one `ErrorMessageProvider`. Duplicated *code* that represents different knowledge may stay separate. |
+| **KISS** | Is this the simplest design that fully works? | Pure DI instead of a container; static formatter instead of a service. |
+| **YAGNI** | Is every abstraction used by a current or *planned* step? | No `IFileSystem` wrapper until a test needs one; no plugin system. |
+| **OOP — encapsulation** | Is state private and changed only through meaningful methods? Are invariants protected? | Records are immutable; fields are private and `readonly`. |
+| **OOP — abstraction & polymorphism** | Do callers see *what* an object does, not *how*? | Callers use `IFileDetailsReader`, not `FileInfo`. |
+| **Composition over inheritance** | Are we combining small objects instead of building class hierarchies? | Core classes are `sealed`; behaviour is combined through constructor parameters. |
+| **Separation of concerns / layering** | Is each concern in its layer (Core logic, Presentation state, UI rendering)? | Enforced by architecture tests (G10). |
+| **High cohesion, low coupling** | Are related things together and unrelated things apart? | Code is organised **by feature** (`Files/`, `Cryptography/`), interface next to implementation (ADR-14). |
+| **Law of Demeter** | Does code talk only to its direct collaborators (no `a.B.C.D()` chains)? | Review item. |
+| **Fail fast** | Are invalid inputs rejected at the boundary with a clear exception? | Guard clauses (ADR-13). |
+| **Immutability by default** | Can this be immutable? | Records, `readonly` fields, `static readonly` tables. |
+| **Design patterns** | Which known pattern solves this, and is it worth its cost? Name it in `<remarks>`. | §1.9 list; no pattern without a reason. |
+| **Algorithms & data structures** | What is the time and space Big-O? Is there a better standard algorithm or data structure for this access pattern? | `<remarks>` "Complexity:" line (G17); streaming O(n) time / O(1) memory for file data. |
+| **System design qualities** | Scalability (0 B to 100 GB+), reliability (atomic output), security (STRIDE), observability (local log), maintainability, portability (3 OS). | Review Board roles (§1.8). |
+| **Secure by design** | What could an attacker control here (path, file content, password), and how is it constrained? | Security Engineer review; threat table in Stage 5. |
+| **SDLC traceability** | Which requirement does this serve (§15), which test proves it (§9), where is it documented? | Every step links requirement → code → test → doc. |
+
+**SDLC mapping (how this project follows the software development life cycle):**
+
+| SDLC phase | Where it happens here |
+|---|---|
+| Requirements | §2 (R1–R6 from the task, D1–D7 derived), §13 stakeholder suggestions |
+| Design | §4 ADRs, §5 crypto design, §6 structure, §1.9–1.10 standards, Review Board design review |
+| Implementation | §7 steps (small, explained, reviewed) |
+| Verification | §1.7 quality gate, §9 test catalog, Review Board code review, CI on 3 OS |
+| Release | Stage 6 packaging, Stage 9 deliverables, semantic version tags |
+| Maintenance | CHANGELOG, Dependabot, versioned file format, ADRs explaining *why* for future maintainers |
 
 ---
 
@@ -282,6 +370,25 @@ We need **two different keys**: one for AES, one for HMAC (never reuse one key f
 | Two passes: verify HMAC first, then decrypt | Safe, but reads the file twice (slower for big files). | ❌ |
 | **One pass to a temp file in the destination folder; verify HMAC; then atomic `File.Move`** | Fast (one read) and safe (the final file appears only if everything is valid). Temp file is in the *same folder* because a move across drives is not atomic. | ✅ |
 
+**Trade-off accepted (Review Board Step 1.1, Team Lead question):** during the single pass, *not-yet-verified*
+plaintext exists in the temp file. If the app is killed or the power fails before verification, that temp file stays
+behind. Mitigations: (1) the temp file has a recognisable hidden name (`.~<name>.securefile-tmp`) so it is obviously
+not a real result; (2) it is deleted in `finally` on every handled failure or cancel; (3) on Windows it is created with
+the *hidden* attribute; (4) the user chose that folder for the decrypted output anyway. The two-pass alternative would
+avoid unverified plaintext on disk at the cost of reading the whole file twice; it stays the fallback if a reviewer
+judges the risk higher than the speed benefit.
+
+### ADR-14 — Code organisation: by feature, interface next to implementation
+
+| Option | Pros | Cons | Verdict |
+|---|---|---|---|
+| By type: `Interfaces/`, `Services/`, `Models/` folders | Familiar from tutorials | One feature is spread over 3+ folders; low cohesion; every change touches several places | ❌ |
+| Separate abstractions assembly (`SecureFile.Abstractions`) | Needed when other assemblies must use only the contracts (plugins, shared packages) | We have no such consumer → YAGNI | ❌ (until needed) |
+| **By feature (`Files/`, `Cryptography/`, …), interface next to its implementation** | High cohesion: everything about one feature in one place; namespaces describe the domain | Folder alone does not show what is an abstraction — solved by the `I` prefix convention | ✅ |
+
+SOLID is respected either way: Interface Segregation is about the *size* of an interface, Dependency Inversion about
+depending on the interface *type* — neither depends on the folder. The rule: one feature = one folder = one namespace.
+
 ### ADR-08 — MVVM helpers
 
 | Option | Notes | Verdict |
@@ -357,12 +464,17 @@ Each command (Browse, Encrypt, Decrypt) has one `try/catch` with **specific** ca
 | `AuthenticationFailedException` | "Wrong password, or the file was changed or damaged." |
 | `InvalidEncryptedFileException` | "This is not a SecureFile encrypted file, or it is damaged." |
 | `FileNotFoundException` / `DirectoryNotFoundException` | "The file or folder can't be found or opened." |
-| `UnauthorizedAccessException` | "Windows denied access. Choose another folder or check permissions." |
+| `UnauthorizedAccessException` | "Access to this file or folder was denied. Choose another folder or check its permissions." |
 | `PathTooLongException` | "The path is too long. Choose a shorter folder or name." |
-| `IOException` (incl. disk full, file in use) | "The file couldn't be read or written: {reason}." |
+| `IOException` — disk full (Windows HResult `0x80070070`, `ENOSPC` on Linux/macOS) | "There is not enough free space to save the file. Free up space or choose another drive." |
+| `IOException` — file in use (sharing violation `0x80070020`) | "The file is being used by another program. Close it and try again." |
+| `IOException` (any other) | "The file couldn't be read or written. Check that the drive is still connected and try again." |
 
-The mapping lives in one small, unit-tested class (`ErrorMessageProvider`), so every message is consistent and
-testable. The ViewModel does **not** catch `Exception` — anything unexpected goes to Layer 3.
+Messages are **fixed, plain text** — never the raw .NET message (it is technical, English-only, and can contain full
+paths with the user name). The technical details go to the log. Messages say *"access was denied"*, not *"Windows…"*,
+because the same ViewModels run on macOS and Linux (bonus). When a file name is shown, it is the name only, never the
+full path. The mapping lives in one small, unit-tested class (`ErrorMessageProvider`), so every message is consistent
+and testable. The ViewModel does **not** catch `Exception` — anything unexpected goes to Layer 3.
 
 **Layer 3 — WPF app (global safety nets, registered first thing in `App.OnStartup`)**
 
@@ -371,6 +483,14 @@ testable. The ViewModel does **not** catch `Exception` — anything unexpected g
 | `Application.DispatcherUnhandledException` | Unhandled exceptions on the **UI thread** | Log details; show a friendly dialog; `e.Handled = true` → the app keeps running. |
 | `AppDomain.CurrentDomain.UnhandledException` | Unhandled exceptions on **any other thread** | Log only — Microsoft: it *cannot* prevent the app from closing. |
 | `TaskScheduler.UnobservedTaskException` | Faulted tasks nobody awaited | Log and `SetObserved()`. (In .NET Core it no longer crashes the app, but it would hide a bug.) |
+
+**Is it honest to keep running after an unexpected error? (Team Lead question)** Yes, within limits, because every
+file operation is atomic (temp file + move, ADR-07): an interrupted operation leaves no half-written result, so the
+app's *data* is consistent. After an unexpected UI-thread error the app: logs it, resets the ViewModel to the idle
+state (no operation in progress, inputs enabled), and shows *"Something unexpected went wrong. Your files were not
+changed. Details were saved to the log."* If a second unexpected error happens within a short time, or the error is
+one that signals a broken process (e.g. `OutOfMemoryException`, `InvalidProgramException`), the dialog offers only
+**Close** — continuing would not be safe. So the promise is "never crash *on a user action*", not "never close".
 
 **WinForms equivalent (for comparison in the presentation):** `Application.ThreadException` +
 `Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException)` (set before `Application.Run`)
@@ -394,7 +514,7 @@ All numbers are **little-endian** (written with `BinaryPrimitives`, so the file 
 |---:|---:|---|---|
 | 0 | 4 | `Magic` | ASCII `SFEN` — "this is our file" |
 | 4 | 1 | `FormatVersion` | `1` = PBKDF2-SHA256 → HKDF → AES-256-CBC/PKCS7 + HMAC-SHA256 |
-| 5 | 4 | `Pbkdf2Iterations` | e.g. 600,000 (checked to be within an allowed range on read) |
+| 5 | 4 | `Pbkdf2Iterations` | 600,000 when writing (OWASP Password Storage Cheat Sheet: *"PBKDF2-HMAC-SHA256: 600,000 iterations"*, verified 2026-11-24). On read it must be between **100,000** and **10,000,000**: lower values are refused as too weak (a tampered header must not force a weak key), higher values are refused so a crafted file cannot freeze the app for minutes (denial of service). |
 | 9 | 16 | `Salt` | random per file; makes the same password give a different key per file |
 | 25 | 16 | `Iv` | random per file; the CBC starting block |
 | 41 | n | `Ciphertext` | AES-256-CBC output; n is a multiple of 16 and at least 16 |
@@ -418,6 +538,14 @@ password ──NFC normalize──► UTF-8 bytes
 - **NFC normalization:** the same visible password can be stored as different bytes (macOS often uses NFD).
   Normalizing makes the password produce the same bytes on every OS.
 - All key buffers are wiped with `CryptographicOperations.ZeroMemory` in `finally`.
+- **Where does the password live in memory? (Team Lead question)** WPF's `PasswordBox.Password` returns a .NET `string`,
+  which is immutable and cannot be wiped; the garbage collector frees it at an unknown time. `SecureString` is **not**
+  used: Microsoft no longer recommends it for new code (it does not protect the value on non-Windows systems and the
+  text still has to become a normal string or bytes to be used). What we do instead: read the password only when the
+  user clicks Encrypt/Decrypt; convert it once to a UTF-8 byte array; wipe that array with `ZeroMemory` right after key
+  derivation; clear the password box after the operation; never log, copy or store it. Honest limit: a process memory
+  dump taken during the operation could contain the password — protecting against an attacker who can already read
+  this process's memory is outside a desktop app's control.
 
 ### 5.3 Encrypt flow
 
@@ -478,8 +606,16 @@ SecureFile/                           (git repository root)
 ## 7. Step-by-step roadmap (Stages 0–9)
 
 Each step: **Goal · Why · Done when · Checkpoint questions** (you answer before ✅).
-Time estimates assume the learning loop in §1; the required track (Stages 0–6, 9) targets the 3-day estimate,
-the bonus (Stage 7) comes after.
+**Honest re-baseline (Review Board Step 1.1, PM finding):** the stage estimates below add up to about **5 days of
+coding** for the required track, and the learning loop, Review Board and full quality gate add roughly as much again.
+The task's "3 days" is the assessor's estimate for the coding alone. You chose quality and understanding over speed
+("we are not in a rush — production-ready"), so the realistic plan is **about 8–10 working days for the required
+track**, with the bonus (Stage 7) after that. To keep the required app safe whatever happens:
+
+- the automated gate runs on every commit; the full Review Board runs per step but in a lighter form for very small steps;
+- a working **end-to-end vertical slice** (Core crypto → minimal ViewModel → plain window that encrypts and decrypts)
+  is the first milestone after Step 1.7, before any UI polish (decision pending — see §19);
+- items marked *Could* (§13) are time-boxed and are the first to be cut.
 
 ### Stage 0 — Setup (Phase 1 tooling) · ~½ day
 
@@ -551,7 +687,7 @@ responsive during a 4 GB encryption? Why do sizes/spacing follow a 4/8 px grid?
 | 4.1 | Integration tests on the real file system (§9.2). | All pass. | ⬜ |
 | 4.2 | Large-file runs: 1 GB and >4 GB (manual or nightly, not every commit). | Round-trip OK, memory stays flat. | ⬜ |
 | 4.3 | `TESTPLAN.md` manual script + exploratory session. | Every item ticked, bugs fixed. | ⬜ |
-| 4.4 | Small usability test: 3–5 non-technical people; measure task success, time to first encryption, SUS score. | SUS ≥ 80, success 100%. | ⬜ |
+| 4.4 | Short usability check with 2–3 non-technical people (task success, time to first encryption; SUS questionnaire optional). | All complete the task unaided; findings fixed or recorded. | ⬜ |
 
 ### Stage 5 — Measure and harden (Phase 1 report) · ~½ day
 
@@ -625,8 +761,8 @@ Targets are measured on one reference machine (recorded in the report: CPU, RAM,
 | .NET analyzers (built into the SDK; CA5350, CA5351, CA5379, CA5387, CA5388, CA5390, CA5401, CA5402 …) | Weak/broken algorithms, weak KDF, hard-coded keys, IV misuse | 0 warnings (build fails otherwise) |
 | NuGet Audit (runs on restore) / `dotnet list package --vulnerable --include-transitive` | Known vulnerabilities in packages | 0 |
 | SonarQube for IDE (VS extension) | Vulnerabilities, security hotspots | 0 vulnerabilities; all hotspots reviewed |
-| CodeQL (GitHub, free for public repos) | Static security analysis | 0 high/critical alerts |
-| gitleaks | Secrets committed by mistake | 0 |
+| CodeQL (GitHub) | Static security analysis | Only if the repository becomes public (free there; on a private repo it needs paid GitHub Advanced Security). Meanwhile: .NET security analyzers (G3) + SonarQube for IDE. |
+| gitleaks (CI job, full history) + local pattern scan (verify.ps1) | Secrets committed by mistake | 0 |
 | Known-answer tests (NIST SP 800-38A, RFC 5869, RFC 7914) | We use the algorithms correctly | 100% pass |
 | Tamper/truncation tests (§9) | Integrity protection works | 100% detected |
 | Threat model (Microsoft Threat Modeling Tool, STRIDE) | Threats considered and mitigated | Every threat has a mitigation or a stated limit |
@@ -732,14 +868,22 @@ we test them anyway.
 ### 11.1 The flow (one window, top to bottom)
 
 1. **Drop zone:** "Drop a file here or **Browse…**" (large target, also accepts keyboard).
-2. **File card:** icon, **name**, **extension**, **size** (`1.5 MB`, exact bytes in tooltip), last modified. "Change file" link.
-3. **Mode:** Encrypt / Decrypt — preselected automatically from the file header; the user can switch.
-4. **Password:** field with show/hide; *Confirm password* (encrypt only); strength meter; "Generate strong password" + Copy; Caps Lock warning.
+2. **File card:** icon, **name**, **extension**, **size** (`1.5 MB`; tooltip with exact bytes like Explorer: `1.5 KB (1,536 bytes)`), last modified. "Change file" link.
+   Reading the details runs off the UI thread (it can take seconds on an unavailable network drive).
+3. **Mode:** Encrypt / Decrypt — preselected automatically from the file header; the user can switch. For a `.enc`
+   file a hint says *"This is a SecureFile encrypted file — enter its password to decrypt it."* (a `.enc` file has no
+   icon or double-click action, so users need this hint).
+4. **Password:** field with show/hide; *Confirm password* (encrypt only); Caps Lock warning.
    Warning text: **"If you forget this password, the file cannot be recovered. Nobody can reset it."**
+   *Could (time-boxed):* strength meter and "Generate strong password". If generation is built, the app shows the
+   password with *"Save this password somewhere safe now (for example in a password manager)"*, and any Copy button
+   clears the clipboard after 30 seconds (clipboard history and cloud sync could otherwise keep it).
 5. **Output:** suggested name and folder (same folder as the input; `name.ext.enc` or `.enc` removed), **Change…** opens the Save dialog (R5). Overwrite asks for confirmation.
 6. **Primary button:** "Encrypt file" / "Decrypt file" — disabled until inputs are valid, with a hint why.
 7. **Progress:** bar + % + MB/s + time left + **Cancel**. Inputs locked while working.
 8. **Result:** success message with **Open folder**; or an error saying *what happened* and *what to do*.
+   After encryption the message is explicit: **"Encrypted copy saved. Your original file was not changed."** —
+   so nobody assumes the original is now protected.
 
 ### 11.2 Visual and interaction rules
 
@@ -798,6 +942,8 @@ Priority uses **MoSCoW**: Must / Should / Could / Won't (this version).
 | Encrypt a whole folder (zip, then encrypt) | Common real need | Could | ⏸ v2 |
 | Store the original file name inside the encrypted file | Better restore experience | Could | ⏸ v2 |
 | Arabic UI with right-to-left layout | Local users | Could | ⏸ |
+| Password strength meter + generator (with clipboard auto-clear) | Helps users pick strong passwords | Could (time-boxed) | ⏸ |
+| Windows Arm64 build | Snapdragon laptops | Could | ⏸ |
 | "Secure delete" the original | Users ask for it, but SSDs cannot guarantee it | Won't (explain why) | ❌ |
 
 ### 13.2 Business Analyst
@@ -906,6 +1052,8 @@ change with more time?
 | SmartScreen/Gatekeeper warnings | Reviewer cannot open the app easily | README instructions; optional signing |
 | macOS testing needs Apple hardware | Bonus not fully verified | CI macOS runner for automated tests; state the limit honestly |
 | Live demo fails | Bad impression | Backup video + release `.exe` on a USB stick |
+| Process overhead (lessons, Review Board, gate) exceeds the 3-day estimate | Late delivery if a deadline appears | Re-baselined to 8–10 days (§7); vertical slice first; *Could* items cut first; you confirmed quality over speed |
+| Branch protection is not available for private repositories on the free GitHub plan | CI results cannot be made *required* before merging | Merge only on a green CI by rule; make the repo public (enables protection and CodeQL) or upgrade before sharing |
 | Password forgotten by a user | Data loss | Clear warning in UI; documented as by-design |
 
 ---
@@ -973,7 +1121,7 @@ change with more time?
 - Azure Artifact Signing — https://azure.microsoft.com/en-us/products/artifact-signing
 - Velopack — https://www.nuget.org/packages/velopack
 
-**To verify when we reach the step:** the exact OWASP iteration figure (seen in secondary sources),
+**Verified:** the OWASP iteration figure (600,000 for PBKDF2-HMAC-SHA256, read directly on 2026-11-24). **To verify when we reach the step:**
 whether the WPF Fluent `ThemeMode` API is still marked experimental in .NET 10, and Velopack's Linux output formats.
 
 ---
@@ -987,3 +1135,4 @@ whether the WPF Fluent `ThemeMode` API is still marked experimental in .NET 10, 
 | 2026-11-24 | Stage 0 | .NET 10 SDK 10.0.404 + GitHub CLI installed; solution, projects, shared build rules, packages, editorconfig, gitattributes, local tools, CI, docs created. Build: 0 warnings. Walkthrough in LEARNING_LOG.md. |
 | 2026-11-24 | Step 1.1 | FileDetails, IFileDetailsReader, FileDetailsReader, FileSizeFormatter + 31 tests (incl. property-based), 100 % coverage. Style rules refined: interface members, static readonly naming. |
 | 2026-11-24 | Step 1.1 revision | ADR-13 exception strategy; quality gate §1.7 with verify.ps1, Git hooks, metric limits (CA1502/CA1505), architecture tests; Stryker mutation score 100 %. |
+| 2026-11-24 | Step 1.1 Review Board | 3 reviewer agents, 48 findings fixed or recorded; §1.8–1.10 principles, ADR-14, honest re-baseline; symlink support; CI runs the gate + gitleaks. Gate passed, mutation 100 %. |

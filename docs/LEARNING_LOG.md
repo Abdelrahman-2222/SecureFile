@@ -436,7 +436,7 @@ when the clock changes or the file moves to another time zone.
 | `ArgumentNullException.ThrowIfNull(formatProvider);` | Guard: the culture must be given. |
 | `if (sizeInBytes == 1) { return "1 byte"; }` | Grammar: "1 byte", not "1 bytes". |
 | `double size = sizeInBytes; int unitIndex = 0;` | Work with a decimal number; start at the "bytes" unit (index 0). |
-| `while (unitIndex < UnitNames.Length - 1 && Math.Round(size, 2, AwayFromZero) >= 1024)` | Keep moving to the next unit while the number **as it would be shown** is still ≥ 1024 — and stop at the last unit (EB). Rounding first avoids the ugly result "1024 KB" for 1,048,575 bytes. `AwayFromZero` is the same rounding the text formatting uses, so the check and the display always agree. |
+| `while (unitIndex < UnitNames.Length - 1 && Math.Round(size, 2, AwayFromZero) >= 1024)` | *(Replaced in the revision below by `ScaleToLargestFittingUnit`; same logic.)* Keep moving to the next unit while the number **as it would be shown** is still ≥ 1024 — and stop at the last unit (EB). Rounding first avoids the ugly result "1024 KB" for 1,048,575 bytes. `AwayFromZero` is the same rounding the text formatting uses, so the check and the display always agree. |
 | `size /= BytesPerUnitStep; unitIndex++;` | Divide by 1024 and step to the next unit name. |
 | `return string.Create(formatProvider, $"{size:0.##} {UnitNames[unitIndex]}");` | Build the text with the given culture. Format `0.##`: at most two decimals, no trailing zeros (`1.5`, not `1.50`). |
 
@@ -598,3 +598,114 @@ A **quality gate** is a list of checks that must *all* pass before work moves fo
 4. Why did we keep our own guard clause although `FileInfo` throws for empty paths too?
 5. What is mutation testing, and what did it reveal that 100 % coverage did not?
 6. Why is a gate check useless unless you have seen it fail once?
+
+### Step 1.1 — Review Board report (2026-11-24)
+
+Three independent reviewer agents read the code fresh and only reported (PROJECT_PLAN §1.8):
+**(A)** Architect + Performance/Algorithms engineer, **(B)** Security engineer + QA engineer + Critic,
+**(C)** Senior PM/Product Owner + End user + Team Lead. 48 findings in total. Every one was fixed or answered.
+
+#### Lesson — what a code review board is for
+
+One author reviewing their own work keeps the same blind spots. Reviewers with *different jobs* ask different
+questions: the architect asks "will this design survive the next steps?", the performance engineer "what is the Big-O
+and what does it allocate?", the security engineer "what can an attacker control?", QA "what case is missing?", the
+critic "what is the weakest part?", the PM "does this serve the requirement and the deadline?", the end user "would
+I understand this?", and the Team Lead "can you defend this?". The result is a list of findings with a severity;
+the author fixes each one or writes down why not. That record is what makes the work *defensible*.
+
+#### High findings — all fixed
+
+| ID | Finding | Fix |
+|---|---|---|
+| A1 | The "no UI framework" architecture rule matched the namespace prefix `System.Windows`, which would wrongly fail the first ViewModel that uses `ICommand` (`System.Windows.Input` lives in the cross-platform System.ObjectModel assembly). It only passed because Presentation is still empty. | Rules now check the referenced **assemblies** (PresentationFramework, WindowsBase, Avalonia…). Added "Core has types" so a rule can't pass on nothing. |
+| R1 | CI never ran `verify.ps1`; hooks can be bypassed, so "a failing push is impossible" was false. | The Windows CI job now runs the full gate; wording corrected: hooks are a fast local check, **CI is the real gate**. |
+| R2 | The empty-catch check could never fire: `git grep` reads one line, but our brace style puts `{` and `}` on separate lines. | Each C# file is now read whole (multi-line patterns) with comments removed first. Proven with a 3-line empty catch. |
+| F1–F3 | The plan's own numbers add up to ~5 coding days, plus process time; nothing works end-to-end until Stage 3. | Honest re-baseline (8–10 days, you chose quality over speed); vertical slice proposed as the first milestone after Step 1.7 (your decision). |
+
+#### Medium findings — fixed
+
+| ID | Finding | Fix |
+|---|---|---|
+| A2 | Complexity (Big-O) not stated as §1.9 requires | `<remarks>` "Complexity:" on `FileDetailsReader` and `FileSizeFormatter` |
+| A3 | `Read` can block for seconds on an unavailable network drive | Documented: UI must call it off the UI thread (`Task.Run`); added to UX spec §11.1 |
+| A5 / R6 | A symbolic link showed **0 bytes** on Windows (the link, not the file it points to) | `ResolveFinalTarget`: size and time come from the final target; the name stays the one the user chose; broken links → `FileNotFoundException`. Tests run on Linux/macOS CI and on Windows with Developer Mode |
+| R6 | Devices/FIFOs on Linux (`/dev/zero`) pass `Exists` with size 0 → later encryption could read forever | Decision: the encryption step (1.5) opens the file and rejects non-seekable streams — the right boundary, since only reading the content is affected |
+| R3 / R4 / R13 / R14 | `verify.ps1` could pass silently: `git grep` errors hidden, missing branch-coverage value defaulted to 100, English-text parsing for build warnings and vulnerable packages | git grep exit codes separated (0 found / 1 clean / other = FAIL); missing coverage = FAIL; build judged by exit code; vulnerable packages read from JSON |
+| R5 | Secret patterns thin; only the working tree scanned | More patterns (GitHub fine-grained tokens, Slack, Azure keys, `sk-` keys, passwords); **gitleaks** CI job scans the whole history |
+| R7 | The property test drew sizes uniformly, so ~99.9 % were PB/EB; and it was weak (a formatter that always says "0 bytes" passed) | Sizes now drawn per magnitude (bit length first); the shown text must convert back to the original size within rounding; 10,000 samples |
+| F9 | Planned messages showed the raw .NET message (`{reason}`), said "Windows denied access" in a cross-platform layer, and had no disk-full message | Fixed plain messages; "access was denied"; disk-full and file-in-use messages; details only in the log; file name only, never the full path |
+| F10 | Users could think the original is protected after encryption | Success text: "Encrypted copy saved. Your original file was not changed." |
+| F11 | A copied generated password stays in clipboard history | Generator is now *Could*; if built: "save it now" warning and clipboard cleared after 30 s |
+| F14 / F15 / F17 | Over-claims: "failing push impossible", CodeQL "free" on a private repo, "tested on 3 OS" | Reworded honestly in §1.7, §8.1, §1.9 |
+| F16 | Decrypt writes not-yet-verified plaintext to a temp file; left behind after a crash | Trade-off documented in ADR-07 with mitigations (hidden recognisable temp name, deletion in `finally`); two-pass kept as fallback |
+| TL | "Where does the password live in memory?" had no answer | Answer added to §5.2 (string limits, no `SecureString`, bytes wiped, honest limit) |
+| TL | Iteration "allowed range" had no numbers; OWASP figure unverified | 100,000–10,000,000 on read (too weak / denial of service); OWASP 600,000 verified on the cheat sheet itself |
+| TL | Is "keep running after an unexpected error" honest? | ADR-13: data stays consistent (atomic output); ViewModel reset; second error or process-level failure → Close only |
+| F4 / F5 | Too much scope for the time; no references file yet | *Could* items marked and time-boxed; usability test reduced to 2–3 people; `docs/REFERENCES.md` created |
+
+#### Low findings and notes — fixed or recorded
+
+| ID | Finding | Decision |
+|---|---|---|
+| A4 / R12 | Docs promised exceptions that cannot happen (`Read` never opens the file; size is cached after `Exists`) | Docs now say the result is a **snapshot**; speculative "changed while reading" removed; `PathTooLongException` kept (observed) |
+| A6 | Wrong comment ("static classes count as sealed" — they are *excluded*) and a magic string | Comment fixed; magic string replaced in Stage 2.2 when Presentation gets its first type |
+| A7 | Bonus plans trimming/Native AOT but analyzers are off | `<IsAotCompatible>true</IsAotCompatible>` on Core and Presentation |
+| A8 | "Matches Explorer" over-stated; unit words English-only | Remarks reworded (Explorer uses 3 significant digits); English units = recorded decision until translation |
+| F12 | `1023 bytes` without thousands separator | `1,023 bytes` (culture-aware `N0`); exact bytes in the UI tooltip |
+| F13 | `.enc` files have no icon/hint | Hint text in UX spec §11.1 |
+| R8 / R9 / R10 / R11 | Missing tests: UTC kind, 1.5 GB, the exact rounding boundary, relative path, locked/read-only/hidden files; misleading comment on an OS-dependent case | All added; comment corrected |
+| R15 | Pattern scan flagged comments; `throw\s+\w+;` blocked legitimate code | Comments stripped before matching; rule dropped (CA2200 in the build covers `throw ex;`); `ReadAllLines` and `Random r = new()` added |
+| R16 | Actions pinned by tag; checkout kept the token on disk | Actions pinned to commit SHAs (Dependabot updates them); `persist-credentials: false` |
+| R17 | Hook limited only the subject to 72, rejected `fixup!` commits | Whole line ≤ 72; `fixup!`/`squash!`/`amend!` allowed |
+| R18 | Exception `FileName` holds the full path (may include the user name) | `ErrorMessageProvider` shows the file name only (ADR-13) |
+| R19 | Nothing enforced ADR-12 (no network) | Architecture test bans network assemblies in Core and Presentation — proven by injecting `HttpClient` (test failed as expected) |
+| Mutation | The word "bytes" was written twice (the table entry became dead data) | DRY fix: the bytes branch uses `UnitNames[0]` |
+| Screenshot | `CodeMetricsConfig.txt` appeared inside every project in Solution Explorer | `Visible="false"` on the shared item |
+| F8 | Plan is long and repeats ADRs | Kept: the plan is the single source the presentation and final guide are built from; ADR files are added as each decision is implemented |
+
+#### Your question — "interfaces and services in the same folder?"
+
+Answered in **ADR-14**: organise **by feature** (`Files/`, `Cryptography/`), interface next to its implementation.
+SOLID's Interface Segregation is about the *size* of an interface and Dependency Inversion about depending on the
+interface *type* — neither is about folders. Grouping by feature gives high cohesion (one change = one folder).
+A separate abstractions project becomes right only when another assembly needs the contracts without the code.
+
+#### Complexity summary (G17)
+
+| Operation | Time | Space |
+|---|---|---|
+| `FileDetailsReader.Read(path)` | O(p) for the path + 1 metadata request (2 for a symbolic link); independent of file size | O(p) |
+| `FileSizeFormatter.Format(size, culture)` | O(1) — at most 6 divisions | O(1) — only the result text |
+
+#### Quality gate — Step 1.1 after the Review Board (final)
+
+Windows **Developer Mode** was turned on so the symbolic-link tests run locally too (Windows only lets ordinary
+users create symbolic links in Developer Mode; GitHub's Windows, Linux and macOS runners allow it already).
+
+| # | Check | Result |
+|---|---|---|
+| G1 | Requirement R2 | ✅ |
+| G2–G3 | Format, build with all analyzers | ✅ 0 warnings |
+| G4 | Tests | ✅ 54 passed, 0 failed, 0 skipped |
+| G5 | Core coverage | ✅ 100 % lines, 100 % branches |
+| G6–G8 | Vulnerable packages, secrets, forbidden patterns | ✅ none / none / clean |
+| G9 | Exceptions documented (ADR-13) | ✅ incl. links and snapshot semantics |
+| G10 | Architecture (assembly-based UI and network rules) | ✅ 5 tests |
+| G11 | Complexity ≤ 10, Maintainability Index ≥ 60 | ✅ build-enforced |
+| G12 | Mutation score | ✅ **100 %** (34/34). The last survivor (`returnFinalTarget: true` → `false`) was killed by a new link-chain test |
+| G13 | Performance | ✅ unchanged; one extra metadata request only for links |
+| G14 | Docs | ✅ |
+| G15 | Git | ✅ hooks + CI |
+| G16 | System design (ADR-14, SOLID review) | ✅ Review Board |
+| G17 | Complexity stated | ✅ `<remarks>` on both public types |
+| G18 | Review Board | ✅ 48 findings: all fixed or recorded |
+
+#### Self-check — Review Board (open book)
+
+1. Why did checking the *namespace* `System.Windows` give a wrong rule, and why are *assembly* references better?
+2. Why is CI the real quality gate while Git hooks are only a fast local check?
+3. Why must a symbolic link's size come from its final target — and which test proves "final"?
+4. Why do error messages show fixed text instead of the exception's own message?
+5. What is the trade-off in decrypting to a temp file in one pass, and how is the risk reduced?
+6. Why is "organise by feature" compatible with Interface Segregation and Dependency Inversion?

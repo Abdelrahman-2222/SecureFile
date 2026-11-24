@@ -16,6 +16,20 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Code-metric limits enforced by the build: cyclomatic complexity ≤ 10 (CA1502), Maintainability Index ≥ 60 (CA1505).
 - Architecture tests for the layer rule (Core and Presentation free of UI dependencies; Core classes sealed).
 - Exception-handling strategy ADR-13 (Core throws, ViewModel handles expected errors, global safety nets).
+- Review Board process (PROJECT_PLAN §1.8), design/algorithm standards (§1.9), engineering-principles checklist
+  (§1.10: SOLID, DRY, KISS, YAGNI, OOP, patterns, DSA, system design, SDLC) and ADR-14 (organise code by feature).
+- CI runs the full quality gate on Windows, a gitleaks secrets scan over the whole history, and pins every action
+  to a commit SHA without keeping the token on disk.
+- `docs/REFERENCES.md`: every source used and what it was used for.
+
+### Changed
+
+- File details of a symbolic link now report the size and change time of the file it points to (Windows reported
+  0 bytes); a link to a missing file is reported as not found.
+- File sizes below 1 KB use the culture's thousands separator (`1,023 bytes`).
+- Architecture tests check referenced assemblies (UI frameworks, network) instead of namespace prefixes.
+- Quality gate: multi-line pattern checks without comments, fail-closed coverage and git-grep handling, JSON-based
+  vulnerability audit, broader secret patterns; commit-msg hook checks the whole first line and allows `fixup!`.
 - Solution `SecureFile.slnx` with projects `SecureFile.Core`, `SecureFile.Presentation`, `SecureFile.Wpf`
   and test projects for core, presentation, integration and architecture tests.
 - `SecureFile.CrossPlatform.slnf` solution filter for building on macOS and Linux.
