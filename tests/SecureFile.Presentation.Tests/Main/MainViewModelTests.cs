@@ -414,7 +414,7 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
-    public async Task Browse_ReadFails_ClearsTheSelectionAndShowsTheMessage()
+    public async Task Browse_ReadFails_ShowsTheMessageAndSelectsNothing()
     {
         MainViewModel viewModel = CreateViewModel();
         _dialogs.OpenResult = InputPath;
@@ -426,6 +426,70 @@ public sealed class MainViewModelTests
         Assert.Null(viewModel.SelectedFile);
         Assert.Equal("The file or folder can't be found or opened.", viewModel.StatusMessage);
         Assert.Single(_errorLog.Exceptions);
+    }
+
+    [Fact]
+    public async Task OpenFile_BadDropAfterAGoodFile_KeepsThePreviousSelection()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        _detailsReader.ExceptionToThrow = new FileNotFoundException();
+
+        await viewModel.OpenFileCommand.ExecuteAsync(Path.Combine(Path.GetTempPath(), "gone.bin"));
+
+        Assert.Equal(MainViewState.Failed, viewModel.State);
+        Assert.Equal(InputPath, viewModel.SelectedFile?.FullPath); // the good file stays, with the message about the bad drop
+        Assert.Equal(ValidPassword, viewModel.Password);
+    }
+
+    [Fact]
+    public async Task Browse_FileChosenAfterAFailure_ShowsGuidanceAndKeepsThePasswords()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        _dialogs.SaveResult = InputPath + ".enc";
+        _encryption.ExceptionToThrow = new AuthenticationFailedException();
+        await viewModel.EncryptCommand.ExecuteAsync(null);
+
+        _dialogs.OpenResult = Path.Combine(Path.GetTempPath(), "other.bin");
+        await viewModel.BrowseCommand.ExecuteAsync(null);
+
+        Assert.Equal(MainViewState.FileSelected, viewModel.State);
+        Assert.False(viewModel.IsFailed);
+        Assert.Equal("other.bin", viewModel.SelectedFile?.Name);
+        Assert.Equal(ValidPassword, viewModel.Password); // the typed password survives a change of file
+        Assert.Equal(ValidPassword, viewModel.ConfirmPassword);
+    }
+
+    [Fact]
+    public async Task Cancel_WhenNothingIsRunning_DoesNothing()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        string message = viewModel.StatusMessage;
+
+        Assert.False(viewModel.CancelCommand.CanExecute(null)); // what Esc triggers: not available while idle
+        viewModel.CancelCommand.Execute(null);
+
+        Assert.Equal(MainViewState.FileSelected, viewModel.State);
+        Assert.Equal(message, viewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task Progress_ThenFailure_ClearsTheOldPercentageAndText()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        _dialogs.SaveResult = InputPath + ".enc";
+        var release = new TaskCompletionSource();
+        _encryption.WaitFor = release.Task;
+        Task running = viewModel.EncryptCommand.ExecuteAsync(null);
+        viewModel.OnProgress(42);
+        Assert.Equal(42, viewModel.ProgressPercentage);
+        Assert.NotEmpty(viewModel.ProgressText);
+
+        _encryption.ExceptionToThrow = new AuthenticationFailedException();
+        release.SetResult();
+        await running;
+
+        Assert.Equal(0, viewModel.ProgressPercentage);
+        Assert.Equal(string.Empty, viewModel.ProgressText);
     }
 
     [Fact]
@@ -683,7 +747,7 @@ public sealed class MainViewModelTests
     [InlineData("report.pdf", "Encrypt")]
     [InlineData("report.pdf.enc", "Decrypt")]
     [InlineData("REPORT.ENC", "Decrypt")]
-    public async Task RunPrimary_ChoosesTheOperationFromTheFileName(string fileName, string expectedOperation)
+    public async Task RunPrimary_ChoosesTheOperationFromWhetherTheFileIsEncrypted(string fileName, string expectedOperation)
     {
         string path = Path.Combine(Path.GetTempPath(), fileName);
         MainViewModel viewModel = await CreateWithFileAsync(path);

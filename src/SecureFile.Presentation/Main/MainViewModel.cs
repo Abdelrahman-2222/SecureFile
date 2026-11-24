@@ -220,7 +220,7 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanBrowse))]
     private Task BrowseAsync()
     {
-        return RunGuardedAsync(BrowseCoreAsync, clearSelectionOnFailure: true);
+        return RunGuardedAsync(BrowseCoreAsync);
     }
 
     /// <summary>The Browse work itself, without the error handling around it.</summary>
@@ -242,7 +242,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         return string.IsNullOrEmpty(path)
             ? Task.CompletedTask
-            : RunGuardedAsync(() => LoadFileAsync(path), clearSelectionOnFailure: true);
+            : RunGuardedAsync(() => LoadFileAsync(path));
     }
 
     /// <summary>
@@ -409,7 +409,7 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanEncrypt))]
     private Task EncryptAsync()
     {
-        return RunGuardedAsync(() => RunFileOperationAsync(encrypt: true), clearSelectionOnFailure: false);
+        return RunGuardedAsync(() => RunFileOperationAsync(encrypt: true));
     }
 
     /// <summary>Decrypts the chosen file to a location the user picks (suggested: same folder, name without <c>.enc</c>).</summary>
@@ -417,7 +417,7 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanRunFileOperation))]
     private Task DecryptAsync()
     {
-        return RunGuardedAsync(() => RunFileOperationAsync(encrypt: false), clearSelectionOnFailure: false);
+        return RunGuardedAsync(() => RunFileOperationAsync(encrypt: false));
     }
 
     /// <summary>
@@ -449,7 +449,6 @@ public sealed partial class MainViewModel : ObservableObject
     /// Runs a user action and handles the <b>expected</b> failures (ADR-13, Layer 2): log the details, show a plain message.
     /// </summary>
     /// <param name="action">The Browse or Encrypt/Decrypt work.</param>
-    /// <param name="clearSelectionOnFailure">Whether a failure also forgets the chosen file (true for Browse, whose file could not be read).</param>
     /// <returns>A task that completes when the action has ended, successfully or with a handled failure.</returns>
     /// <remarks>
     /// Only the specific types Core and the file system document are caught. <see cref="ArgumentException"/> (a
@@ -457,7 +456,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <see cref="FileNotFoundException"/>, <see cref="DirectoryNotFoundException"/> and the like are covered by
     /// <see cref="IOException"/>.
     /// </remarks>
-    private async Task RunGuardedAsync(Func<Task> action, bool clearSelectionOnFailure)
+    private async Task RunGuardedAsync(Func<Task> action)
     {
         try
         {
@@ -469,19 +468,19 @@ public sealed partial class MainViewModel : ObservableObject
         }
         catch (SecureFileException exception)
         {
-            Fail(exception, clearSelectionOnFailure);
+            Fail(exception);
         }
         catch (IOException exception)
         {
-            Fail(exception, clearSelectionOnFailure);
+            Fail(exception);
         }
         catch (UnauthorizedAccessException exception)
         {
-            Fail(exception, clearSelectionOnFailure);
+            Fail(exception);
         }
         catch (NotSupportedException exception)
         {
-            Fail(exception, clearSelectionOnFailure);
+            Fail(exception);
         }
         finally
         {
@@ -515,16 +514,14 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Logs a handled exception and shows its plain message.</summary>
     /// <param name="exception">The expected exception.</param>
-    /// <param name="clearSelection">Whether to forget the chosen file.</param>
-    private void Fail(Exception exception, bool clearSelection)
+    /// <remarks>
+    /// The chosen file is kept: a bad drop or Browse leaves the previous good selection in place (backlog B1 item 12), and
+    /// a failed operation keeps its file so the user can fix the password and try again.
+    /// </remarks>
+    private void Fail(Exception exception)
     {
         _errorLog.Write(exception);
         ClearProgress();
-        if (clearSelection)
-        {
-            SelectedFile = null;
-        }
-
         State = MainViewState.Failed;
         StatusMessage = ErrorMessageProvider.GetMessage(exception);
     }

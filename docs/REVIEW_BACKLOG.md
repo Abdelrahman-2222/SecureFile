@@ -17,12 +17,14 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 ## A2. Fixed in Stage 5 (Step 5.6)
 
 - **20** Cancelling the Save dialog left an old red message (test `Encrypt_SaveDialogCancelledAfterAFailure_ClearsTheOldErrorMessage`).
+- **12 (part)** A bad drop or Browse no longer clears the previous good selection (tests `OpenFile_BadDropAfterAGoodFile_KeepsThePreviousSelection`, `Browse_FileChosenAfterAFailure_...`).
+- **B5, part** VM tests added: progress cleared after a failure, a bad drop keeping the old selection, Esc/Cancel with no operation, a file chosen after a failure, passwords surviving a file change; the misnamed `RunPrimary_...` test renamed.
 
 ## B. Open: from the review (grouped; do in this order)
 
 ### B1. Do first: small, visible, low risk
 - **9** Mnemonics `_Password` and `Co_nfirm` still target the collapsed password boxes when "Show password" is on (the F clash is fixed).
-- **12** A bad drop or Browse clears the previous good selection; a dropped folder says "can't be found or opened" (should say it is a folder);
+- **12 (rest)** A dropped folder says "can't be found or opened" (should say it is a folder);
   several dropped files silently use the first; dropping while busy shows a copy cursor; only the dashed zone is a drop target.
 - **17 / 31** Drop-zone text "Drop a file here or Browse…" and a drag-over highlight; the first-run text is repeated three times.
 - **16 / 33** File card: a long name hides extension and size; add a tooltip, the folder, the date and the exact size (plan §11.1 promised them).
@@ -58,7 +60,7 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 ### B5. Test gaps still open
 - Window code-behind (password sync, Caps Lock, drop handler, closing) has no unit test; add a FlaUI case with Show password ticked and one for
   close-during-operation, or extract the sync into a testable class.
-- VM: a progress value that is non-empty and then cleared (the fake never reports progress); a bad drop keeping the old selection; Esc with no
+- VM: (done in Step 5.6, see A2)
   operation; a file chosen after a failure; passwords surviving a file change. `RunPrimary_ChoosesTheOperationFromTheFileName` is misnamed.
 - `ProgressTextFormatter` above one hour, 99 % at a tiny `elapsed`, a comma-decimal culture. The Save filter (`BuildSaveFilter`). Close during an operation.
 - A "Cli is free of UI and network assemblies" rule in `SecureFile.Architecture.Tests` (the Cli project is not covered).
