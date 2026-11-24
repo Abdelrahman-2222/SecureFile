@@ -1,6 +1,7 @@
 using System.Reflection;
 using NetArchTest.Rules;
 using SecureFile.Core.Files;
+using SecureFile.Presentation.Main;
 using ArchitectureTestResult = NetArchTest.Rules.TestResult;
 
 namespace SecureFile.Architecture.Tests;
@@ -17,8 +18,7 @@ public sealed class LayerDependencyTests
 {
     private static readonly Assembly CoreAssembly = typeof(FileDetails).Assembly;
 
-    // Stage 2.2: replace with typeof(MainViewModel).Assembly once Presentation has its first type.
-    private static readonly Assembly PresentationAssembly = Assembly.Load("SecureFile.Presentation");
+    private static readonly Assembly PresentationAssembly = typeof(MainViewModel).Assembly;
 
     /// <summary>Assemblies that only a user-interface project may reference.</summary>
     private static readonly string[] UserInterfaceAssemblyPrefixes =

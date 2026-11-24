@@ -57,6 +57,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - `SECURITY.md`: how to report a vulnerability privately, and what is in scope.
 - Presentation service interfaces: `IFileDialogService` (native Open/Save dialogs; Save confirms replacing) and
   `IErrorLog` (local technical log, never throws).
+- `MainViewModel` with one `MainViewState` (no file → working → file selected → succeeded / failed) and a Browse
+  command that reads the file details off the UI thread and shows name, extension and size.
 
 ### Changed
 
