@@ -4,6 +4,8 @@
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>SecureFile.Presentation</RootNamespace>
+    <!-- Trimming / Native AOT analyzers on (see SecureFile.Core.csproj). -->
+    <IsAotCompatible>true</IsAotCompatible>
   </PropertyGroup>
 
   <ItemGroup>
