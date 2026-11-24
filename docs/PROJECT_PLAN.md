@@ -359,8 +359,9 @@ We need **two different keys**: one for AES, one for HMAC (never reuse one key f
 | Option | Notes | Verdict |
 |---|---|---|
 | Read the whole file into memory (`File.ReadAllBytes`) | Simple, but a 4 GB file needs 4 GB+ of RAM, and >2 GB fails. | ❌ |
-| Manual `TransformBlock` loop | Full control, but padding/last-block handling is easy to get wrong. | ❌ |
-| **`CryptoStream` + an explicit read/write loop with a reused buffer (1 MiB, `ArrayPool`)** | Constant memory for any size; the loop is visible and easy to explain; one place to add HMAC, progress and cancel. | ✅ |
+| `CryptoStream` + read/write loop with a reused buffer | Constant memory, but for **decryption** disposing the stream after a failed check runs the final block and throws a *padding* error (verified in Review Board 1.4), so padding would be examined before the HMAC verdict. Also hides when the last block is processed. | ❌ (revised 2026-11-24) |
+| **Our own loop with a reused 1 MiB `ArrayPool` buffer and `ICryptoTransform.TransformBlock`; `TransformFinalBlock` only at the end — for decryption only after the HMAC tag matched** | Constant memory for any size; every step is visible (read → HMAC → transform → write → progress → cancel); the padding of an unverified file is never touched. The last-block rule is pinned by a test (`Decryptor_TransformBlock_HoldsBackTheLastBlockUntilFinalBlock`). Encryption uses the same loop shape. | ✅ |
+| One-shot `EncryptCbc`/`DecryptCbc` per chunk with manual chaining | Chaining IVs and padding by hand is new correctness risk for no measurable gain. | ❌ |
 
 ### ADR-07 — Safe output on decrypt
 
@@ -565,9 +566,9 @@ password ──NFC normalize──► UTF-8 bytes
 1. Read and **validate the header**: magic, version, iteration range, file length ≥ 89, ciphertext length multiple of 16.
 2. Derive keys from the password and the stored salt/iterations.
 3. Open a temp file in the destination folder.
-4. Loop over exactly `n` ciphertext bytes: add chunk to the HMAC → write chunk into a `CryptoStream` (AES decryptor) that writes plaintext to the temp file → progress → cancel.
+4. Loop over exactly `n` ciphertext bytes (whole 16-byte blocks, 1 MiB pooled buffer): add chunk to the HMAC → `decryptor.TransformBlock` (it always holds back the last block) → write plaintext to the temp file → progress → cancel. **No decrypting `CryptoStream`:** disposing one after a failed check runs the final block and throws a padding error, so padding would be examined before the verdict (Review Board 1.4, R1 — verified).
 5. Read the stored tag; compare with the computed tag using `CryptographicOperations.FixedTimeEquals` (constant time).
-6. **Mismatch** → delete temp → "Wrong password, or the file was changed or damaged." **Match** → finish the final block → atomic move.
+6. **Mismatch** → delete temp → "Wrong password, or the file was changed or damaged." **Match** → `TransformFinalBlock` (only now is the padding checked and removed) → flush → atomic move.
 
 ---
 
@@ -646,9 +647,9 @@ Why does Core not reference WPF? What does `TreatWarningsAsErrors` buy us?
 | 1.1 | `FileDetails` (name, size in bytes, extension, last modified) + `FileSizeFormatter` (`1.5 MB`). | Unit tests for 0 B, 1023 B, 1 KB, >4 GB, no extension, `.tar.gz`, `.bashrc`. | 🟨 done — quality gate passed (G1–G15, mutation 100 %) — self-check pending |
 | 1.2 | `EncryptedFileFormat` constants + `EncryptedFileHeader` (write/read/validate). | Tests: round-trip, wrong magic, unknown version, iterations out of range, file too short. | 🟨 done — quality gate passed (Review Board: 0 High, 2 Medium fixed), mutation 100 % — self-check pending |
 | 1.3 | `KeyDerivation`: PBKDF2 → HKDF (§5.2), NFC normalization, key wiping. | Known-answer tests: RFC 7914 §11 (PBKDF2-HMAC-SHA256), RFC 5869 test case 1 (HKDF-SHA256). | 🟨 done — quality gate passed (Review Board: 0 High, 3 Medium fixed), mutation 100 % — self-check pending |
-| 1.4 | AES-CBC check against NIST: prove we call `Aes` correctly. | NIST SP 800-38A F.2.5/F.2.6 (CBC-AES256) vectors pass (with `PaddingMode.None` for the vector). | ⬜ |
+| 1.4 | AES-CBC check against NIST: prove we call `Aes` correctly. | NIST SP 800-38A F.2.5/F.2.6 (CBC-AES256) vectors pass (with `PaddingMode.None` for the vector). | 🟨 done — through the production factory (`AesCbc.CreateEncryptor/CreateDecryptor`), quality gate passed, mutation 100 % — self-check pending |
 | 1.5 | `FileEncryptionService.EncryptAsync` (§5.3): streaming, HMAC, progress, cancel, temp + move. | Round-trip tests at 0, 1, 15, 16, 17 bytes, 1 MiB ± 1; same input → different output each time. Keys: `using FileKeys keys = await Task.Run(() => KeyDerivation.DeriveKeys(password, header), ct);` (off the UI thread; pass the `string`, a span cannot be captured; Review Board 1.3, R9). | ⬜ |
-| 1.6 | `FileEncryptionService.DecryptAsync` (§5.4): verify-then-commit. | Wrong password and every tamper/truncation case fail **and leave no output file**. Header read with `ReadAtLeast(buffer, 41, throwOnEndOfStream: false)` and only the bytes read passed to `EncryptedFileHeader.Read`, **before** `GetCiphertextLength` (Review Board 1.2, R1); tests: a 3-byte text file → `NotEncryptedFile`, an 80-byte file starting with `SFEN` → `Damaged`. | ⬜ |
+| 1.6 | `FileEncryptionService.DecryptAsync` (§5.4): verify-then-commit. | Wrong password and every tamper/truncation case fail **and leave no output file**. Header read with `ReadAtLeast(buffer, 41, throwOnEndOfStream: false)` and only the bytes read passed to `EncryptedFileHeader.Read`, **before** `GetCiphertextLength` (Review Board 1.2, R1); tests: a 3-byte text file → `NotEncryptedFile`, an 80-byte file starting with `SFEN` → `Damaged`. Decrypt with our own `TransformBlock` loop and call `TransformFinalBlock` only after `FixedTimeEquals` succeeds (§5.4, Review Board 1.4, R1); test that chunked and one-call results are equal (R5). | ⬜ |
 | 1.7 | Error model (ADR-13 Layer 1): `AuthenticationFailedException` with the three standard constructors (`SecureFileException` and `InvalidEncryptedFileException` were pulled forward into Step 1.2). | Every failure in §9 maps to one exception type; tests prove no partial output. | ⬜ |
 | 1.8 | `PasswordStrengthEvaluator` (simple rules: length + character variety) and `PasswordGenerator` (`RandomNumberGenerator`). | Tests for empty, short, long, Unicode passwords. A maximum length (e.g. 1,024 characters, also `PasswordBox.MaxLength`) so a pasted 100 MB text cannot waste memory (Review Board 1.3, R5). | ⬜ |
 
@@ -1146,3 +1147,4 @@ whether the WPF Fluent `ThemeMode` API is still marked experimental in .NET 10, 
 | 2026-11-24 | Decision | Vertical slice first: after Step 1.7, build the thinnest end-to-end app before Step 1.8 and UI polish (§7). |
 | 2026-11-24 | Step 1.2 | Encrypted file header: format constants, header write/read/validate, `SecureFileException` + `InvalidEncryptedFileException` (with `Reason`), 80 tests incl. golden bytes and fuzzing. Review Board: 0 High, 2 Medium + 3 Low fixed. Gate passed. |
 | 2026-11-24 | Step 1.3 | Key derivation: NFC → UTF-8 → PBKDF2-HMAC-SHA256 → HKDF-Expand into two keys; `FileKeys` wipes keys on dispose. RFC 7914 / RFC 5869 vectors + Python-computed golden keys; PBKDF2 600k measured at ≈0.46 s. Review Board: 0 High, 3 Medium fixed (fail-closed normalisation, error naming, mutation exclusions with reasons). Gate passed, mutation 100 %. |
+| 2026-11-24 | Step 1.4 | `AesCbc` factory returns ready AES-256-CBC/PKCS7 encryptor/decryptor for (key, IV). NIST SP 800-38A F.2.5/F.2.6 + OpenSSL-checked padding cases. Review Board: 1 High for the 1.6 design recorded (no decrypting CryptoStream; finish last block only after HMAC check), 3 Medium fixed. Gate passed, mutation 100 %. |

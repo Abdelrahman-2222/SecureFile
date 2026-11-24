@@ -1218,3 +1218,160 @@ costs about 88 ms to convert. **No High findings.**
 7. Why did the first version's `Debug.Assert` become a real `throw`?
 8. What is a known-answer test, and why were the golden keys computed with Python and not with our own code?
 9. Why are some lines excluded from mutation testing, and how do we keep that honest?
+
+## Step 1.4 — AES-256-CBC, checked against NIST (requirement R3) · 2026-11-24
+
+### Lesson 1.4 — the concepts used in this step
+
+**1. AES is a block cipher.**
+AES (the Advanced Encryption Standard, FIPS 197) takes exactly **16 bytes** (one *block*) and a key, and turns them
+into 16 bytes that look random. With the key, the block can be turned back. *Analogy:* a lockbox that holds exactly
+16 letters. The key size picks the strength: 16 bytes = AES-128, 24 = AES-192, **32 = AES-256** (ours). .NET
+picks the size *from the key length*, so a 16-byte key by mistake would silently give AES-128. That is why our
+factory refuses any key that is not exactly 32 bytes.
+
+**2. A mode of operation: how to encrypt more than 16 bytes.**
+Files are longer than one block, so a *mode* says how the blocks are chained.
+- **ECB** (each block alone) is broken: identical blocks give identical output, so patterns stay visible (the
+  famous "ECB penguin" picture is still recognisable after encryption). The analyzer forbids it (CA5358).
+- **CBC** (Cipher Block Chaining, the mode the task requires): before encrypting a block, XOR it with the
+  *previous ciphertext block*. The first block is XORed with the **IV**. Every output block then depends on all the
+  data before it, so repeated data does not repeat in the output.
+
+**3. Why the IV must be random for every file.**
+With the same key and the same IV, the same file gives exactly the same bytes, so an observer could tell that two
+encrypted files are equal (test `Encrypt_SameDataWithDifferentIv_…`). A fresh random IV per file (from the header,
+Step 1.2) prevents that. The IV is not secret.
+
+**4. PKCS7 padding: filling the last block.**
+AES works on whole 16-byte blocks, so the last block is filled up. PKCS7 adds *n* bytes, each holding the value *n*:
+1 byte missing → `01`; 15 missing → fifteen `0F`. If the data already fills the last block, a **whole extra block**
+of sixteen `10` (16) is added. Otherwise the decryptor could not tell padding from real data that happens to end in
+`01`. So the encrypted size is always `(⌊size / 16⌋ + 1) × 16`, and an empty file becomes one block. That is why
+the smallest encrypted file is 89 bytes (Step 1.2). Test `Decrypt_EmptyFileCiphertextWithoutRemovingPadding_…`
+shows the sixteen `10` bytes.
+
+**5. What CBC does *not* do, and why we need the HMAC.**
+CBC hides the data but does **not** detect changes:
+- **Tampering:** flipping one bit in a ciphertext block garbles that block and flips *the same bit* in the next
+  plaintext block, with no error at all. An attacker can make controlled changes (test
+  `Decrypt_CiphertextWithOneBitChanged_…`).
+- **Wrong password:** a wrong key usually breaks the padding (an exception), but about 1 time in 256 the padding
+  looks valid and garbage comes out with no error.
+- **Padding oracle:** if an app tells an attacker "bad padding" versus "other error", the attacker can decrypt a
+  file byte by byte, just by asking. This attack is well known and practical.
+
+The fix is **encrypt-then-MAC** (ADR-04): the HMAC tag over header and ciphertext is checked **before** decrypting
+anything that is kept, and every failure gives the same message ("wrong password, or the file was changed"). The
+attacker learns nothing, and no unverified data reaches the user.
+
+**6. Known-answer tests against NIST, and three independent sources.**
+NIST SP 800-38A Appendix F publishes AES-256-CBC example vectors (F.2.5 encrypt, F.2.6 decrypt): key, IV, four
+plaintext blocks and the expected ciphertext. Our configured cipher must reproduce them exactly.
+- The NIST vector has no padding (exactly four blocks), so the test switches padding off for that one check.
+- For the *padded* cases (0, 1, 15, 16, 17 bytes), NIST has no vector, so the expected bytes were computed with
+  **OpenSSL** (`openssl enc -aes-256-cbc`), a completely separate AES implementation. .NET on Windows uses Windows
+  CNG; OpenSSL is a different code base.
+- OpenSSL also reproduced the NIST vector, and the NIST values were read from the NIST PDF itself. Three sources agree.
+
+**7. A security analyzer at work (CA5401).**
+The build refused the tests at first: CA5401 warns when encryption uses a fixed IV ("could be repeatable"). It is
+right in general, but a known-answer test *must* use the published IV. So the warning is suppressed **only for this
+test class**, with a written justification. The app itself takes the IV from the random header. In production, CA5401 fires even on random IVs (it cannot see where they come from), so `CreateEncryptor` carries one suppression with the reason written next to it.
+
+**8. `var`: when the type is already visible.**
+`var aes = Aes.Create();`. The project's style (IDE0007) asks for `var` when the type is obvious from the right-hand
+side, and explicit types otherwise. The build enforced it.
+
+### Design review before coding (§1.10)
+
+| Principle | Answer for this step |
+|---|---|
+| Single responsibility / DRY | One place configures AES (`AesCbc.CreateEncryptor` / `CreateDecryptor`). Steps 1.5 and 1.6 both use it, so encrypt and decrypt cannot drift apart. |
+| YAGNI | Only a factory. The streaming loop comes in Step 1.5, when it is needed. The factory exists now so the NIST test checks *our* configuration, not a copy of it. |
+| Fail fast / secure by design | The key length is checked *before* the cipher is created: no silent AES-128, and nothing to clean up. |
+| Encapsulation | `internal`: only Core uses it. The caller disposes the cipher, which clears its own key copy. |
+| Algorithms | AES-CBC is O(n) for n bytes. Encryption cannot run in parallel (each block needs the previous one); decryption could, but files are I/O-bound anyway. The OS uses the processor's AES instructions. |
+| Pattern | **Factory method**: hides *how* the cipher is configured behind one name. |
+
+### Walkthrough — `src/SecureFile.Core/Cryptography/AesCbc.cs` (final version, after the Review Board)
+
+| Code | Meaning |
+|---|---|
+| `internal static class AesCbc` | A factory with no state, used only inside Core. |
+| `CreateEncryptor(ReadOnlySpan<byte> key, ReadOnlySpan<byte> iv)` / `CreateDecryptor(…)` | Return a ready **`ICryptoTransform`** for one file. Key *and* IV are required together, so the file's IV cannot be forgotten. |
+| `using Aes aes = CreateConfigured(key, iv); return aes.CreateEncryptor();` | The `Aes` object is only a builder. It is disposed at once (clearing its key copy), and the transform keeps working on its own (verified by the Review Board). |
+| `[SuppressMessage("Security", "CA5401", Justification = …)]` on `CreateEncryptor` | CA5401 fires even for IVs from `RandomNumberGenerator` (verified): the analyzer cannot follow where the IV comes from. One method-level suppression, with the reason written in the code. A test proves that two encryptions of the same data differ. |
+| `RequireLength(key, KeyDerivation.KeyLength, …)` / `RequireLength(iv, EncryptedFileFormat.IvLength, …)` | Both lengths are checked *before* anything is created. One constant per fact: the key length comes from `KeyDerivation`, the IV length from the format. |
+| `var aes = Aes.Create(); aes.SetKey(key); aes.IV = iv.ToArray();` | The OS implementation (Windows CNG, OpenSSL, Apple). The key is copied from a span; the IV is not secret, so an ordinary copy is fine. |
+| `aes.Mode = CipherMode.CBC; aes.Padding = PaddingMode.PKCS7;` | Already the .NET defaults, set explicitly so the code *states* the format's rule. |
+
+### Walkthrough — the tests (`AesCbcTests`)
+
+| Test | What it proves |
+|---|---|
+| `CreateEncryptor_NistF25Vector_…` | Our encryptor writes the four NIST F.2.5 blocks, then one PKCS7 block (computed by OpenSSL). |
+| `CreateDecryptor_NistF26Vector_…` | Our decryptor gives back the NIST F.2.6 plaintext exactly. |
+| `EncryptThenDecrypt_VariousLengths_…` (0, 1, 15, 16, 17 bytes) | Matches OpenSSL byte for byte; size follows the §5.1 formula; round-trips. |
+| `Ciphertext_OfEmptyFile_HoldsSixteenPaddingBytesOfValue16` | PKCS7 made visible (with plain .NET AES, since the app never turns padding off). |
+| `CreateEncryptor_SameDataWithDifferentIv_…` | Same IV → same bytes; different IV → different bytes. This is why every file has a random IV. |
+| `Decrypt_CiphertextWithOneBitChanged_…` | CBC lets a bit flip through silently. This is why the HMAC exists. |
+| `Decrypt_WithThisWrongKey_ThrowsBecauseThePaddingIsBroken` | Deterministic for this key. The comment explains why a *random* wrong key slips through about 1 time in 256. |
+| `Decryptor_TransformBlock_HoldsBackTheLastBlockUntilFinalBlock` | The behaviour Step 1.6 relies on: the last block is released only by the final call, *after* the HMAC check. |
+| `Create_KeyNot32Bytes_…` (0, 16, 24, 31, 33) / `Create_IvNot16Bytes_…` (0, 15, 17) | Both factory methods refuse wrong lengths, including the sizes that would silently be AES-128 or AES-192. |
+
+**Mutation testing note:** the first version had `// Stryker disable` comments on the `Mode` and `Padding` lines
+"just in case". A re-run showed Stryker creates **no** mutants for those lines, so the comments were noise and
+were removed. The rule: exclude only a mutant that *actually* survives, with a reason.
+
+### Step 1.4 — Review Board report (2026-11-24)
+
+The reviewer ran throwaway probe programs to check how .NET actually behaves:
+- CA5401 also fires on random IVs.
+- `EncryptCbc` ignores the `Mode` and `Padding` settings.
+- A transform keeps working after its `Aes` object is disposed.
+- A decrypting `CryptoStream` with a broken last block **throws from `Dispose`**.
+- 788 of 200,000 random blocks decrypt with valid PKCS7 padding, which matches the expected 1 in 256.
+
+| ID | Role | Severity | Finding | Decision |
+|---|---|---|---|---|
+| R1 | Security / Architect | **High (for the Step 1.6 design)** | With the planned `CryptoStream` for decryption, disposing it after an HMAC mismatch runs the final-block step and throws a *padding* error (verified). That replaces the planned "wrong password" path, and it processes the padding before the verdict. | **Recorded** in ADR-06, §5.4 and the Step 1.6 row: decryption uses our own `TransformBlock` loop, and `TransformFinalBlock` only runs **after** `FixedTimeEquals` succeeds. A new test pins the "last block is held back" behaviour this relies on. |
+| R2 | Architect | Medium | Returning a mutable `Aes` with its own random IV made "forgot to set the IV" possible, which would produce files that can never be decrypted. | **Fixed:** `CreateEncryptor(key, iv)` / `CreateDecryptor(key, iv)` return ready transforms; both lengths are checked. |
+| R3 | Security / Build | Medium | CA5401 will fire on production code (verified, even with random IVs). | **Fixed:** one method-level suppression with a written reason, backed by the "different IV → different output" test. |
+| R4 | QA | Medium | The wrong-key test accepted "exception **or** garbage", but its inputs always throw, so a regression returning garbage would still pass. | **Fixed:** `Assert.Throws<CryptographicException>`; the 1-in-256 explanation stays as a comment. |
+| R5 | QA | Low | No test that chunked `TransformBlock` calls equal one call. | **Recorded** for Steps 1.5 and 1.6, where the loop lives. |
+| R6 | Critic | Low | The exclusion named the `Assignment` mutator, which does not apply to `=`. | **Moot:** the comments were removed (Stryker makes no mutants there). |
+| R7 | Critic | Low | Two `KeyLength` constants kept in step only by a test. | **Fixed:** `AesCbc` uses `KeyDerivation.KeyLength`, so there is one source. |
+| R8 | Security | Low | The `Aes` object's key copy is not pinned; the OS library holds its own. | **Documented** in the class remarks. The `Aes` object now lives only for one line. |
+| R9–R12 | Several | Note / Good | Negligible cost; vectors from outside our code; the factory is justified; small, traceable step. | No change. |
+
+**Recommendation recorded for Steps 1.5/1.6:** use our own loop over a 1 MiB `ArrayPool` buffer with
+`TransformBlock`, and do **not** use the one-shot `EncryptCbc` per chunk (chaining by hand is new risk). Decrypt:
+HMAC each chunk → `TransformBlock` → write to temp file → progress → cancel check; after the loop, `FixedTimeEquals`;
+only on a match, `TransformFinalBlock` → flush → move. Encrypt uses the same loop shape for symmetry.
+
+#### Quality gate — Step 1.4
+
+| # | Check | Result |
+|---|---|---|
+| G1 | "Done when": NIST SP 800-38A F.2.5/F.2.6 pass | ✅ through the production factory, plus OpenSSL-checked padding cases |
+| G2–G3 | Format, build with all analyzers | ✅ 0 warnings (IDE0007 and CA5401 handled, see above) |
+| G4 | Tests | ✅ 190 passed (20 new), 0 failed, 0 skipped |
+| G5 | Core coverage | ✅ 99.4 % lines, 97.9 % branches (the only uncovered code is still the fail-closed line from Step 1.3) |
+| G6–G8 | Packages, secrets, patterns | ✅ |
+| G9 | Exceptions documented; no secrets in messages | ✅ |
+| G10–G11 | Architecture, complexity, MI | ✅ |
+| G12 | Mutation score | ✅ **100 %**, with no exclusions in `AesCbc` |
+| G13 | Performance | ✅ O(1) creation; AES uses the processor's AES instructions |
+| G14–G18 | Docs, Git, design, complexity, Review Board | ✅ 12 findings: 1 High recorded for Step 1.6 (with a test), 3 Medium fixed, the rest fixed or recorded |
+
+### Self-check 1.4 (open book)
+
+1. Why is ECB unsafe, and what does CBC add?
+2. What does PKCS7 add to a 16-byte file, and why a whole block?
+3. Show with the bit-flip test why CBC alone is not enough. What does the HMAC add?
+4. What is a padding oracle, and how does our design make sure there is none?
+5. Why does the factory take the key *and* the IV together, instead of returning an `Aes` object?
+6. Why are 16- and 24-byte keys rejected, when AES accepts them?
+7. CA5401 fired twice. Why is it suppressed in the tests and in `CreateEncryptor`, and why is that honest?
+8. Why must Step 1.6 call `TransformFinalBlock` only after the HMAC check, and not use a decrypting `CryptoStream`?
