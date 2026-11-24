@@ -3,6 +3,11 @@
   <!-- Architecture tests: enforce the layer rule (UI -> Presentation -> Core) automatically. -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
+    <!--
+      Exit code 8 = "zero tests ran". Ignored only while this project has no tests yet.
+      Remove this line when its first test is added (see PROJECT_PLAN stage for this project).
+    -->
+    <TestingPlatformCommandLineArguments>$(TestingPlatformCommandLineArguments) --ignore-exit-code 8</TestingPlatformCommandLineArguments>
   </PropertyGroup>
 
   <ItemGroup>
