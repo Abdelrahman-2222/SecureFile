@@ -710,7 +710,7 @@ Why `FixedTimeEquals` instead of `==`? Why HKDF instead of 64 bytes from PBKDF2?
 | 2.1 | Service interfaces: `IFileDialogService`, `IMessageService`, `IShellService` (open folder), `IClipboardService`. | Interfaces documented. | 🟨 slice form — `IFileDialogService` + `IErrorLog` (ADR-13 log); `IShellService` and `IClipboardService` come with the steps that use them (3.5, 1.8); no `IMessageService`: messages are shown in the window |
 | 2.2 | `MainViewModel` with clear states: *No file → File selected → Working → Succeeded / Failed*. | State diagram in `LEARNING_LOG.md`. | 🟨 slice form — `MainViewState` enum (diagram in its XML docs and the slice section of LEARNING_LOG); Browse shows name, extension and size |
 | 2.3 | Commands: Browse, Encrypt, Decrypt, Cancel, Generate password, Open folder; `CanExecute` rules. | Buttons enable/disable correctly in tests. | 🟨 slice form — Browse, Encrypt, Decrypt with CanExecute (file + password + not busy); Save dialog suggests `.enc` added/removed; Cancel, Generate password, Open folder come in 3.5/1.8 |
-| 2.4 | Auto-detect: if the file starts with `SFEN`, suggest Decrypt; otherwise Encrypt. A small Core method takes the path and returns `true`/`false` (built on `EncryptedFileFormat.HasSignature`), so the ViewModel never reads file bytes itself (Review Board 1.2, R8). | Tests for both cases. | ⬜ |
+| 2.4 | Auto-detect: if the file starts with `SFEN`, suggest Decrypt; otherwise Encrypt. A small Core method takes the path and returns `true`/`false` (built on `EncryptedFileFormat.HasSignature`), so the ViewModel never reads file bytes itself (Review Board 1.2, R8). | Tests for both cases. | ✅ done 2026-11-24 (Step 4.3 finding): `FileDetailsReader` reads the first 4 bytes and sets `FileDetails.IsEncrypted` (via `HasSignature`), so the ViewModel never reads bytes; the window offers Encrypt or Decrypt by content, not name. Core tests for both cases + a renamed file + a locked file; ViewModel tests for the buttons |
 | 2.5 | ViewModel tests with fake services (no window needed). | Presentation coverage ≥ 85%. | ⬜ |
 | 2.6 | `ErrorMessageProvider` + per-command `try/catch` with specific catches (ADR-13 Layer 2). | Every exception in the ADR-13 table gives its message; unexpected exceptions are **not** caught here. | ✅ |
 
@@ -738,7 +738,7 @@ responsive during a 4 GB encryption? Why do sizes/spacing follow a 4/8 px grid?
 |---|---|---|---|
 | 4.1 | Integration tests on the real file system (§9.2). | All pass. | ✅ |
 | 4.2 | Large-file runs: 1 GB and >4 GB (manual or nightly, not every commit). | Round-trip OK, memory stays flat. | 🟡 1 GiB done (46 MB peak); 4.5 GiB blocked: Kaspersky kills the test exe (2026-11-24), rerun elsewhere |
-| 4.3 | `TESTPLAN.md` manual script + exploratory session. | Every item ticked, bugs fixed. | 🟡 script written (docs/TESTPLAN.md); needs a human run |
+| 4.3 | `TESTPLAN.md` manual script + exploratory session. | Every item ticked, bugs fixed. | 🟡 script written (docs/TESTPLAN.md); first hand run found and fixed 5 issues (no clear result, file and password not cleared, empty "Save as type", no Show password, misleading warning and buttons); full run (sections A–I) still to do |
 | 4.4 | Short usability check with 2–3 non-technical people (task success, time to first encryption; SUS questionnaire optional). | All complete the task unaided; findings fixed or recorded. | 🟡 protocol written (docs/USABILITY.md); needs 3–5 real people |
 
 ### Stage 5 — Measure and harden (Phase 1 report) · ~½ day
