@@ -45,7 +45,8 @@
     Because warnings are errors, code that is too complex or hard to maintain cannot be built.
   -->
   <ItemGroup>
-    <AdditionalFiles Include="$(MSBuildThisFileDirectory)CodeMetricsConfig.txt" />
+    <!-- Visible="false": analyzers read it, but it is not shown as a file inside every project in Solution Explorer. -->
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)CodeMetricsConfig.txt" Visible="false" />
   </ItemGroup>
 
   <!-- Build reproducibility. -->

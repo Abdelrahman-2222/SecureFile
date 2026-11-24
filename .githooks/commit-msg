@@ -1,8 +1,10 @@
 #!/bin/sh
 # commit-msg hook: rejects a commit whose message
 #   1. contains an AI attribution line, or
-#   2. does not follow Conventional Commits: type(scope): subject   (PROJECT_PLAN §1.5)
+#   2. does not follow Conventional Commits: type(scope): subject, whole first line at most 72 characters
+#      (PROJECT_PLAN §1.5).
 # Enabled once per clone with:  git config core.hooksPath .githooks
+# Note: hooks are a fast local check and can be bypassed; CI runs the same checks (scripts/verify.ps1).
 
 message_file="$1"
 
@@ -12,13 +14,21 @@ if grep -qiE 'co-authored-by:.*(claude|anthropic)|generated with.*claude|noreply
 fi
 
 first_line=$(head -n 1 "$message_file")
-if ! echo "$first_line" | grep -qE '^(feat|fix|test|docs|refactor|perf|build|ci|chore|style|revert)(\([a-z0-9-]+\))?!?: .{1,72}$'; then
-  # Allow Git's own generated messages (merges and reverts).
-  if ! echo "$first_line" | grep -qE '^(Merge|Revert) '; then
-    echo "commit-msg: the first line must look like 'type(scope): subject' (max 72 characters)." >&2
-    echo "            types: feat fix test docs refactor perf build ci chore style revert" >&2
-    exit 1
-  fi
+
+# Git's own generated messages and interactive-rebase helpers are allowed as they are.
+if echo "$first_line" | grep -qE '^(Merge |Revert |fixup! |squash! |amend! )'; then
+  exit 0
+fi
+
+if [ "${#first_line}" -gt 72 ]; then
+  echo "commit-msg: the first line is ${#first_line} characters; the limit is 72." >&2
+  exit 1
+fi
+
+if ! echo "$first_line" | grep -qE '^(feat|fix|test|docs|refactor|perf|build|ci|chore|style|revert)(\([a-z0-9-]+\))?!?: .+$'; then
+  echo "commit-msg: the first line must look like 'type(scope): subject'." >&2
+  echo "            types: feat fix test docs refactor perf build ci chore style revert" >&2
+  exit 1
 fi
 
 exit 0

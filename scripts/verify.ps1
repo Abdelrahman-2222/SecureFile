@@ -59,9 +59,10 @@ $format = Invoke-Native 'Format' { dotnet format SecureFile.slnx --verify-no-cha
 Add-Result 'Format' ($format.ExitCode -eq 0) $(if ($format.ExitCode -eq 0) { 'no changes needed' } else { 'run: dotnet format SecureFile.slnx' })
 
 # 2. Build ------------------------------------------------------------------
+# TreatWarningsAsErrors (Directory.Build.props) turns every warning into an error, so the exit code alone is the
+# truth; no parsing of (language-dependent) console text.
 $build = Invoke-Native 'Build' { dotnet build SecureFile.slnx -c Release }
-$warningCount = if ($build.Output -match '(\d+) Warning\(s\)') { [int]$Matches[1] } else { -1 }
-Add-Result 'Build (warnings = errors)' ($build.ExitCode -eq 0 -and $warningCount -eq 0) "exit $($build.ExitCode), warnings $warningCount"
+Add-Result 'Build (warnings = errors)' ($build.ExitCode -eq 0) "exit code $($build.ExitCode)"
 if ($build.ExitCode -ne 0) { Write-Host $build.Output }
 
 # 3. Tests + coverage data ----------------------------------------------------
@@ -71,60 +72,106 @@ $test = Invoke-Native 'Tests' {
 }
 $total = if ($test.Output -match 'total:\s*(\d+)') { $Matches[1] } else { '?' }
 $failed = if ($test.Output -match 'failed:\s*(\d+)') { $Matches[1] } else { '?' }
-Add-Result 'Tests' ($test.ExitCode -eq 0) "total $total, failed $failed"
+$skipped = if ($test.Output -match 'skipped:\s*(\d+)') { $Matches[1] } else { '?' }
+Add-Result 'Tests' ($test.ExitCode -eq 0) "total $total, failed $failed, skipped $skipped (exit code $($test.ExitCode))"
 if ($test.ExitCode -ne 0) { Write-Host $test.Output }
 
 # 4. Coverage of SecureFile.Core ---------------------------------------------
+# Fail-closed: a missing report or a value that cannot be read is a FAIL, never a silent pass.
 $coverageFolder = Join-Path $artifactsFolder 'Coverage'
 dotnet reportgenerator "-reports:$testResultsFolder/*.cobertura.xml" "-targetdir:$coverageFolder" `
     '-reporttypes:TextSummary;Html' '-assemblyfilters:+SecureFile.Core' | Out-Null
 $summaryPath = Join-Path $coverageFolder 'Summary.txt'
-if (Test-Path $summaryPath) {
-    $summary = Get-Content $summaryPath -Raw
-    $lineCoverage = if ($summary -match 'Line coverage:\s*([\d.]+)%') { [double]$Matches[1] } else { 0 }
-    $branchCoverage = if ($summary -match 'Branch coverage:\s*([\d.]+)%') { [double]$Matches[1] } else { 100 }
+$summary = if (Test-Path $summaryPath) { Get-Content $summaryPath -Raw } else { '' }
+if ($summary -match 'Line coverage:\s*([\d.]+)%') {
+    $lineCoverage = [double]$Matches[1]
+    $branchCoverage = if ($summary -match 'Branch coverage:\s*([\d.]+)%') { [double]$Matches[1] }
+                      elseif ($summary -match 'Branch coverage:\s*N/A') { 100 }   # code with no branches at all
+                      else { -1 }
     $coveragePassed = $lineCoverage -ge $MinimumCoreLineCoverage -and $branchCoverage -ge $MinimumCoreBranchCoverage
     Add-Result 'Coverage (Core)' $coveragePassed "lines $lineCoverage % (min $MinimumCoreLineCoverage), branches $branchCoverage % (min $MinimumCoreBranchCoverage)"
 }
 else {
-    Add-Result 'Coverage (Core)' $false 'no coverage report produced'
+    Add-Result 'Coverage (Core)' $false 'coverage report missing or unreadable'
 }
 
 # 5. Vulnerable packages ------------------------------------------------------
-$vulnerable = Invoke-Native 'Vulnerable packages' { dotnet list SecureFile.slnx package --vulnerable --include-transitive }
-$hasVulnerable = $vulnerable.Output -match 'has the following vulnerable packages'
-Add-Result 'Vulnerable packages' (-not $hasVulnerable -and $vulnerable.ExitCode -eq 0) $(if ($hasVulnerable) { 'see output above' } else { 'none found' })
-if ($hasVulnerable) { Write-Host $vulnerable.Output }
+# JSON output instead of console text, so the check does not depend on the SDK's display language.
+$vulnerable = Invoke-Native 'Vulnerable packages' { dotnet list SecureFile.slnx package --vulnerable --include-transitive --format json }
+try {
+    $report = $vulnerable.Output | ConvertFrom-Json
+    $vulnerablePackages = @(
+        foreach ($project in @($report.projects)) {
+            # A project with no vulnerable packages has no "frameworks" property at all.
+            $frameworksProperty = $project.PSObject.Properties['frameworks']
+            if (-not $frameworksProperty) { continue }
+            foreach ($framework in @($frameworksProperty.Value)) {
+                foreach ($listName in 'topLevelPackages', 'transitivePackages') {
+                    $list = $framework.PSObject.Properties[$listName]
+                    if ($list) { @($list.Value) | Where-Object { $_.PSObject.Properties['vulnerabilities'] } | ForEach-Object { $_.id } }
+                }
+            }
+        })
+    Add-Result 'Vulnerable packages' ($vulnerable.ExitCode -eq 0 -and $vulnerablePackages.Count -eq 0) $(if ($vulnerablePackages.Count) { $vulnerablePackages -join ', ' } else { 'none found' })
+}
+catch {
+    Add-Result 'Vulnerable packages' $false "could not read the audit result: $($_.Exception.Message)"
+}
+
+# Helper: runs git grep and separates "found" (exit 0), "nothing found" (exit 1) and "git failed" (anything else).
+function Invoke-GitGrep([string] $pattern, [string[]] $pathSpecs) {
+    $output = git grep -I -n -P -e $pattern -- @pathSpecs 2>&1
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -gt 1) { throw "git grep failed (exit $exitCode): $output" }
+    return @($output | Where-Object { $_ })
+}
 
 # 6. Secrets in tracked files -------------------------------------------------
+# Fast local check. CI additionally runs gitleaks over the full commit history.
 Write-Host "`n=== Secrets ===" -ForegroundColor Cyan
 $secretPatterns = @(
-    '-----BEGIN ([A-Z]+ )?PRIVATE KEY-----',
-    'gh[pousr]_[A-Za-z0-9]{36,}',
-    'AKIA[0-9A-Z]{16}',
-    '(?i)(api[_-]?key|client[_-]?secret|access[_-]?token)\s*[:=]\s*["''][A-Za-z0-9_\-]{16,}["'']'
+    '-----BEGIN ([A-Z]+ )?PRIVATE KEY-----',                            # private keys (PEM)
+    'gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{40,}',         # GitHub tokens
+    'AKIA[0-9A-Z]{16}',                                                 # AWS access key id
+    'xox[abposr]-[A-Za-z0-9-]{10,}',                                    # Slack tokens
+    '\bsk-[A-Za-z0-9_-]{20,}',                                          # "sk-" style API keys (at a word start)
+    '(?i)AccountKey=[A-Za-z0-9+/=]{20,}',                               # Azure storage connection strings
+    '(?i)(api[_-]?key|client[_-]?secret|access[_-]?token|password)\s*[:=]\s*["''][^"''\s]{8,}["'']'
 )
-$secretHits = foreach ($pattern in $secretPatterns) {
-    git grep -I -n -P -e $pattern -- . ':(exclude)scripts/verify.ps1' 2>$null
+try {
+    $secretHits = foreach ($pattern in $secretPatterns) { Invoke-GitGrep $pattern @('.', ':(exclude)scripts/verify.ps1') }
+    Add-Result 'Secrets' (-not $secretHits) $(if ($secretHits) { ($secretHits | Select-Object -First 5) -join ' | ' } else { 'none found' })
 }
-Add-Result 'Secrets' (-not $secretHits) $(if ($secretHits) { ($secretHits | Select-Object -First 5) -join ' | ' } else { 'none found' })
+catch {
+    Add-Result 'Secrets' $false $_.Exception.Message
+}
 
 # 7. Forbidden code patterns (ADR-13 and security rules) -------------------------
+# Each C# file is read whole (so patterns can span lines, e.g. an empty catch written over three lines) and
+# comments are removed first (so documentation that mentions a pattern is not reported).
+# Note: catch (Exception) and "throw ex;" are also enforced by the analyzers CA1031 and CA2200 in the build.
 Write-Host "`n=== Forbidden patterns ===" -ForegroundColor Cyan
+function Get-CodeWithoutComments([string] $path) {
+    $text = Get-Content $path -Raw
+    $text = [regex]::Replace($text, '/\*.*?\*/', '', 'Singleline')          # block comments
+    return [regex]::Replace($text, '(?m)^\s*//.*$|\s//[^"\r\n]*$', '')     # line and trailing comments
+}
 $rules = @(
-    @{ Name = 'catch (Exception) in Core/Presentation'; Pattern = 'catch\s*\(\s*(System\.)?Exception\b'; Paths = @('src/SecureFile.Core', 'src/SecureFile.Presentation') },
-    @{ Name = 'empty catch block'; Pattern = 'catch\s*(\([^)]*\))?\s*\{\s*\}'; Paths = @('src') },
-    @{ Name = 'throw ex; (loses stack trace)'; Pattern = 'throw\s+[a-zA-Z_][a-zA-Z0-9_]*\s*;'; Paths = @('src') },
-    @{ Name = 'async void outside the WPF app'; Pattern = 'async\s+void'; Paths = @('src/SecureFile.Core', 'src/SecureFile.Presentation') },
-    @{ Name = 'System.Random (not secure)'; Pattern = '\bnew\s+Random\s*\(|Random\.Shared'; Paths = @('src') },
-    @{ Name = 'whole-file reads in Core (must stream)'; Pattern = 'File\.ReadAllBytes|File\.ReadAllText'; Paths = @('src/SecureFile.Core') },
-    @{ Name = 'console output in app code'; Pattern = 'Console\.Write'; Paths = @('src') }
+    @{ Name = 'catch (Exception) in Core/Presentation'; Pattern = 'catch\s*\(\s*(System\.)?Exception\b'; Folders = @('src/SecureFile.Core', 'src/SecureFile.Presentation') },
+    @{ Name = 'empty catch block'; Pattern = 'catch\s*(\([^)]*\))?\s*(when\s*\([^)]*\)\s*)?\{\s*\}'; Folders = @('src') },
+    @{ Name = 'async void outside the UI apps'; Pattern = '\basync\s+void\b'; Folders = @('src/SecureFile.Core', 'src/SecureFile.Presentation') },
+    @{ Name = 'System.Random (not secure)'; Pattern = '\bnew\s+(System\.)?Random\s*\(|\bRandom\.Shared\b|\bRandom\s+\w+\s*=\s*new\s*\('; Folders = @('src') },
+    @{ Name = 'whole-file reads in Core (must stream)'; Pattern = '\bFile\.(ReadAllBytes|ReadAllText|ReadAllLines|ReadAllBytesAsync|ReadAllTextAsync|ReadAllLinesAsync)\b'; Folders = @('src/SecureFile.Core') },
+    @{ Name = 'console output in app code'; Pattern = '\bConsole\.(Write|WriteLine)\b'; Folders = @('src') }
 )
+$trackedCodeFiles = @(git ls-files -- 'src/*.cs')
 foreach ($rule in $rules) {
-    $hits = git grep -n -P -e $rule.Pattern -- ($rule.Paths | ForEach-Object { "$_/*.cs" }) 2>$null
+    $hits = foreach ($file in $trackedCodeFiles) {
+        $inScope = $rule.Folders | Where-Object { $file.StartsWith("$_/") }
+        if ($inScope -and (Get-CodeWithoutComments $file) -match $rule.Pattern) { $file }
+    }
     Add-Result "No $($rule.Name)" (-not $hits) $(if ($hits) { ($hits | Select-Object -First 3) -join ' | ' } else { 'clean' })
 }
-
 # 8. AI attribution in commits not yet pushed ---------------------------------------
 Write-Host "`n=== Commit messages ===" -ForegroundColor Cyan
 $upstream = git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>$null
