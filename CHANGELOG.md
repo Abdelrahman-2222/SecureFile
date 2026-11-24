@@ -29,6 +29,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
   (not an encrypted file / newer version / damaged), so the app can tell the user what to do.
 - Tests with golden bytes, boundary values, property-based round trips and fuzzing (random input never causes an
   undocumented exception).
+- Key derivation (`KeyDerivation`, internal): the password is normalised (NFC) and UTF-8 encoded, strengthened with
+  PBKDF2-HMAC-SHA256 (600,000 iterations for new files) and split with HKDF-Expand into separate encryption and
+  authentication keys. Temporary copies are pinned and wiped.
+- `FileKeys` (internal): holds the two keys and overwrites them with zeros when disposed.
+- Known-answer tests from RFC 7914 and RFC 5869, plus independently computed golden keys (accents, Arabic, emoji).
 
 ### Changed
 
