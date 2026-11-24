@@ -159,11 +159,55 @@ The survivors, and what was done:
 
 ## 5.4 Security and threat model
 
-_pending_
+Full STRIDE table: [THREAT_MODEL.md](THREAT_MODEL.md) (20 threats, each with a mitigation, a test or a stated limit).
+
+| Check | Result |
+|---|---|
+| .NET security analyzers (`AnalysisLevel=latest-all`, warnings are errors) | 0 warnings; the build passes |
+| `dotnet list SecureFile.slnx package --vulnerable --include-transitive` (re-run in Step 5.4) | 0 vulnerable packages in all 11 projects |
+| gitleaks (CI, full history) and the local pattern scan in `verify.ps1` | "Secrets: none found" in the Stage 5 run |
+| Forbidden-pattern scan (catch Exception, empty catch, async void, System.Random, whole-file reads, console output) | clean |
+| Known-answer and tamper/truncation tests | pass (part of the 510 tests) |
+| CodeQL | **Not run**: needs a public repository (free there; a private repository needs paid GitHub Advanced Security) |
+| SonarQube for IDE | **Not run**: Visual Studio extension, user task (checklist) |
+| Independent security review (subagent, read-only, one pass) | 8 findings: 1 doc error fixed, 1 CLI crash fixed, 5 recorded as backlog items C14-C17 or accepted with a reason, 1 out-of-scope line added (THREAT_MODEL §4) |
+
+No open high-severity issue. The medium finding (the threat table claimed the tag is checked before any plaintext is
+written) was a documentation error: decryption streams unverified plaintext into the hidden temp file and verifies
+before the rename. That is now written down as "verify-then-commit"; an extra HMAC-only pass would double the reads.
 
 ## 5.5 Summary table
 
-_pending_
+| # | Metric (plan §8) | Target | Measured | Verdict |
+|---|---|---|---|---|
+| 1 | Throughput vs plain copy (5.1) | >= 70 % of a plain copy | 3 % of the OS-cache copy; 53 % of an fsync copy (66 % without the KDF) on a HDD | **Not met**; explained (copy measures RAM; encrypt = CPU time + disk time, no overlap); backlog C13 |
+| 2 | Key derivation p50 / p95 (5.1) | reported, about 0.3-1 s | 363 / 366 ms | Met |
+| 3 | Allocations per operation (5.1) | no per-chunk buffer | about 150 B per 1 MiB chunk (bookkeeping), no buffer | Met |
+| 4 | Time to first window, warm (5.2) | < 0.5 s | 643 ms build, 707 ms published single file | **Not met** (+0.14 to +0.21 s) |
+| 5 | Time to first window, cold (5.2) | < 1.5 s | first run 1.86 s build, 2.64 s published; true cold after reboot not measured | **Not met / not measured** (user checklist) |
+| 6 | Peak memory 1 MB / 100 MB / 1 GiB (5.2) | flat, < 150 MB | 25 / 28 / 28 MB | Met |
+| 7 | Progress updates (5.2) | <= 10 per second | was about 70 per second; throttled to 10 per second | Met after fix |
+| 8 | UI thread blocked (5.2) | never > 50 ms | by code review: work off the UI thread; profiler run pending | **Open** (user checklist, VS profiler) |
+| 9 | Published size (5.2) | reported per architecture | WPF win-x64 134 MB (65 MB compressed); CLI 12.6-14.5 MB exe, 5.3-5.9 MB archives; win-arm64 in Stage 6 | Reported |
+| 10 | Complexity / maintainability (5.3) | <= 10 / >= 60 | worst 7 / lowest 60 (Core) | Met |
+| 11 | Coverage Core (5.3) | >= 90 % lines, >= 85 % branches | 98.7 % / 98.6 % | Met |
+| 12 | Coverage Presentation (5.3) | >= 85 % | 95.8 % lines, about 91 % branches | Met |
+| 13 | Mutation score Core (5.3) | >= 80 % (goal 100 %) | 100 % (207 disabled mutants, each with a reason) | Met |
+| 14 | NuGet vulnerabilities (5.4) | 0 | 0 | Met |
+| 15 | Analyzer warnings / secrets (5.4) | 0 | 0 / none | Met |
+| 16 | Threat model (5.4) | every threat has a mitigation or a stated limit | 20 threats, all covered | Met |
+| 17 | CodeQL, SonarQube for IDE (5.4) | 0 issues | not run (public repo needed; VS extension) | **Open** (user) |
+| 18 | Class coupling, inheritance depth (5.3) | reported | not exported | **Open** (user) |
+
+### Known limits
+
+- **Antivirus (Kaspersky):** it scans every write, makes backup copies of temp files in test folders (about 1 full test
+  run in 4 fails here with a different `...LeavesNothing` test; re-run) and it kills the test program for the 4.5 GiB
+  run (T-27 is blocked; only 1 GiB is measured). The benchmark, startup and memory scripts ran without being killed.
+- **Unsigned binaries:** SmartScreen and antivirus warnings; hash-only integrity (Stage 6 decision).
+- **Linux and macOS command-line binaries** were built and sized but never run on those systems (backlog C2).
+- **One machine, a spinning disk:** every number is from the i7-8750H laptop; results on an SSD or other CPU differ.
+- **Cold start** was not measured after a reboot; the figure above is "first run this session".
 
 ## Things only the user can do
 
@@ -171,4 +215,7 @@ _pending_
 - [ ] **Visual Studio Performance Profiler (5.2), click by click:** open `SecureFile.slnx` in Visual Studio, set `SecureFile.Wpf` as startup project, set the configuration to **Release**, press **Alt+F2**, tick **CPU Usage** and **.NET Async** (and **.NET Object Allocation** for a second run), press **Start**. In the app choose a 100 MB file, encrypt it, wait for "Done", close the app. In the report open **Top Functions** and the **timeline**: the UI thread must show no block longer than 50 ms during the encryption; note the main-thread time before the window appears. Screenshot the timeline and save it as `docs/quality/screenshots/profiler-cpu.png`.
 - [ ] **Windows Performance Analyzer (optional, 5.2):** `wpr -start GeneralProfile`, start the app, `wpr -stop startup.etl`, open in WPA, expand *Computation > CPU Usage (Sampled)*, filter for `SecureFile.exe`, look at the first second.
 - [ ] **Class coupling (5.3):** in Visual Studio, Analyze > Calculate Code Metrics for Solution, note the class-coupling and inheritance-depth columns for Core, Presentation, Cli, Wpf (analyzers could not export them).
+- [ ] **SonarQube for IDE (5.4):** install the "SonarQube for IDE" extension in Visual Studio (Extensions > Manage Extensions), open the solution, and note vulnerabilities and security hotspots (target: 0 vulnerabilities, hotspots reviewed).
+- [ ] **Microsoft Threat Modeling Tool (optional):** the STRIDE table is in `docs/THREAT_MODEL.md`; redraw it in the tool if the course needs the .tm7 file.
+- [ ] **Screenshots to supply:** profiler timeline (`docs/quality/screenshots/profiler-cpu.png`), SonarQube result, Task Manager during a 1 GiB encryption. They are not invented here.
 - [ ] **Decision C1:** accept `EnableCompressionInSingleFile` (65 MB, about 0.2 s slower start) or keep 134 MB uncompressed.
