@@ -1,0 +1,129 @@
+# .editorconfig — code style rules shared by Visual Studio, VS Code, Rider and the build.
+# Because Directory.Build.props sets EnforceCodeStyleInBuild=true, style violations marked
+# "warning" here fail the build (TreatWarningsAsErrors). See PROJECT_PLAN.md §1.2.
+
+root = true
+
+# ---------------------------------------------------------------------------
+# All files
+# ---------------------------------------------------------------------------
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+[*.{xml,xaml,csproj,props,targets,slnx,manifest,json,yml,yaml}]
+indent_size = 2
+
+[*.md]
+trim_trailing_whitespace = false
+
+# ---------------------------------------------------------------------------
+# C# files
+# ---------------------------------------------------------------------------
+[*.cs]
+end_of_line = crlf
+
+# --- Namespaces and usings ---
+# One namespace per file, written as "namespace X;" (saves one indentation level).
+csharp_style_namespace_declarations = file_scoped:warning
+dotnet_sort_system_directives_first = true
+csharp_using_directive_placement = outside_namespace:warning
+# Unused "using" lines are errors (keeps files clean).
+dotnet_diagnostic.IDE0005.severity = warning
+
+# --- "var" rules (PROJECT_PLAN §1.2): only when the type is obvious on the same line ---
+csharp_style_var_for_built_in_types = false:warning
+csharp_style_var_when_type_is_apparent = true:warning
+csharp_style_var_elsewhere = false:warning
+
+# --- Braces and blocks: always use braces, even for one-line if statements ---
+csharp_prefer_braces = true:warning
+csharp_new_line_before_open_brace = all
+
+# --- Readability over cleverness ---
+# Expression-bodied members only for one-line properties, never for methods/constructors.
+csharp_style_expression_bodied_methods = false:suggestion
+csharp_style_expression_bodied_constructors = false:suggestion
+csharp_style_expression_bodied_properties = true:suggestion
+# Prefer clear modern null checks.
+csharp_style_prefer_pattern_matching = true:suggestion
+dotnet_style_prefer_is_null_check_over_reference_equality_method = true:warning
+# Always write the access modifier (public/private/...) explicitly.
+dotnet_style_require_accessibility_modifiers = always:warning
+# Fields that are never reassigned must be readonly.
+dotnet_style_readonly_field = true:warning
+# Use "this." never (it is noise).
+dotnet_style_qualification_for_field = false:warning
+dotnet_style_qualification_for_property = false:warning
+dotnet_style_qualification_for_method = false:warning
+dotnet_style_qualification_for_event = false:warning
+
+# --- Naming rules (PROJECT_PLAN §1.3) ---
+# Interfaces start with "I".
+dotnet_naming_rule.interfaces_start_with_i.symbols = interface_symbols
+dotnet_naming_rule.interfaces_start_with_i.style = prefix_i_style
+dotnet_naming_rule.interfaces_start_with_i.severity = warning
+dotnet_naming_symbols.interface_symbols.applicable_kinds = interface
+dotnet_naming_style.prefix_i_style.required_prefix = I
+dotnet_naming_style.prefix_i_style.capitalization = pascal_case
+
+# Types, methods, properties, events, constants: PascalCase.
+dotnet_naming_rule.types_and_members_pascal.symbols = pascal_symbols
+dotnet_naming_rule.types_and_members_pascal.style = pascal_style
+dotnet_naming_rule.types_and_members_pascal.severity = warning
+dotnet_naming_symbols.pascal_symbols.applicable_kinds = class, struct, enum, delegate, method, property, event, namespace
+dotnet_naming_style.pascal_style.capitalization = pascal_case
+
+dotnet_naming_rule.constants_pascal.symbols = constant_symbols
+dotnet_naming_rule.constants_pascal.style = pascal_style
+dotnet_naming_rule.constants_pascal.severity = warning
+dotnet_naming_symbols.constant_symbols.applicable_kinds = field
+dotnet_naming_symbols.constant_symbols.required_modifiers = const
+
+# Private fields: _camelCase.
+dotnet_naming_rule.private_fields_underscore.symbols = private_field_symbols
+dotnet_naming_rule.private_fields_underscore.style = underscore_camel_style
+dotnet_naming_rule.private_fields_underscore.severity = warning
+dotnet_naming_symbols.private_field_symbols.applicable_kinds = field
+dotnet_naming_symbols.private_field_symbols.applicable_accessibilities = private
+dotnet_naming_style.underscore_camel_style.required_prefix = _
+dotnet_naming_style.underscore_camel_style.capitalization = camel_case
+
+# Parameters and locals: camelCase.
+dotnet_naming_rule.locals_camel.symbols = local_symbols
+dotnet_naming_rule.locals_camel.style = camel_style
+dotnet_naming_rule.locals_camel.severity = warning
+dotnet_naming_symbols.local_symbols.applicable_kinds = parameter, local
+dotnet_naming_style.camel_style.capitalization = camel_case
+
+# Async methods end with "Async".
+dotnet_naming_rule.async_methods_end_in_async.symbols = async_method_symbols
+dotnet_naming_rule.async_methods_end_in_async.style = async_suffix_style
+dotnet_naming_rule.async_methods_end_in_async.severity = warning
+dotnet_naming_symbols.async_method_symbols.applicable_kinds = method
+dotnet_naming_symbols.async_method_symbols.required_modifiers = async
+dotnet_naming_style.async_suffix_style.required_suffix = Async
+dotnet_naming_style.async_suffix_style.capitalization = pascal_case
+
+# --- Security analyzers (CA53xx): weak crypto is always an error, never just a suggestion ---
+dotnet_diagnostic.CA5350.severity = error   # Do not use weak algorithms (TripleDES, SHA1, RIPEMD160)
+dotnet_diagnostic.CA5351.severity = error   # Do not use broken algorithms (DES, MD5, RC2)
+dotnet_diagnostic.CA5379.severity = error   # Key derivation must use a strong hash
+dotnet_diagnostic.CA5387.severity = error   # Weak key derivation with too few iterations
+dotnet_diagnostic.CA5388.severity = error   # Ensure enough iterations
+dotnet_diagnostic.CA5390.severity = error   # Do not hard-code encryption keys
+dotnet_diagnostic.CA5394.severity = error   # Do not use System.Random for security
+
+# ---------------------------------------------------------------------------
+# UI projects: CA2007 (ConfigureAwait) does not apply — UI code MUST return to the UI thread.
+# Library code (Core, Presentation) keeps CA2007 on (PROJECT_PLAN §1.2).
+# ---------------------------------------------------------------------------
+[src/SecureFile.Wpf/**.cs]
+dotnet_diagnostic.CA2007.severity = none
+
+# Test code: xUnit recommends NOT using ConfigureAwait(false) in tests.
+[tests/**.cs]
+dotnet_diagnostic.CA2007.severity = none
