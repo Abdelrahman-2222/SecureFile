@@ -15,9 +15,22 @@ public interface IFileDetailsReader
     /// <param name="filePath">The path of the file to describe. Relative paths are resolved from the current folder.</param>
     /// <returns>The details of the file.</returns>
     /// <exception cref="ArgumentNullException"><paramref name="filePath"/> is <see langword="null"/>.</exception>
-    /// <exception cref="ArgumentException"><paramref name="filePath"/> is empty or contains only white space.</exception>
-    /// <exception cref="FileNotFoundException">
-    /// No file exists at <paramref name="filePath"/>. This is also thrown when the path points to a folder.
+    /// <exception cref="ArgumentException">
+    /// <paramref name="filePath"/> is empty, contains only white space, or contains a null character.
     /// </exception>
+    /// <exception cref="FileNotFoundException">
+    /// No file can be found at <paramref name="filePath"/>: it does not exist, it is a folder, the drive or network
+    /// location is not available, the name contains characters the file system does not allow, or the file cannot
+    /// be opened because access to it is denied (the file system reports all of these as "does not exist").
+    /// </exception>
+    /// <exception cref="PathTooLongException"><paramref name="filePath"/> is longer than the system allows.</exception>
+    /// <exception cref="IOException">
+    /// The file changed or became unavailable while its details were being read
+    /// (for example it was deleted or the drive was removed at that moment).
+    /// </exception>
+    /// <remarks>
+    /// <see cref="FileNotFoundException"/> and <see cref="PathTooLongException"/> both derive from
+    /// <see cref="IOException"/>, so a caller can handle every file-system problem with one <c>catch (IOException)</c>.
+    /// </remarks>
     FileDetails Read(string filePath);
 }

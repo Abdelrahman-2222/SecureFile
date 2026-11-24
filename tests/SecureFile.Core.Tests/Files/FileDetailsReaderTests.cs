@@ -93,6 +93,7 @@ public sealed class FileDetailsReaderTests : IDisposable
         FileNotFoundException exception = Assert.Throws<FileNotFoundException>(() => _reader.Read(missingPath));
 
         Assert.Equal(missingPath, exception.FileName);
+        Assert.False(string.IsNullOrWhiteSpace(exception.Message), "The exception must explain the problem (it is logged).");
     }
 
     [Fact]
@@ -101,18 +102,51 @@ public sealed class FileDetailsReaderTests : IDisposable
         Assert.Throws<FileNotFoundException>(() => _reader.Read(_temporaryFolder.FullName));
     }
 
+    // The ParamName checks prove that OUR guard clause rejected the input (FileInfo would report "fileName"/"path").
+    // This matters because on Linux and macOS "   " is a valid file name, so without the guard the behaviour
+    // would differ between operating systems.
     [Fact]
-    public void Read_NullPath_ThrowsArgumentNullException()
+    public void Read_NullPath_ThrowsArgumentNullExceptionNamingTheParameter()
     {
-        Assert.Throws<ArgumentNullException>(() => _reader.Read(null!));
+        ArgumentNullException exception = Assert.Throws<ArgumentNullException>(() => _reader.Read(null!));
+
+        Assert.Equal("filePath", exception.ParamName);
     }
 
     [Theory]
     [InlineData("")]
     [InlineData("   ")]
-    public void Read_EmptyOrWhiteSpacePath_ThrowsArgumentException(string filePath)
+    public void Read_EmptyOrWhiteSpacePath_ThrowsArgumentExceptionNamingTheParameter(string filePath)
     {
-        Assert.Throws<ArgumentException>(() => _reader.Read(filePath));
+        ArgumentException exception = Assert.Throws<ArgumentException>(() => _reader.Read(filePath));
+
+        Assert.Equal("filePath", exception.ParamName);
+    }
+
+    [Fact]
+    public void Read_PathWithNullCharacter_ThrowsArgumentException()
+    {
+        Assert.Throws<ArgumentException>(() => _reader.Read("file\0name.txt"));
+    }
+
+    [Theory]
+    [InlineData("a<b>|?*.txt")]                   // characters Windows does not allow in names
+    [InlineData("missing-folder/missing.txt")]    // folder that does not exist
+    public void Read_InvalidOrUnreachablePath_ThrowsFileNotFoundException(string relativePath)
+    {
+        string path = Path.Combine(_temporaryFolder.FullName, relativePath);
+
+        Assert.Throws<FileNotFoundException>(() => _reader.Read(path));
+    }
+
+    [Fact]
+    public void Read_PathFarLongerThanSystemMaximum_ThrowsIOException()
+    {
+        // 40,000 characters: beyond every OS limit. Windows reports PathTooLongException, Linux and macOS may
+        // report FileNotFoundException; both derive from IOException, which is what callers handle.
+        string tooLongPath = Path.Combine(_temporaryFolder.FullName, new string('x', 40_000));
+
+        Assert.ThrowsAny<IOException>(() => _reader.Read(tooLongPath));
     }
 
     /// <summary>Creates a file of the given size (filled with zeros) in this test's temporary folder.</summary>

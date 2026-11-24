@@ -19,6 +19,8 @@ public sealed class FileSizeFormatterTests
     [InlineData(1_572_864L, "1.5 MB")]
     [InlineData(1_073_741_824L, "1 GB")]
     [InlineData(5_368_709_120L, "5 GB")]      // larger than 4 GB (beyond the 32-bit limit)
+    [InlineData(1_099_511_627_776L, "1 TB")]
+    [InlineData(1_125_899_906_842_624L, "1 PB")]
     [InlineData(long.MaxValue, "8 EB")]       // the largest possible size
     public void Format_KnownSizes_ReturnsExpectedText(long sizeInBytes, string expectedText)
     {

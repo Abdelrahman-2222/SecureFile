@@ -39,19 +39,41 @@ public static class FileSizeFormatter
             return "1 byte";
         }
 
+        (double size, int unitIndex) = ScaleToLargestFittingUnit(sizeInBytes);
+
+        // "0.##" = at most two decimals, and no trailing zeros ("1.5", not "1.50"; "2", not "2.00").
+        return string.Create(formatProvider, $"{size:0.##} {UnitNames[unitIndex]}");
+    }
+
+    /// <summary>
+    /// Divides the size by 1,024 until the number, as it will be displayed, is below 1,024 (or the largest unit is reached).
+    /// </summary>
+    /// <param name="sizeInBytes">The size in bytes; zero or more.</param>
+    /// <returns>The scaled number and the index of its unit in <see cref="UnitNames"/>.</returns>
+    /// <remarks>
+    /// The check uses the ROUNDED number (two decimals, the same rounding the text uses), so 1,048,575 bytes
+    /// becomes "1 MB" and never "1024 KB".
+    /// </remarks>
+    private static (double Size, int UnitIndex) ScaleToLargestFittingUnit(long sizeInBytes)
+    {
         double size = sizeInBytes;
         int unitIndex = 0;
+        int largestUnitIndex = UnitNames.Length - 1;
 
-        // Move to the next bigger unit while the ROUNDED number would still be 1,024 or more.
-        // Checking the rounded value means 1,048,575 bytes shows as "1 MB" instead of "1024 KB".
-        while (unitIndex < UnitNames.Length - 1
-            && Math.Round(size, MaximumDecimalPlaces, MidpointRounding.AwayFromZero) >= BytesPerUnitStep)
+        while (unitIndex < largestUnitIndex && RoundForDisplay(size) >= BytesPerUnitStep)
         {
             size /= BytesPerUnitStep;
             unitIndex++;
         }
 
-        // "0.##" = at most two decimals, and no trailing zeros ("1.5", not "1.50"; "2", not "2.00").
-        return string.Create(formatProvider, $"{size:0.##} {UnitNames[unitIndex]}");
+        return (size, unitIndex);
+    }
+
+    /// <summary>Rounds a number exactly the way the "0.##" text format will show it.</summary>
+    /// <param name="value">The number to round.</param>
+    /// <returns>The number rounded to two decimals, halves rounded away from zero.</returns>
+    private static double RoundForDisplay(double value)
+    {
+        return Math.Round(value, MaximumDecimalPlaces, MidpointRounding.AwayFromZero);
     }
 }
