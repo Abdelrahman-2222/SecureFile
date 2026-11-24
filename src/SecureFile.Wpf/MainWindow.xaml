@@ -4,7 +4,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="SecureFile"
         Icon="Assets/SecureFile.ico"
-        Width="800" Height="560"
+        Width="800" Height="720"
         MinWidth="640" MinHeight="480"
         WindowStartupLocation="CenterScreen"
         PreviewKeyDown="OnWindowKeyDown">
@@ -52,15 +52,31 @@
 
             <!-- 4. Password -->
             <Label Content="_Password" Target="{Binding ElementName=PasswordInput}" Margin="0,16,0,4" Padding="0" FontSize="14" />
-            <PasswordBox x:Name="PasswordInput" AutomationProperties.AutomationId="PasswordInput"
-                         AutomationProperties.Name="Password"
+            <!-- The PasswordBox and the plain TextBox share one cell; "Show password" swaps which one is visible. -->
+            <Grid>
+                <PasswordBox x:Name="PasswordInput" AutomationProperties.AutomationId="PasswordInput"
+                             AutomationProperties.Name="Password"
+                             MinHeight="32" FontSize="14" VerticalContentAlignment="Center"
+                             IsEnabled="{Binding CanEditInputs}"
+                             MaxLength="1024" PasswordChanged="OnPasswordChanged">
+                    <PasswordBox.InputBindings>
+                        <KeyBinding Key="Return" Command="{Binding RunPrimaryCommand}" />
+                    </PasswordBox.InputBindings>
+                </PasswordBox>
+                <TextBox x:Name="PasswordVisibleInput" AutomationProperties.AutomationId="PasswordVisibleInput"
+                         AutomationProperties.Name="Password (visible)"
+                         Visibility="Collapsed"
                          MinHeight="32" FontSize="14" VerticalContentAlignment="Center"
                          IsEnabled="{Binding CanEditInputs}"
-                         MaxLength="1024" PasswordChanged="OnPasswordChanged">
-                <PasswordBox.InputBindings>
-                    <KeyBinding Key="Return" Command="{Binding RunPrimaryCommand}" />
-                </PasswordBox.InputBindings>
-            </PasswordBox>
+                         MaxLength="1024" TextChanged="OnVisiblePasswordChanged">
+                    <TextBox.InputBindings>
+                        <KeyBinding Key="Return" Command="{Binding RunPrimaryCommand}" />
+                    </TextBox.InputBindings>
+                </TextBox>
+            </Grid>
+            <CheckBox x:Name="ShowPasswordCheck" AutomationProperties.AutomationId="ShowPasswordCheck"
+                      Content="_Show password" Margin="0,8,0,0"
+                      Checked="OnShowPasswordChanged" Unchecked="OnShowPasswordChanged" />
             <TextBlock Text="If you forget this password, the file cannot be recovered. Nobody can reset it."
                        TextWrapping="Wrap" Margin="0,8,0,0" />
 
@@ -94,9 +110,27 @@
             </Grid>
 
             <!-- 8. Result / status -->
-            <TextBlock x:Name="StatusText" AutomationProperties.AutomationId="StatusMessage"
-                       AutomationProperties.LiveSetting="Polite"
-                       Text="{Binding StatusMessage}" TextWrapping="Wrap" Margin="0,16,0,0" />
+            <!-- A coloured banner after the operation ends (green = done, red = failed), so the result cannot be missed;
+                 neutral while idle or working. The text carries the meaning too, colour is only an extra cue. -->
+            <Border CornerRadius="8" Padding="16,12" Margin="0,16,0,0" BorderThickness="1"
+                    BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}">
+                <Border.Style>
+                    <Style TargetType="Border">
+                        <Setter Property="Background" Value="Transparent" />
+                        <Style.Triggers>
+                            <DataTrigger Binding="{Binding IsSucceeded}" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource SystemFillColorSuccessBackgroundBrush}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsFailed}" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource SystemFillColorCriticalBackgroundBrush}" />
+                            </DataTrigger>
+                        </Style.Triggers>
+                    </Style>
+                </Border.Style>
+                <TextBlock x:Name="StatusText" AutomationProperties.AutomationId="StatusMessage"
+                           AutomationProperties.LiveSetting="Polite"
+                           Text="{Binding StatusMessage}" TextWrapping="Wrap" FontWeight="SemiBold" />
+            </Border>
             <Button x:Name="OpenFolderButton" AutomationProperties.AutomationId="OpenFolderButton"
                     AutomationProperties.Name="Open folder"
                     Content="Open _folder" Command="{Binding OpenFolderCommand}" HorizontalAlignment="Left" Margin="0,12,0,0"

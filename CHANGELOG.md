@@ -87,6 +87,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Found in the manual test run (Step 4.3): after a successful Encrypt or Decrypt the chosen file and the password are
+  cleared (the result message and "Open folder" stay); the result is a green banner and an error a red one; the Save
+  dialog's "Save as type" lists the file type and all files; a "Show password" check box reveals the typed password;
+  the window is taller so the About button is not hidden behind a scroll bar.
 - Decryption reports invalid padding after a valid tag (only possible for a file another program wrote) as
   `InvalidEncryptedFileException(Damaged)` with the original `CryptographicException` inside, so callers handle one
   documented type (Step 1.7). New constructor `InvalidEncryptedFileException(message, reason, innerException)`.

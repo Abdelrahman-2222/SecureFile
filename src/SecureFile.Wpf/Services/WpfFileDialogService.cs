@@ -28,7 +28,27 @@ internal sealed class WpfFileDialogService : IFileDialogService
             Title = "Save as",
             InitialDirectory = Path.GetDirectoryName(suggestedFilePath),
             FileName = Path.GetFileName(suggestedFilePath),
+            Filter = BuildSaveFilter(Path.GetExtension(suggestedFilePath)),
         };
         return dialog.ShowDialog() == true ? dialog.FileName : null;
+    }
+
+    /// <summary>Builds the "Save as type" list: the suggested file's own type first, then all files.</summary>
+    /// <param name="extension">The suggested file's extension with its dot (<c>.enc</c>, <c>.txt</c>), or empty.</param>
+    /// <returns>A Windows dialog filter string.</returns>
+    /// <remarks>
+    /// Without a filter the dialog's "Save as type" box is empty, which looks broken. The first entry is selected, so
+    /// a name typed without an extension gets the suggested one.
+    /// </remarks>
+    private static string BuildSaveFilter(string extension)
+    {
+        const string allFiles = "All files (*.*)|*.*";
+        if (extension.Length < 2)
+        {
+            return allFiles;
+        }
+
+        string label = extension[1..].ToUpperInvariant();
+        return $"{label} file (*{extension})|*{extension}|{allFiles}";
     }
 }

@@ -73,7 +73,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Gets the current state; it decides which commands can run (see <see cref="MainViewState"/>).</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsBusy), nameof(CanEditInputs), nameof(IsSucceeded), nameof(IsProgressIndeterminate))]
+    [NotifyPropertyChangedFor(nameof(IsBusy), nameof(CanEditInputs), nameof(IsSucceeded), nameof(IsFailed), nameof(IsProgressIndeterminate))]
     [NotifyCanExecuteChangedFor(nameof(BrowseCommand), nameof(OpenFileCommand), nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand), nameof(OpenFolderCommand))]
     public partial MainViewState State { get; private set; } = MainViewState.NoFile;
 
@@ -106,6 +106,9 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Gets a value indicating whether the last operation succeeded (the window shows the result panel).</summary>
     public bool IsSucceeded => State == MainViewState.Succeeded;
+
+    /// <summary>Gets a value indicating whether the last operation failed (the window colours the message as an error).</summary>
+    public bool IsFailed => State == MainViewState.Failed;
 
     /// <summary>Gets a value indicating whether the progress bar should only animate: busy, but with no percentage (reading a file).</summary>
     public bool IsProgressIndeterminate => IsBusy && _operationCts is null;
@@ -348,6 +351,12 @@ public sealed partial class MainViewModel : ObservableObject
         _lastOutputPath = outputPath;
         State = MainViewState.Succeeded;
         StatusMessage = SuccessMessage(encrypt, Path.GetFileName(outputPath));
+
+        // The job is done: forget the file and the password, so the window shows the real new state (nothing chosen)
+        // and the password does not stay in memory or on screen longer than needed. On failure both are kept on
+        // purpose: the user fixes the password and tries again.
+        SelectedFile = null;
+        Password = string.Empty;
     }
 
     /// <summary>Runs the operation with a cancellation token and a clock for the progress line.</summary>

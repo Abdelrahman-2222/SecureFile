@@ -92,6 +92,36 @@ public sealed class MainViewModelTests
         Assert.Equal("Encrypted copy saved as \"report.pdf.enc\". Your original file was not changed.", viewModel.StatusMessage);
     }
 
+    [Fact]
+    public async Task Encrypt_OnSuccess_ClearsTheFileAndThePasswordButKeepsTheResult()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        _dialogs.SaveResult = InputPath + ".enc";
+
+        await viewModel.EncryptCommand.ExecuteAsync(null);
+
+        Assert.Null(viewModel.SelectedFile);
+        Assert.Equal("No file selected.", viewModel.FileSummary);
+        Assert.Equal(string.Empty, viewModel.Password);
+        Assert.True(viewModel.IsSucceeded);
+        Assert.False(viewModel.IsFailed);
+        Assert.True(viewModel.OpenFolderCommand.CanExecute(null)); // the result is still reachable
+        Assert.False(viewModel.EncryptCommand.CanExecute(null));   // a new file and password are needed
+    }
+
+    [Fact]
+    public async Task Encrypt_OnFailure_KeepsFileAndPasswordAndMarksTheMessageAsFailed()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        _dialogs.SaveResult = InputPath; // the input itself: refused with a message
+
+        await viewModel.EncryptCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.IsFailed);
+        Assert.NotNull(viewModel.SelectedFile);
+        Assert.Equal("secret", viewModel.Password);
+    }
+
     [Theory]
     [InlineData("report.pdf.enc", "report.pdf")]
     [InlineData("report.pdf.ENC", "report.pdf")]
@@ -143,7 +173,7 @@ public sealed class MainViewModelTests
         release.SetResult();
         await running;
         Assert.Equal(MainViewState.Succeeded, viewModel.State);
-        Assert.True(viewModel.EncryptCommand.CanExecute(null)); // ready for the next operation
+        Assert.True(viewModel.BrowseCommand.CanExecute(null)); // ready for the next file (file and password were cleared)
     }
 
     [Fact]
