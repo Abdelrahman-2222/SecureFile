@@ -395,6 +395,25 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public async Task Encrypt_SaveDialogCancelledAfterAFailure_ClearsTheOldErrorMessage()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        _dialogs.SaveResult = InputPath + ".enc";
+        _encryption.ExceptionToThrow = new AuthenticationFailedException();
+        await viewModel.EncryptCommand.ExecuteAsync(null);
+        Assert.True(viewModel.IsFailed);
+
+        _dialogs.SaveResult = null; // the user cancels the Save dialog on the second try
+        await viewModel.EncryptCommand.ExecuteAsync(null);
+
+        Assert.False(viewModel.IsFailed);
+        Assert.Equal(MainViewState.FileSelected, viewModel.State);
+        Assert.DoesNotContain("Wrong password", viewModel.StatusMessage, StringComparison.Ordinal);
+        Assert.NotNull(viewModel.SelectedFile);
+        Assert.Equal(ValidPassword, viewModel.Password);
+    }
+
+    [Fact]
     public async Task Browse_ReadFails_ClearsTheSelectionAndShowsTheMessage()
     {
         MainViewModel viewModel = CreateViewModel();

@@ -14,6 +14,10 @@ reason when Encrypt is disabled · 5 `.enc` file with a damaged start · 10 Canc
 progress text · 14 Open folder failure replaced the success message · test gaps for cancel, Open folder, strength · the
 TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 
+## A2. Fixed in Stage 5 (Step 5.6)
+
+- **20** Cancelling the Save dialog left an old red message (test `Encrypt_SaveDialogCancelledAfterAFailure_ClearsTheOldErrorMessage`).
+
 ## B. Open: from the review (grouped; do in this order)
 
 ### B1. Do first: small, visible, low risk
@@ -22,7 +26,6 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
   several dropped files silently use the first; dropping while busy shows a copy cursor; only the dashed zone is a drop target.
 - **17 / 31** Drop-zone text "Drop a file here or Browse…" and a drag-over highlight; the first-run text is repeated three times.
 - **16 / 33** File card: a long name hides extension and size; add a tooltip, the folder, the date and the exact size (plan §11.1 promised them).
-- **20** Cancelling the Save dialog leaves an old red message.
 - **8 / 11 / 30** Show-password toggle moves focus off the checkbox; Enter in the first box should move to Confirm; newline-paste difference between box types.
 - **7** Cancel is not focused while working; focus after a cancel; check that Esc still cancels when the focused box has just been disabled.
 - **15** Error dialogs do not say where the log file is (`FileErrorLog.LogFilePath` exists) and have no owner window.

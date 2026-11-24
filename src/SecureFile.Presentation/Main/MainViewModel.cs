@@ -728,6 +728,14 @@ public sealed partial class MainViewModel : ObservableObject
             return null;
         }
 
+        if (outputPath is null)
+        {
+            // Cancelling the Save dialog is the user's choice, not an error: an old red message from an earlier try must go
+            // (backlog B1 item 20); the password and the file stay so a second try is one click.
+            State = MainViewState.FileSelected;
+            StatusMessage = GuidanceMessage();
+        }
+
         return outputPath;
     }
 
