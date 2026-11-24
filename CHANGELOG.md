@@ -22,6 +22,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
   must always decrypt (protects the file format).
 - Opt-in large-file round trip (Step 4.2, `scripts/large-file-check.ps1`): 1 GiB passes with a 46 MB peak working
   set; the 4.5 GiB case is still to be run on a machine whose antivirus does not stop the test program.
+- Manual test script (`docs/TESTPLAN.md`, Step 4.3) and usability-check protocol with SUS form
+  (`docs/USABILITY.md`, Step 4.4); both still have to be run by people.
 - The pre-push hook now also refuses pushes straight to main, branch deletions and force-pushes (a local stand-in for
   branch protection, which GitHub does not enforce on private repositories without a paid plan).
 - UI tests with FlaUI (`tests/SecureFile.Wpf.UiTests`): the real app encrypts and decrypts a file, shows the friendly
