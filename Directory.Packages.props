@@ -33,4 +33,10 @@
     <PackageVersion Include="FlaUI.UIA3" Version="5.0.0" />
   </ItemGroup>
 
+  <!-- Benchmark packages (Step 5.1). -->
+  <ItemGroup>
+    <!-- Measures time and allocations of the real code; used only by benchmarks/SecureFile.Benchmarks. -->
+    <PackageVersion Include="BenchmarkDotNet" Version="0.15.8" />
+  </ItemGroup>
+
 </Project>

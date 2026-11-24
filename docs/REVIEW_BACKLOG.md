@@ -81,6 +81,7 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 | C10 | 2.5 coverage target (Presentation ≥ 85 %) has not been measured | Plan row 2.5 |
 | C11 | CLI: `tar.gz` archives built on Windows may not carry the executable bit (README tells users `chmod +x`); no `--quiet`/`--json` mode; no folder or multi-file support | CLI polish |
 | C12 | Original findings that stay as documented limits: no secure delete (SSDs cannot guarantee it); AES-CBC+HMAC format v1 only | See `docs/SUGGESTIONS.md` |
+| C13 | Encrypt/decrypt do not overlap CPU work with the final disk flush: 100 MB takes about CPU time + disk time (1.4 s) instead of the larger of the two (about 0.9 s on the HDD) | Measured in Step 5.1; fix means a write-behind or periodic flush in the crash-safe path, so it needs its own design and tests |
 
 ## D. How to burn this down
 

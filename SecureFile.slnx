@@ -4,6 +4,7 @@
     <Project Path="src/SecureFile.Cli/SecureFile.Cli.csproj" />
     <Project Path="src/SecureFile.Presentation/SecureFile.Presentation.csproj" />
     <Project Path="src/SecureFile.Wpf/SecureFile.Wpf.csproj" />
+    <Project Path="benchmarks/SecureFile.Benchmarks/SecureFile.Benchmarks.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/SecureFile.Architecture.Tests/SecureFile.Architecture.Tests.csproj" />
