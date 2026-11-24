@@ -1,0 +1,12 @@
+#!/bin/sh
+# pre-push hook: runs the full quality gate (scripts/verify.ps1) before anything leaves this machine.
+# If any check fails, the push is cancelled. Enabled once per clone with:  git config core.hooksPath .githooks
+
+echo "pre-push: running the quality gate (scripts/verify.ps1)..."
+pwsh -NoProfile -File scripts/verify.ps1
+status=$?
+if [ $status -ne 0 ]; then
+  echo "pre-push: quality gate FAILED - push cancelled. Fix the failing checks and push again." >&2
+  exit 1
+fi
+exit 0

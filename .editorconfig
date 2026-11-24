@@ -117,6 +117,11 @@ dotnet_naming_symbols.async_method_symbols.required_modifiers = async
 dotnet_naming_style.async_suffix_style.required_suffix = Async
 dotnet_naming_style.async_suffix_style.capitalization = pascal_case
 
+# --- Code-metric limits (quality gate G11); thresholds are in CodeMetricsConfig.txt ---
+# These rules are not switched on by AnalysisLevel=latest-all, so they are enabled here explicitly.
+dotnet_diagnostic.CA1502.severity = warning   # Avoid excessive complexity (cyclomatic complexity > 10)
+dotnet_diagnostic.CA1505.severity = warning   # Avoid unmaintainable code (Maintainability Index < 60)
+
 # --- Security analyzers (CA53xx): weak crypto is always an error, never just a suggestion ---
 dotnet_diagnostic.CA5350.severity = error   # Do not use weak algorithms (TripleDES, SHA1, RIPEMD160)
 dotnet_diagnostic.CA5351.severity = error   # Do not use broken algorithms (DES, MD5, RC2)
@@ -136,3 +141,6 @@ dotnet_diagnostic.CA2007.severity = none
 # Test code: xUnit recommends NOT using ConfigureAwait(false) in tests.
 [tests/**.cs]
 dotnet_diagnostic.CA2007.severity = none
+# Maintainability Index counts [InlineData] rows (test DATA tables) as code volume, which says nothing about
+# test logic. The complexity limit (CA1502) still applies to tests.
+dotnet_diagnostic.CA1505.severity = none

@@ -1,0 +1,24 @@
+#!/bin/sh
+# commit-msg hook: rejects a commit whose message
+#   1. contains an AI attribution line, or
+#   2. does not follow Conventional Commits: type(scope): subject   (PROJECT_PLAN §1.5)
+# Enabled once per clone with:  git config core.hooksPath .githooks
+
+message_file="$1"
+
+if grep -qiE 'co-authored-by:.*(claude|anthropic)|generated with.*claude|noreply@anthropic\.com' "$message_file"; then
+  echo "commit-msg: AI attribution lines are not allowed in commit messages." >&2
+  exit 1
+fi
+
+first_line=$(head -n 1 "$message_file")
+if ! echo "$first_line" | grep -qE '^(feat|fix|test|docs|refactor|perf|build|ci|chore|style|revert)(\([a-z0-9-]+\))?!?: .{1,72}$'; then
+  # Allow Git's own generated messages (merges and reverts).
+  if ! echo "$first_line" | grep -qE '^(Merge|Revert) '; then
+    echo "commit-msg: the first line must look like 'type(scope): subject' (max 72 characters)." >&2
+    echo "            types: feat fix test docs refactor perf build ci chore style revert" >&2
+    exit 1
+  fi
+fi
+
+exit 0

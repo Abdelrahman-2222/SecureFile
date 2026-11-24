@@ -38,6 +38,16 @@
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
+  <!--
+    Code-metric limits (quality gate G11), read by the built-in analyzers:
+      CA1502 - a method's cyclomatic complexity (number of independent paths) must not exceed 10;
+      CA1505 - every type and method must keep a Maintainability Index of at least 60 (0-100 scale; Microsoft rates 20-100 as "good").
+    Because warnings are errors, code that is too complex or hard to maintain cannot be built.
+  -->
+  <ItemGroup>
+    <AdditionalFiles Include="$(MSBuildThisFileDirectory)CodeMetricsConfig.txt" />
+  </ItemGroup>
+
   <!-- Build reproducibility. -->
   <PropertyGroup>
     <!-- Same source code always produces the same binary. -->
