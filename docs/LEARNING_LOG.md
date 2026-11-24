@@ -985,3 +985,236 @@ existing test. **No High findings.**
 7. Why one exception type with a `Reason`, and not three exception types?
 8. What does the fuzz test prove that the example tests cannot?
 9. Why did three mutants survive the first Stryker run, and how did the tests change?
+
+## Step 1.3 — Key derivation: from a password to two keys (requirements R3, R4) · 2026-11-24
+
+### Lesson 1.3 — the concepts used in this step
+
+**1. Why a password cannot be the key.**
+AES-256 needs a key of exactly 32 random bytes (256 bits). A password is short, typed by a human, and easy to
+guess. A **key derivation function (KDF)** turns the password into a key. It does three things:
+1. It makes the length right.
+2. It mixes in the **salt**, so the same password gives a different key in every file.
+3. It is deliberately **slow**, so every guess an attacker makes costs real time.
+
+**2. PBKDF2: slow on purpose.**
+PBKDF2 ("Password-Based Key Derivation Function 2", RFC 8018) runs HMAC-SHA256 over and over, 600,000 times here,
+feeding each result into the next round.
+- **For us:** about **0.46 s once per file** (measured on this i7-8750H: 600k rounds ≈ 0.46 s median, 100k ≈ 67 ms).
+- **For an attacker:** 0.46 s *for every password they try*. 600,000 rounds means 600,000 times more work per guess
+  than a single hash.
+- Why not just `SHA256(password)`? A graphics card computes billions of SHA-256 hashes per second, so a weak
+  password would fall in seconds.
+- Why not Argon2 (the modern winner)? It is not built into .NET, and the task requires the built-in crypto APIs.
+  PBKDF2-HMAC-SHA256 at 600,000 rounds is OWASP's recommendation for when Argon2 is not available.
+- The 10,000,000 cap from Step 1.2: on this machine that is about **7 s**, the longest a crafted file can make us wait.
+
+**3. HKDF: one master key, two independent keys.**
+We need **two** keys: one for AES (to hide the data) and one for HMAC (to detect changes). Using one key for two
+jobs is a classic mistake. HKDF (RFC 5869) has two parts:
+- **Extract:** turns uneven input into a uniformly random key. We skip it, because PBKDF2's output already *is* a
+  uniformly random 32-byte key. RFC 5869 §3.3 allows skipping Extract in this case.
+- **Expand:** turns that key plus a **label** into as many key bytes as needed. Different label → unrelated key.
+  Our labels are `"SecureFile v1 encryption"` and `"SecureFile v1 authentication"`. This is called **domain
+  separation**: each key is tied to one purpose and to format v1.
+- **Why not ask PBKDF2 for 64 bytes and cut them in half?** PBKDF2 computes each 32-byte block *separately*, with
+  all 600,000 rounds each. We would pay 2 × 0.46 s. An attacker only needs **one** block to test a guess (the HMAC
+  key alone tells them whether the tag matches), so they would still pay only once. Double cost for us, no extra
+  safety. With HKDF, the slow part runs once and the split costs microseconds.
+
+**4. Unicode normalisation (NFC): the "same" password as different bytes.**
+The letter "é" can be stored in two ways:
+- one character, U+00E9 (typical on Windows);
+- "e" plus a combining accent, U+0065 U+0301 (common on macOS).
+
+They look identical on screen but are different bytes, so they would give **different keys**. A file encrypted on a
+Mac would then refuse the "correct" password on Windows. **NFC** ("Normalization Form C", for "composed") rewrites
+both into the same form before hashing.
+- **NFC, not NFKC:** NFKC also merges *look-alikes*. The ligature "ﬁ" becomes "fi" and "²" becomes "2", so different
+  passwords would become equal. We keep those as typed.
+- **Nothing else is changed.** Case matters and spaces are kept (never trimmed): the password is exactly what was
+  typed, apart from the accent form.
+
+**5. UTF-8, strictly.**
+After normalising, the characters become bytes with UTF-8 (1–4 bytes per character; Arabic uses 2, an emoji 4).
+We use a **strict** encoder that throws on invalid text, such as half of an emoji (a "lone surrogate"). The default
+encoder would silently replace it with "�", so two *different* broken passwords would give the *same* key.
+*What mutation testing taught us here:* the NFC step already rejects invalid text, so today the strict encoder never
+sees any. It stays as a second guard (defence in depth), and the error is re-reported with *our* parameter name,
+`password`, instead of the runtime's internal one.
+
+**6. Memory hygiene: keeping secrets in memory for as short a time as possible.**
+- `CryptographicOperations.ZeroMemory` overwrites a buffer with zeros. Unlike a normal loop, the compiler cannot
+  remove it as "useless".
+- **`finally`** makes the wipe run even if something throws.
+- **Pinned arrays** (`GC.AllocateUninitializedArray<byte>(n, pinned: true)`): the garbage collector moves normal
+  arrays around in memory to compact the heap, and each move can leave an old copy behind that we cannot wipe.
+  A pinned array never moves.
+- **`stackalloc`** for the master key: stack memory is never moved and is wiped in `finally`.
+- **Honest limit:** the password arrives as a .NET `string`, which cannot be wiped (PROJECT_PLAN §5.2). We make no
+  *extra* copies we cannot wipe, but a memory dump taken during the operation could still find it.
+
+**7. `IDisposable` and `using`: a visible lifetime for the keys.**
+`FileKeys` holds the two keys. Its `Dispose()` wipes them, and `using FileKeys keys = …;` calls `Dispose()`
+automatically at the end of the block, even after an exception. After disposal, reading a key throws
+`ObjectDisposedException`, so a wiped (all-zero) key can never be used by mistake. The keys are handed out as
+`ReadOnlySpan<byte>`: the caller can give them to `Aes.SetKey(...)` and `IncrementalHash.CreateHMAC(...)` (both
+accept spans in .NET 10) but cannot keep or change them.
+
+**8. Known-answer tests and an independent oracle.**
+- **Known-answer test (KAT):** feed in a published input and compare with the published output. RFC 7914 §11 gives
+  two PBKDF2-HMAC-SHA256 vectors; RFC 5869 Appendix A gives HKDF vectors. If we used SHA-1 by mistake, or swapped
+  two arguments, the KAT would fail.
+- **Independent oracle:** for the whole chain (normalise → UTF-8 → PBKDF2 → HKDF), no published vector exists, so the
+  expected keys were computed with a **different implementation** (Python's `hashlib`, `hmac` and `unicodedata`).
+  Comparing our code with itself would prove nothing; comparing with an unrelated implementation does.
+
+### Design review before coding (§1.10)
+
+| Principle | Answer for this step |
+|---|---|
+| Single responsibility | `KeyDerivation` = password → keys. `FileKeys` = holds two keys and wipes them. Neither reads files or encrypts. |
+| KISS / YAGNI | A `static` class, not an interface: there is exactly one correct key derivation for format v1 and nothing to swap. A v2 format can add its own. Tests run the real (fast enough) code. |
+| DRY | `KeyLength` is written once. Each algorithm call is in one small method (`DeriveMasterKey`, `ExpandKey`), and those exact methods are checked by the published vectors. |
+| Encapsulation | Keys only as read-only spans; unusable after `Dispose`. Both types are `internal`. |
+| Fail fast | Empty password, missing header and invalid Unicode are rejected before any slow work. |
+| Secure by design | Salt from the header, OWASP iteration count, domain-separated keys, strict encoding, wiping in `finally`, no secrets in exception messages. |
+| Algorithms | O(i) time for i rounds: the cost is *intended*. Only one slow PBKDF2 run per file (HKDF instead of 64-byte PBKDF2). O(p) temporary memory for the password bytes, O(1) for the keys. |
+| Pattern | **Dispose pattern** (deterministic cleanup of a resource, here secret memory). |
+
+### Alternatives we compared
+
+| Choice | Alternative | Why ours |
+|---|---|---|
+| PBKDF2-HMAC-SHA256, 600k | Argon2id, scrypt | Built into .NET and required by the task; OWASP's PBKDF2 setting. Argon2 noted as a v2 option. |
+| PBKDF2 → HKDF-Expand | PBKDF2 with 64 bytes; one key for both jobs | Half the waiting time with the same safety; never reuse one key for two purposes. |
+| NFC | No normalisation; NFKC | Same password on every OS; NFKC would merge different passwords. |
+| Strict UTF-8 | `Encoding.UTF8` | No silent "�" replacement. |
+| Pinned arrays + `ZeroMemory` | `SecureString` | Microsoft no longer recommends `SecureString` for new code, and it must become plain bytes to be used anyway. |
+| `FileKeys : IDisposable` | Returning a `byte[]` | The lifetime and the wipe are visible and automatic with `using`. |
+
+### Walkthrough — `src/SecureFile.Core/Cryptography/`
+
+**`KeyDerivation.cs`**
+
+| Code | Meaning |
+|---|---|
+| `internal static class KeyDerivation` | Pure computation with no state, used only inside Core. |
+| `internal const int KeyLength = 32;` | 256 bits: AES-256 and HMAC-SHA256 key size. |
+| `StrictUtf8 = new(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true)` | No byte-order mark at the start; throw on invalid text. Created once (`static readonly`). |
+| `EncryptionKeyLabel => "SecureFile v1 encryption"u8` | The HKDF label, as bytes with no allocation. |
+| `DeriveKeys(ReadOnlySpan<char> password, EncryptedFileHeader header)` | A `string` converts to `ReadOnlySpan<char>` automatically, so the ViewModel can pass `PasswordBox.Password`. The header gives the salt and the iteration count. |
+| `if (password.IsEmpty) throw …` / `ThrowIfNull(header)` | Guard clauses, before any slow work. |
+| `byte[] passwordBytes = PasswordToBytes(password);` | Normalised, UTF-8, pinned. |
+| `Span<byte> masterKey = stackalloc byte[KeyLength];` | The master key lives only on the stack. |
+| `try { DeriveMasterKey(…); return SplitMasterKey(masterKey); } finally { ZeroMemory(…) ×2 }` | Slow step, then fast split; both temporaries are wiped whatever happens. |
+| `SplitMasterKey` | Two pinned 32-byte arrays, filled by HKDF-Expand with the two labels, handed to `FileKeys`. (It is its own method because the maintainability gate, CA1505, scored `DeriveKeys` at 58 with it inline, below our limit of 60.) |
+| `PasswordToBytes`: `try { return NormalizeAndEncode(password); } catch (ArgumentException e) { throw new ArgumentException("…invalid Unicode…", nameof(password), e); }` | A *specific* catch that only re-labels. The runtime names its own parameter (`source`); we report ours (`password`) and keep the original as `InnerException` for the log. |
+| `NormalizeAndEncode`: `password.GetNormalizedLength(FormC)` | How many characters the NFC form needs, so the buffer has exactly that size. |
+| `if (!password.TryNormalize(normalized, out int charsWritten, FormC)) throw new CryptographicException(…)` | NFC straight into our pinned buffer (a .NET 10 span API). The `string` version would create another copy we could not wipe. The check "cannot fail", but if it ever did, going on would encrypt with an **empty** password. So it throws (fail closed). The first version used `Debug.Assert`, which Release builds remove (Review Board R1). |
+| `StrictUtf8.GetByteCount` / `GetBytes` | Size, then encode into a pinned byte array. |
+| `finally { ZeroMemory(MemoryMarshal.AsBytes(normalized.AsSpan())); }` | Wipe the normalised characters. `AsBytes` views the `char` array as bytes, because `ZeroMemory` works on bytes. |
+| `AllocatePinned<T>(int length) where T : unmanaged` | The one place that creates every pinned array (DRY). `unmanaged` = plain value types such as `byte` and `char`. |
+| `// Stryker disable once … : reason` | Tells the mutation tester to skip a line no test can observe (wiping, pinning) or that can never run. **Each one has a written reason** and is checked by review (G9). |
+| `DeriveMasterKey` → `Rfc2898DeriveBytes.Pbkdf2(…, HashAlgorithmName.SHA256)` | The one-call static PBKDF2 API (no object to dispose). |
+| `ExpandKey` → `HKDF.Expand(HashAlgorithmName.SHA256, masterKey, destination, label)` | RFC 5869 Expand. |
+
+**`FileKeys.cs`**
+
+| Code | Meaning |
+|---|---|
+| `internal sealed class FileKeys : IDisposable` | Holds two keys; wipes them on `Dispose`. |
+| Constructor `RequireKeyLength(…)` | Both keys must exist and be exactly 32 bytes. The object takes **ownership**: it will wipe these arrays. |
+| `EncryptionKey { get { ObjectDisposedException.ThrowIf(_disposed, this); return _encryptionKey; } }` | Read-only view; refused after wiping. |
+| `Dispose()`: `ZeroMemory` ×2, `_disposed = true` | Wipe; safe to call twice. |
+
+### Walkthrough — the tests
+
+| Test | What it proves |
+|---|---|
+| `DeriveMasterKey_Rfc7914Vectors_…` (2) | Our PBKDF2 call matches the RFC's published outputs (also confirmed with Python before writing them in). |
+| `ExpandKey_Rfc5869Vectors_…` (2) | Our HKDF-Expand call matches RFC 5869 test cases 1 and 3. |
+| `DeriveKeys_KnownInputs_MatchIndependentlyComputedKeys` (2) | The whole chain, including Arabic, an accent and an emoji, matches Python's independent result. |
+| `DeriveKeys_SamePasswordTypedDifferently_…` | "café" typed as é or as e + accent gives the same keys (NFC). |
+| `DeriveKeys_AnyInput_GivesTwoDifferentKeys` | The labels really separate the two keys. |
+| `DeriveKeys_SlightlyDifferentPassword_…` (3) | One character less, a capital letter or a trailing space gives a different key. |
+| `DeriveKeys_DifferentSaltOrIterations_…` / `DeriveKeys_IvIsNotPartOfTheKey_…` | The key depends on salt and iterations, and *not* on the IV. |
+| `DeriveKeys_ShortPassword_…` / `DeriveKeys_VeryLongPassword_…` | One space, one letter and 10,000 characters are all accepted (strength is Step 1.8's job). |
+| Empty password, `null` header, lone surrogate | Rejected with the documented exceptions. The lone-surrogate error names `password` and keeps the runtime's error inside. |
+| `PasswordToBytes_VariousText_…` (8) | Exact bytes for ASCII, é in both forms, Å (Ångström sign), the "ﬁ" ligature (NFC keeps it), Arabic, an emoji, and spaces. |
+| `FileKeysTests` (7) | Keys are readable before disposal, and **both arrays are all zeros after `Dispose`**. A span read *before* `Dispose` shows zeros afterwards: a span is a window, not a copy. Access after disposal throws; double `Dispose` is safe; a wrong length or `null` is rejected. |
+
+### Step 1.3 — Review Board report (2026-11-24)
+
+One reviewer agent covered all eight roles. It ran the tests and probed the .NET 10 behaviour in a throwaway
+program: a lone surrogate fails inside normalisation with parameter `source`, and a 50-million-character password
+costs about 88 ms to convert. **No High findings.**
+
+| ID | Role | Severity | Finding | Decision |
+|---|---|---|---|---|
+| R1 | Critic / Security | Medium | `Debug.Assert` is removed in Release. If normalisation ever failed, the file would be encrypted with an **empty password**, silently: fail-open where it must fail closed. | **Fixed:** a real check that throws `CryptographicException`. |
+| R2 | QA / Security | Medium | The lone-surrogate test passed because of *normalisation*, not strict UTF-8 (strict mode was dead code for that input, and Stryker proved it). The error named the runtime's parameter `source`. | **Fixed:** the error is re-reported with `password` and keeps the original inside; the test checks both. Strict UTF-8 is kept as a documented second guard. |
+| R3 | QA | Medium | The first Stryker run scored **65.6 %**. The survivors were the wipes of temporaries, the `pinned` flags, the `Debug.Assert`, and the encoder flags. None of these can be observed by a black-box test. | **Fixed honestly:** no test-only "seam" (over-engineering). Each such line has a `// Stryker disable once … : reason` comment: 11 mutants in total, all listed in the gate table. One `AllocatePinned` helper replaced four `pinned: true` flags. Score: **100 %**. |
+| R4 | Security | Low | "No stray copies are left behind" overstated it: copies inside the runtime, the OS crypto library and the caller's string are outside our control. | **Fixed:** the class docs say exactly what is and is not wiped. |
+| R5 | Security / Perf | Low | No password length limit. A 100 MB password costs ~0.5 GB of short-lived memory (not CPU: PBKDF2 hashes a long password once). | **Recorded** for Step 1.8 and the UI (`PasswordBox.MaxLength`, e.g. 1,024). Core stays simple; the user is local. |
+| R6 | Security | Note | Skipping HKDF-Extract is sound (RFC 5869 §3.3, NIST SP 800-132 §5.4). | **Added** the references to `ExpandKey`'s docs. |
+| R7 | Security | Note | NFC trade-off: full-width "Ａ" ≠ "A". | **Documented** in `PasswordToBytes`. |
+| R8 | Architect | Low | If the second `ExpandKey` threw, the first key would not be wiped. | **Accepted:** `HKDF.Expand` only throws for invalid lengths, and ours are constants. A try/catch for an impossible case would be ceremony. |
+| R9 | Architect | Note | A static class plus disposable `FileKeys` is the right shape. In 1.5/1.6 call `await Task.Run(() => KeyDerivation.DeriveKeys(password, header), ct)` with the `string` (a span cannot be captured in a lambda). | **Recorded** for Step 1.5. |
+| R10 | QA | Low | Add a test that documents "a span read before `Dispose` shows zeros after". | **Added.** |
+| R11 | QA | Low | The test source held *raw* combining characters. An editor that normalises on save would silently turn two test rows into duplicates. | **Fixed:** every non-ASCII character inside test strings is now a `\u` escape. |
+| R12 | Perf | Note | Cost is PBKDF2; everything else is microseconds. | No change. |
+| R13 | End user | Note | Caps Lock, keyboard layout and a trailing space copied from a password manager all give "wrong password". | **Recorded** for the UI (§11 already has a Caps Lock warning): the wrong-password message will add "check Caps Lock, keyboard layout and spaces". Never trim silently. |
+| R14 | PM | Note | Acceptance met and exceeded. | — |
+
+**Team Lead questions (short answers):**
+1. *"Why not 64 bytes from PBKDF2?"* Each 32-byte block is a full 600k run. The attacker needs only one block to test
+   a guess, so we would pay double for nothing.
+2. *"Why skip HKDF-Extract?"* Extract makes uneven input uniform. PBKDF2's output already is uniform, and RFC 5869
+   §3.3 allows going straight to Expand.
+3. *"Is 600k enough? Why not Argon2?"* It is OWASP's setting for PBKDF2-SHA256 (≈0.46 s here). Argon2 is not built
+   into .NET, and the task requires built-in crypto. The count is stored in each file's header, so it can be raised
+   later without breaking old files.
+4. *"Does zeroing protect the password?"* Partly, and we say so. Our own copies are pinned and wiped. The `string`
+   and the crypto library's internals are not ours to wipe. It shortens exposure; it does not stop an attacker who
+   can already read our memory.
+5. *"How do you test that something was zeroed?"* For `FileKeys`: directly. For temporaries inside a method: we
+   can't without a test-only seam, so those lines are excluded from mutation testing *with a written reason* and
+   checked in review.
+
+#### Complexity summary (G17)
+
+| Operation | Time | Space |
+|---|---|---|
+| `KeyDerivation.DeriveKeys` | O(i + p): i PBKDF2 rounds (≈0.46 s at 600k on this machine) + p password characters | O(p) temporary (wiped), O(1) result |
+| `KeyDerivation.PasswordToBytes` | O(p) | O(p) |
+| `FileKeys` (access, `Dispose`) | O(1) | O(1) |
+
+#### Quality gate — Step 1.3
+
+| # | Check | Result |
+|---|---|---|
+| G1 | "Done when": RFC 7914 §11 and RFC 5869 test case 1 pass | ✅ plus RFC 5869 test case 3 and two independent golden vectors |
+| G2–G3 | Format, build with all analyzers | ✅ 0 warnings. CA1505 caught `DeriveKeys` at MI 58 and it was split. |
+| G4 | Tests | ✅ 170 passed (36 new), 0 failed, 0 skipped |
+| G5 | Core coverage | ✅ 99.4 % lines, 97.8 % branches (limits 90 / 85). The only code never run is the fail-closed `throw` after `TryNormalize` (1 line, 1 branch): it exists for a case that cannot happen, so no test can reach it. We report the real number instead of hiding it. |
+| G6–G8 | Vulnerable packages, secrets, forbidden patterns | ✅ none / none / clean. The one `catch` is specific (`ArgumentException`) and rethrows. |
+| G9 | Exceptions and secrets | ✅ all documented; messages never contain the password; every temporary is wiped in `finally` (reviewed line by line) |
+| G10 | Architecture | ✅ both new types sealed/static and internal |
+| G11 | Complexity ≤ 10, MI ≥ 60 | ✅ after the split |
+| G12 | Mutation score | ✅ **100 %** of testable mutants. 11 mutants are excluded, each with a reason: 5 wipes, 1 pinning flag, 3 on the unreachable fail-closed throw, 2 equivalent encoder flags. |
+| G13 | Performance | ✅ measured: PBKDF2 600k ≈ 0.46 s median (i7-8750H); one PBKDF2 run per file |
+| G14–G15 | Docs, Git | ✅ |
+| G16–G18 | Design, complexity, Review Board | ✅ 14 findings: 11 fixed or recorded, 3 notes |
+
+### Self-check 1.3 (open book)
+
+1. Why can't the password itself be the AES key? Name the three jobs of a KDF.
+2. What does 600,000 iterations cost the user, and what does it cost an attacker?
+3. Why do we run PBKDF2 once and then HKDF, instead of asking PBKDF2 for 64 bytes?
+4. What are the two labels for? What would go wrong if one key did both jobs?
+5. Give an example where the same visible password is two different byte sequences. How does NFC fix it, and why not NFKC?
+6. Why are the temporary arrays *pinned*? What can we not wipe, and why?
+7. Why did the first version's `Debug.Assert` become a real `throw`?
+8. What is a known-answer test, and why were the golden keys computed with Python and not with our own code?
+9. Why are some lines excluded from mutation testing, and how do we keep that honest?

@@ -142,7 +142,7 @@ pwsh -File scripts/verify.ps1
 | G9 | Exceptions | Every thrown exception is documented (`<exception>`); messages contain no secrets; cleanup in `using`/`finally` (ADR-13) | Review | Manual |
 | G10 | Modularity | Layer rule holds (Core → no UI; Presentation → no UI framework); Core classes sealed | Architecture tests | ✅ (tests) |
 | G11 | Modularity / quality | Cyclomatic complexity ≤ 10 per method; Maintainability Index ≥ 60 per type **and** method | Built-in analyzers CA1502/CA1505 with `CodeMetricsConfig.txt` (same numbers as VS *Calculate Code Metrics*) | ✅ build |
-| G12 | Test strength | Mutation score ≥ 80 % on changed Core code | `dotnet stryker` | Manual (per step) |
+| G12 | Test strength | Mutation score ≥ 80 % on changed Core code (target 100 %). A line may be excluded only with `// Stryker disable once <mutator> : reason` when no test can observe it (wiping memory, pinning) or it can never run; every exclusion is listed in the step's gate table | `dotnet stryker` | Manual (per step) |
 | G13 | Performance | No whole-file loading; no needless allocations in loops; measured when the step is performance-relevant | Review + quick measurement / BenchmarkDotNet (Stage 5) | Manual |
 | G14 | Documentation | XML docs on all public members (build-enforced); CHANGELOG; LEARNING_LOG lesson + walkthrough; plan status | Build (CS1591) + review | Partly |
 | G15 | Git | Conventional Commit message; **no AI attribution**; one logical change per commit | `commit-msg` hook + verify.ps1 | ✅ hooks |
@@ -645,12 +645,12 @@ Why does Core not reference WPF? What does `TreatWarningsAsErrors` buy us?
 |---|---|---|---|
 | 1.1 | `FileDetails` (name, size in bytes, extension, last modified) + `FileSizeFormatter` (`1.5 MB`). | Unit tests for 0 B, 1023 B, 1 KB, >4 GB, no extension, `.tar.gz`, `.bashrc`. | 🟨 done — quality gate passed (G1–G15, mutation 100 %) — self-check pending |
 | 1.2 | `EncryptedFileFormat` constants + `EncryptedFileHeader` (write/read/validate). | Tests: round-trip, wrong magic, unknown version, iterations out of range, file too short. | 🟨 done — quality gate passed (Review Board: 0 High, 2 Medium fixed), mutation 100 % — self-check pending |
-| 1.3 | `KeyDerivation`: PBKDF2 → HKDF (§5.2), NFC normalization, key wiping. | Known-answer tests: RFC 7914 §11 (PBKDF2-HMAC-SHA256), RFC 5869 test case 1 (HKDF-SHA256). | ⬜ |
+| 1.3 | `KeyDerivation`: PBKDF2 → HKDF (§5.2), NFC normalization, key wiping. | Known-answer tests: RFC 7914 §11 (PBKDF2-HMAC-SHA256), RFC 5869 test case 1 (HKDF-SHA256). | 🟨 done — quality gate passed (Review Board: 0 High, 3 Medium fixed), mutation 100 % — self-check pending |
 | 1.4 | AES-CBC check against NIST: prove we call `Aes` correctly. | NIST SP 800-38A F.2.5/F.2.6 (CBC-AES256) vectors pass (with `PaddingMode.None` for the vector). | ⬜ |
-| 1.5 | `FileEncryptionService.EncryptAsync` (§5.3): streaming, HMAC, progress, cancel, temp + move. | Round-trip tests at 0, 1, 15, 16, 17 bytes, 1 MiB ± 1; same input → different output each time. | ⬜ |
+| 1.5 | `FileEncryptionService.EncryptAsync` (§5.3): streaming, HMAC, progress, cancel, temp + move. | Round-trip tests at 0, 1, 15, 16, 17 bytes, 1 MiB ± 1; same input → different output each time. Keys: `using FileKeys keys = await Task.Run(() => KeyDerivation.DeriveKeys(password, header), ct);` (off the UI thread; pass the `string`, a span cannot be captured; Review Board 1.3, R9). | ⬜ |
 | 1.6 | `FileEncryptionService.DecryptAsync` (§5.4): verify-then-commit. | Wrong password and every tamper/truncation case fail **and leave no output file**. Header read with `ReadAtLeast(buffer, 41, throwOnEndOfStream: false)` and only the bytes read passed to `EncryptedFileHeader.Read`, **before** `GetCiphertextLength` (Review Board 1.2, R1); tests: a 3-byte text file → `NotEncryptedFile`, an 80-byte file starting with `SFEN` → `Damaged`. | ⬜ |
 | 1.7 | Error model (ADR-13 Layer 1): `AuthenticationFailedException` with the three standard constructors (`SecureFileException` and `InvalidEncryptedFileException` were pulled forward into Step 1.2). | Every failure in §9 maps to one exception type; tests prove no partial output. | ⬜ |
-| 1.8 | `PasswordStrengthEvaluator` (simple rules: length + character variety) and `PasswordGenerator` (`RandomNumberGenerator`). | Tests for empty, short, long, Unicode passwords. | ⬜ |
+| 1.8 | `PasswordStrengthEvaluator` (simple rules: length + character variety) and `PasswordGenerator` (`RandomNumberGenerator`). | Tests for empty, short, long, Unicode passwords. A maximum length (e.g. 1,024 characters, also `PasswordBox.MaxLength`) so a pasted 100 MB text cannot waste memory (Review Board 1.3, R5). | ⬜ |
 
 **Checkpoint 1:** What is an IV and why must it be random for CBC? Why a salt? Why 600,000 iterations,
 and what does that cost the user? What is PKCS7 padding? Why encrypt-then-MAC and not MAC-then-encrypt?
@@ -879,7 +879,8 @@ we test them anyway.
 3. **Mode:** Encrypt / Decrypt — preselected automatically from the file header; the user can switch. For a `.enc`
    file a hint says *"This is a SecureFile encrypted file — enter its password to decrypt it."* (a `.enc` file has no
    icon or double-click action, so users need this hint).
-4. **Password:** field with show/hide; *Confirm password* (encrypt only); Caps Lock warning.
+4. **Password:** field with show/hide; *Confirm password* (encrypt only); Caps Lock warning. Spaces are never trimmed;
+   the wrong-password message adds "Check Caps Lock, the keyboard language and spaces at the start or end." (Review Board 1.3, R13).
    Warning text: **"If you forget this password, the file cannot be recovered. Nobody can reset it."**
    *Could (time-boxed):* strength meter and "Generate strong password". If generation is built, the app shows the
    password with *"Save this password somewhere safe now (for example in a password manager)"*, and any Copy button
@@ -1144,3 +1145,4 @@ whether the WPF Fluent `ThemeMode` API is still marked experimental in .NET 10, 
 | 2026-11-24 | Step 1.1 Review Board | 3 reviewer agents, 48 findings fixed or recorded; §1.8–1.10 principles, ADR-14, honest re-baseline; symlink support; CI runs the gate + gitleaks. Gate passed, mutation 100 %. |
 | 2026-11-24 | Decision | Vertical slice first: after Step 1.7, build the thinnest end-to-end app before Step 1.8 and UI polish (§7). |
 | 2026-11-24 | Step 1.2 | Encrypted file header: format constants, header write/read/validate, `SecureFileException` + `InvalidEncryptedFileException` (with `Reason`), 80 tests incl. golden bytes and fuzzing. Review Board: 0 High, 2 Medium + 3 Low fixed. Gate passed. |
+| 2026-11-24 | Step 1.3 | Key derivation: NFC → UTF-8 → PBKDF2-HMAC-SHA256 → HKDF-Expand into two keys; `FileKeys` wipes keys on dispose. RFC 7914 / RFC 5869 vectors + Python-computed golden keys; PBKDF2 600k measured at ≈0.46 s. Review Board: 0 High, 3 Medium fixed (fail-closed normalisation, error naming, mutation exclusions with reasons). Gate passed, mutation 100 %. |
