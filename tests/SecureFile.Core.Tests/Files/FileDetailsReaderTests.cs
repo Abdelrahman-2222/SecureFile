@@ -83,6 +83,92 @@ public sealed class FileDetailsReaderTests : IDisposable
         FileDetails details = _reader.Read(filePath);
 
         Assert.Equal(knownTimeUtc, details.LastModifiedUtc);
+        Assert.Equal(DateTimeKind.Utc, details.LastModifiedUtc.Kind); // Equal() ignores Kind, so check it explicitly
+    }
+
+    [Fact]
+    public void Read_RelativePath_ResolvesFromCurrentFolder()
+    {
+        string fileName = $"relative-{Guid.NewGuid():N}.txt";
+        string expectedFullPath = Path.Combine(Environment.CurrentDirectory, fileName);
+        File.WriteAllBytes(expectedFullPath, new byte[3]);
+        try
+        {
+            FileDetails details = _reader.Read(fileName);
+
+            Assert.Equal(expectedFullPath, details.FullPath);
+            Assert.Equal(3L, details.SizeInBytes);
+        }
+        finally
+        {
+            File.Delete(expectedFullPath);
+        }
+    }
+
+    [Fact]
+    public void Read_FileLockedByAnotherProgram_StillReturnsDetails()
+    {
+        string filePath = CreateFile("locked.bin", sizeInBytes: 7);
+        using FileStream exclusiveLock = new(filePath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+
+        FileDetails details = _reader.Read(filePath);
+
+        Assert.Equal(7L, details.SizeInBytes);
+    }
+
+    [Theory]
+    [InlineData(FileAttributes.ReadOnly)]
+    [InlineData(FileAttributes.Hidden)]
+    public void Read_FileWithSpecialAttribute_ReturnsDetails(FileAttributes attribute)
+    {
+        string filePath = CreateFile("special.txt", sizeInBytes: 4);
+        File.SetAttributes(filePath, attribute);
+        try
+        {
+            FileDetails details = _reader.Read(filePath);
+
+            Assert.Equal(4L, details.SizeInBytes);
+        }
+        finally
+        {
+            File.SetAttributes(filePath, FileAttributes.Normal); // a read-only file could not be deleted afterwards
+        }
+    }
+
+    [Fact]
+    public void Read_SymbolicLinkToFile_ReturnsTargetSizeButLinkName()
+    {
+        string targetPath = CreateFile("target.dat", sizeInBytes: 2048);
+        string linkPath = CreateSymbolicLinkOrSkip("shortcut.lnk.dat", targetPath);
+
+        FileDetails details = _reader.Read(linkPath);
+
+        Assert.Equal("shortcut.lnk.dat", details.Name);
+        Assert.Equal(2048L, details.SizeInBytes);
+    }
+
+    [Fact]
+    public void Read_ChainOfSymbolicLinks_ReturnsSizeOfFinalTarget()
+    {
+        // second-link -> first-link -> target: only following the chain to the END gives the real size.
+        string targetPath = CreateFile("chain-target.dat", sizeInBytes: 4096);
+        string firstLinkPath = CreateSymbolicLinkOrSkip("first-link.dat", targetPath);
+        string secondLinkPath = CreateSymbolicLinkOrSkip("second-link.dat", firstLinkPath);
+
+        FileDetails details = _reader.Read(secondLinkPath);
+
+        Assert.Equal(4096L, details.SizeInBytes);
+    }
+
+    [Fact]
+    public void Read_SymbolicLinkToMissingFile_ThrowsFileNotFoundException()
+    {
+        string missingTarget = Path.Combine(_temporaryFolder.FullName, "gone.dat");
+        string linkPath = CreateSymbolicLinkOrSkip("broken-link.dat", missingTarget);
+
+        FileNotFoundException exception = Assert.Throws<FileNotFoundException>(() => _reader.Read(linkPath));
+
+        Assert.False(string.IsNullOrWhiteSpace(exception.Message), "The exception must explain the problem (it is logged).");
     }
 
     [Fact]
@@ -130,7 +216,7 @@ public sealed class FileDetailsReaderTests : IDisposable
     }
 
     [Theory]
-    [InlineData("a<b>|?*.txt")]                   // characters Windows does not allow in names
+    [InlineData("a<b>|?*.txt")]                   // invalid on Windows; on Linux/macOS a legal name that does not exist
     [InlineData("missing-folder/missing.txt")]    // folder that does not exist
     public void Read_InvalidOrUnreachablePath_ThrowsFileNotFoundException(string relativePath)
     {
@@ -147,6 +233,25 @@ public sealed class FileDetailsReaderTests : IDisposable
         string tooLongPath = Path.Combine(_temporaryFolder.FullName, new string('x', 40_000));
 
         Assert.ThrowsAny<IOException>(() => _reader.Read(tooLongPath));
+    }
+
+    /// <summary>
+    /// Creates a symbolic link, or skips the test when this machine does not allow it
+    /// (Windows needs Developer Mode or administrator rights to create symbolic links).
+    /// </summary>
+    private string CreateSymbolicLinkOrSkip(string linkName, string targetPath)
+    {
+        string linkPath = Path.Combine(_temporaryFolder.FullName, linkName);
+        try
+        {
+            File.CreateSymbolicLink(linkPath, targetPath);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Assert.Skip($"Symbolic links cannot be created here: {exception.Message}");
+        }
+
+        return linkPath;
     }
 
     /// <summary>Creates a file of the given size (filled with zeros) in this test's temporary folder.</summary>

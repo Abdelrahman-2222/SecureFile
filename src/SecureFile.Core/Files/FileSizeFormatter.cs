@@ -4,8 +4,15 @@ namespace SecureFile.Core.Files;
 /// Turns a size in bytes into short, human-readable text such as <c>1.5 MB</c>.
 /// </summary>
 /// <remarks>
-/// Uses binary units (1 KB = 1,024 bytes) with the labels KB, MB, GB…, the same convention as
-/// Windows File Explorer, so the numbers match what Windows users see elsewhere.
+/// <para>
+/// Uses binary units (1 KB = 1,024 bytes) with the labels KB, MB, GB…, the convention Windows File Explorer uses,
+/// and shows at most two decimals (Explorer rounds to three significant digits instead, so the last digit can differ).
+/// </para>
+/// <para>
+/// Numbers follow the given culture; the unit words are English. If the user interface is translated, the unit
+/// words move to the translation resources (recorded decision, Review Board Step 1.1).
+/// </para>
+/// <para>Complexity: O(1) time (at most six divisions) and O(1) space (only the result text is allocated).</para>
 /// </remarks>
 public static class FileSizeFormatter
 {
@@ -26,7 +33,7 @@ public static class FileSizeFormatter
     /// The culture rules for numbers (for example the decimal separator: <c>1.5</c> in English, <c>1,5</c> in German).
     /// Use <see cref="System.Globalization.CultureInfo.CurrentCulture"/> for text shown to the user.
     /// </param>
-    /// <returns>Text such as <c>0 bytes</c>, <c>1 byte</c>, <c>1023 bytes</c>, <c>1.5 KB</c> or <c>4.2 GB</c>.</returns>
+    /// <returns>Text such as <c>0 bytes</c>, <c>1 byte</c>, <c>1,023 bytes</c>, <c>1.5 KB</c> or <c>4.2 GB</c>.</returns>
     /// <exception cref="ArgumentOutOfRangeException"><paramref name="sizeInBytes"/> is negative.</exception>
     /// <exception cref="ArgumentNullException"><paramref name="formatProvider"/> is <see langword="null"/>.</exception>
     public static string Format(long sizeInBytes, IFormatProvider formatProvider)
@@ -37,6 +44,12 @@ public static class FileSizeFormatter
         if (sizeInBytes == 1)
         {
             return "1 byte";
+        }
+
+        if (sizeInBytes < BytesPerUnitStep)
+        {
+            // Whole bytes, with the culture's thousands separator ("1,023 bytes" in English).
+            return string.Create(formatProvider, $"{sizeInBytes:N0} {UnitNames[0]}");
         }
 
         (double size, int unitIndex) = ScaleToLargestFittingUnit(sizeInBytes);
