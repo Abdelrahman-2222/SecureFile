@@ -1592,3 +1592,111 @@ Performance + PM + End user + Team Lead. Findings marked **P** were confirmed wi
 8. What does `Flush(flushToDisk: true)` protect against that `FlushAsync` does not? What is still not protected (ADR-07 "Accepted limits")?
 9. Why does the service report whole percents only when they rise? What does the user see between 100 % and "done"?
 10. Which Stryker survivors were excluded, and why is each exclusion honest?
+
+## Step 1.6 — Decrypting a file: verify, then commit (requirements R4, D2–D5) · 2026-11-24
+
+### Lesson 1.6 — the concepts used in this step (short)
+
+**1. Verify-then-commit.** Decryption reads the file **once**: each ciphertext chunk goes into the HMAC *and* through
+the decryptor, and the plaintext goes to a temp file. Only after the last byte is the stored tag compared with the
+computed one. Match → finish the last block, move the temp file into place. Mismatch → delete the temp file, throw.
+*Analogy:* a cashier counts the notes into a drawer that is still locked; the drawer opens only if the total matches.
+Alternative: two passes (check the tag first, then decrypt) — no unverified plaintext on disk, but twice the reading
+(ADR-07 keeps it as the fallback).
+
+**2. Why the last block waits.** The AES decryptor always **holds back the last block** in `TransformBlock`; only
+`TransformFinalBlock` decrypts it and checks/removes the PKCS7 padding. We call it only after the tag matched, so the
+padding of an unverified file is never examined — that is what closes the door on *padding-oracle* attacks, where an
+attacker learns plaintext from "bad padding" vs "bad tag" answers. (A decrypting `CryptoStream` would run the final
+block on dispose, before our verdict — ADR-06.)
+
+**3. Constant-time comparison.** `CryptographicOperations.FixedTimeEquals(a, b)` always looks at all 32 bytes. A normal
+`SequenceEqual` stops at the first difference, so its timing would tell an attacker how many leading tag bytes were
+right.
+
+**4. Check the cheap things first.** Before any temp file or the 0.5 s key derivation: read the first 41 bytes with
+`ReadAtLeastAsync(41, throwOnEndOfStream: false)` and pass **only the bytes read** to `EncryptedFileHeader.Read`
+(a 3-byte text file → "not an encrypted file", not a disk error), then `GetCiphertextLength(file length)` (an 80-byte
+`SFEN…` file → "damaged"). Then the ciphertext length is known, so the loop uses `ReadExactlyAsync`: short reads are
+waited out, and a file that shrank meanwhile throws `EndOfStreamException`.
+
+**5. One error for "wrong password" and "changed file".** Both just make the tag differ; the HMAC cannot tell them
+apart, so `AuthenticationFailedException` (Step 1.7, pulled forward) says "wrong password, or the file was changed or
+damaged". Guessing one would mislead the user.
+
+**6. The hidden temp file.** The decrypt temp file holds *unverified plaintext*, so on Windows it gets the hidden
+attribute while it is written (set and cleared through the open handle). The mark is removed before the move, because
+a move keeps attributes and the user's result must not be hidden. Encryption does not hide (ciphertext only).
+
+### Walkthrough — `FileEncryptionService.DecryptAsync`
+
+| Code | Meaning |
+|---|---|
+| `DecryptAsync` → `GetCheckedFullPaths(…)` | Not `async`: null/empty arguments, folder or same-file output, existing output without overwrite all throw **at the call** (shared with `EncryptAsync`, DRY). |
+| `OpenInputFile` | `FileShare.Read`, async, sequential, no FileStream buffer — shared with encryption. |
+| `ReadHeaderAsync`: `ReadAtLeastAsync(header, 41, throwOnEndOfStream: false)` → `EncryptedFileHeader.Read(bytes[..read])` | Lesson point 4: "not ours" before "damaged". |
+| `EncryptedFileFormat.GetCiphertextLength(input.Length)` | Rejects lengths < 89 or not whole blocks, still before any output exists. |
+| `AtomicFileWriter.WriteAsync(…, isSensitive: true, …)` | Temp file in the output folder, hidden on Windows, deleted on any failure, moved only on success. |
+| `Task.Run(() => KeyDerivation.DeriveKeys(password, header), ct)` | PBKDF2 off the UI thread (as in encryption). |
+| `header.WriteTo(headerBytes); hmac.AppendData(headerBytes)` | `Read` only accepts values that `WriteTo` writes back unchanged, so these are exactly the 41 bytes of the file. |
+| `DecryptContentAsync`: `ReadExactlyAsync` → `hmac.AppendData` → `TransformBlock` → `WriteAsync` → `progress.Advance` | One 2 MiB pooled buffer (ciphertext half / plaintext half), cleared on return. HMAC over the *ciphertext* (encrypt-then-MAC). |
+| `VerifyTagAsync`: `ReadExactlyAsync(32)` → `FixedTimeEquals` → `AuthenticationFailedException` | Lesson points 3 and 5. |
+| `WriteLastBlockAsync`: `TransformFinalBlock([], 0, 0)` | Only after the tag matched; the returned array is wiped after writing. An invalid padding *with* a valid tag (only another program knowing the password could make that) throws `CryptographicException` — documented, tested, nothing left behind. |
+| `AtomicFileWriter.FillAsync` / `SetHidden` / `TryEmpty` | Hide through the open handle (`File.SetAttributes(SafeFileHandle, …)`, no second path lookup), write, flush to disk, un-hide, then close and move. On any failure the file is first cut to 0 bytes through the still-open handle, so even a failed delete leaves no plaintext. |
+| `CreateTempFile(…, isSensitive)` | On Linux/macOS a sensitive temp file is created with mode 0600 (owner only); the decrypted result keeps it. |
+
+### Walkthrough — the tests (`FileDecryptionTests`, 42 cases)
+
+| Test | What it proves |
+|---|---|
+| Round trip at 0, 1, 15, 16, 17, 1 MiB − 1, 1 MiB, 1 MiB + 1, 2 MiB + 17 | `DecryptAsync(EncryptAsync(x)) == x` at every block and chunk boundary; only the output is left, and it is not hidden. |
+| `WriteDecryptedFileAsync_InputThatReturnsFewBytesPerRead_…` | Header and ciphertext read correctly from a stream returning ≤ 7,777 bytes per read. |
+| Wrong password (also with overwrite allowed) | `AuthenticationFailedException`; no output, no temp — and an existing output file is **kept**. |
+| One flipped bit in signature, version, iterations (in range / negative), salt, IV, first, middle and last ciphertext block, first and last tag byte (T-06) | Header damage → `InvalidEncryptedFileException`; everything else → `AuthenticationFailedException`; nothing left. |
+| Bit flipped in a 3-chunk file | The whole file was streamed (progress hit 100) before the verdict, and the plaintext temp file is still deleted. |
+| Cut by 1 / 16 / 32 bytes, extended by 16 | Not whole blocks → `Damaged`; otherwise tag mismatch. Nothing left. |
+| 3-byte text file / 80-byte `SFEN` file | `NotEncryptedFile` / `Damaged`, before any temp file. |
+| Valid tag, invalid padding | `CryptographicException`, nothing left. |
+| Input shorter than its checked length | `EndOfStreamException` — a file that shrinks while read is never cut silently. |
+| Cancel: already cancelled / during PBKDF2 / after the first of four chunks / after the only chunk | `OperationCanceledException`, nothing left. |
+| Progress for 2.5 MiB | `[39, 79, 100]` (ciphertext is 16 bytes longer than the plaintext). |
+| Temp file hidden while writing (Windows) | The decrypt temp file really has the hidden attribute. |
+| Invalid arguments, existing output, missing input | Thrown at the call / `FileNotFoundException`, nothing created. |
+| `AtomicFileWriterTests` (sensitive on/off, 0600, emptied when the delete fails), `AuthenticationFailedExceptionTests` | Hidden only when asked (Windows), result never hidden; owner-only on Linux/macOS (runs in CI); a read-only leftover is 0 bytes; the three standard constructors. |
+
+### Step 1.6 — review (lean mode: one reviewer, Security + QA + Critic)
+
+| ID | Severity | Finding | Decision |
+|---|---|---|---|
+| M1 | Medium | After a failed decrypt the temp file is mostly real plaintext; if the delete fails (virus scanner), it stays — and hidden. | **Fixed:** on any failure the file is emptied through its open handle before the delete; Windows test with a read-only leftover. |
+| M2 | Medium | On Linux/macOS the temp file was created 0644 (readable by other local users); `FileShare.None` is only advisory there. | **Fixed:** sensitive temp files are created 0600; the decrypted result keeps it (private to the user). Test runs in CI on Linux/macOS. ADR-07 updated. |
+| L3 | Low | A crafted file with 10,000,000 iterations makes Cancel wait ~8 s (PBKDF2 cannot be interrupted). | **Documented** on the interface. `WaitAsync(ct)` would return early but leave the KDF running and need extra key-disposal code — not worth it for a crafted file. |
+| L4 | Low | The header is re-serialised for the MAC; a future v2 `WriteTo` could differ. | **Kept:** a v2 format is a new class behind `IFileEncryptionService` (Strategy, ADR-14), and v1 `Read` accepts only bytes `WriteTo` reproduces. Revisit if v2 ever shares this class. |
+| L5 | Low | The docs said a lone-surrogate password throws "at the call"; it throws when the task is awaited. | **Fixed** in the interface docs (both methods). |
+| L6 | Low | Hiding is not best effort; ADR-07 said "created with" the attribute. | **ADR wording fixed.** Hiding stays strict (fail closed): NTFS, FAT/exFAT and SMB all support it. |
+| T | Low | No test for a file that shrinks while read. | **Added** (`EndOfStreamException`). |
+
+Confirmed fine by the reviewer: check order (header → length → temp → KDF), HMAC over exactly the decrypted bytes, `FixedTimeEquals` before `TransformFinalBlock` (no padding oracle), buffer sizes, wiping, and that `GetFiles()` also lists hidden leftovers (so "nothing left" asserts are real).
+
+#### Quality gate — Step 1.6
+
+| # | Check | Result |
+|---|---|---|
+| G1 | "Done when": wrong password and every tamper/truncation case fail and leave no output; header read before length; 3-byte → `NotEncryptedFile`, 80-byte `SFEN` → `Damaged`; `TransformFinalBlock` only after `FixedTimeEquals`; chunked = original | ✅ |
+| G2–G3 | Format, build with all analyzers | ✅ 0 warnings (CA1505 split two methods; CA2000 kept `await using` in `WriteAsync`) |
+| G4 | Tests | ✅ 316 passed (50 new), 0 failed, 1 skipped on Windows (the Linux/macOS 0600 test) |
+| G5 | Core coverage | ✅ 98.9 % lines, 98.0 % branches |
+| G6–G8 | Packages, secrets, forbidden patterns | ✅ |
+| G9 | Exceptions documented (ADR-13) | ✅ `DecryptAsync` lists every exception, incl. `AuthenticationFailedException`, `CryptographicException` (valid tag, bad padding) and `EndOfStreamException` |
+| G12 | Mutation score (one pass, the three changed files) | ✅ **96.67 %** — `FileEncryptionService` 100 %. Two survivors in `AtomicFileWriter`, both dealt with without a re-run (lean mode): `lowercase: true → false` survived because that run drew an all-digit random part (about 2 % per draw; a manual mutation fails the test), so a new test checks 50 draws; `TryEmpty`'s `return true → false` is equivalent (the result is discarded), so it is excluded with that reason. The Unix-mode line is excluded because only Linux/macOS CI can observe it. |
+| G13 | Performance | ✅ O(n) time, O(1) memory (one 2 MiB pooled buffer), one read of the file |
+| G14–G15 | Docs, git | ✅ |
+
+### Self-check 1.6 (open book)
+
+1. Why may the decryptor not run `TransformFinalBlock` before the tag is checked? What is a padding oracle?
+2. Why `FixedTimeEquals` and not `SequenceEqual`?
+3. Why is the header read with `throwOnEndOfStream: false`, and why before `GetCiphertextLength`?
+4. Why one pass to a temp file instead of two passes? What is the price, and how do the hidden attribute, 0600 and "empty on failure" reduce it?
+5. Why can't the app tell "wrong password" from "changed file"?
+6. Why is the hidden attribute removed before the move?

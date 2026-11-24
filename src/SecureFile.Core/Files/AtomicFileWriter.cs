@@ -46,9 +46,15 @@ internal static class AtomicFileWriter
     /// </summary>
     /// <param name="outputFilePath">The full path of the final file.</param>
     /// <param name="overwriteExisting"><see langword="true"/> to replace an existing file (the user confirmed it).</param>
+    /// <param name="isSensitive">
+    /// <see langword="true"/> when the content is sensitive (decryption: not-yet-verified plaintext, ADR-07). On Windows
+    /// the temp file then gets the <i>hidden</i> attribute while it is written, removed again before the move so the
+    /// result is never hidden. On Linux and macOS (where the leading dot already hides it) it is created readable and
+    /// writable by its owner only (0600), and the result keeps that: a decrypted file stays private to the user.
+    /// </param>
     /// <param name="writeContent">
-    /// Writes the content into the stream it receives. If it throws, the temp file is deleted and the exception passes
-    /// through unchanged.
+    /// Writes the content into the stream it receives. If it throws, the temp file is emptied and deleted, and the
+    /// exception passes through unchanged.
     /// </param>
     /// <returns>A task that completes when the final file is in place.</returns>
     /// <exception cref="ArgumentException"><paramref name="outputFilePath"/> has no folder part (for example a drive root).</exception>
@@ -58,26 +64,20 @@ internal static class AtomicFileWriter
     /// The file already exists and <paramref name="overwriteExisting"/> is <see langword="false"/>, the disk is full,
     /// or another disk error happened.
     /// </exception>
-    [SuppressMessage(
-        "Performance",
-        "CA1849:Call async methods when in an async method",
-        Justification = "Flush(flushToDisk: true) forces the data onto the disk (fsync). FlushAsync only empties the .NET buffer and has no to-disk version. It runs once per file.")]
-    public static async Task WriteAsync(string outputFilePath, bool overwriteExisting, Func<Stream, Task> writeContent)
+    public static async Task WriteAsync(string outputFilePath, bool overwriteExisting, bool isSensitive, Func<Stream, Task> writeContent)
     {
         string tempFilePath = CreateTempFilePath(outputFilePath);
 
         // Created before the try: if creating fails, there is nothing of ours to delete, and a file with the same
         // name that belongs to someone else (FileMode.CreateNew refuses it) is never touched.
-        FileStream tempFile = CreateTempFile(tempFilePath);
+        FileStream tempFile = CreateTempFile(tempFilePath, isSensitive);
 
         bool isMoved = false;
         try
         {
             await using (tempFile.ConfigureAwait(false))
             {
-                await writeContent(tempFile).ConfigureAwait(false);
-                // Stryker disable once Statement,Boolean : only a power cut right after the move could show the difference; checked by review (G9)
-                tempFile.Flush(flushToDisk: true);
+                await FillAsync(tempFile, isSensitive && OperatingSystem.IsWindows(), writeContent).ConfigureAwait(false);
             }
 
             File.Move(tempFilePath, outputFilePath, overwriteExisting);
@@ -94,19 +94,107 @@ internal static class AtomicFileWriter
         }
     }
 
+    /// <summary>
+    /// Lets <paramref name="writeContent"/> fill the temp file and flushes it to the disk, hiding it meanwhile when asked.
+    /// If anything fails, the file is emptied through the still-open handle.
+    /// </summary>
+    /// <param name="tempFile">The open temp file (the caller closes it).</param>
+    /// <param name="hide">Whether to hide the file while it is written (decryption on Windows).</param>
+    /// <param name="writeContent">Writes the content.</param>
+    /// <returns>A task that completes when the file is complete on the disk.</returns>
+    /// <remarks>
+    /// <b>Why empty it (Review Board 1.6, M1):</b> after a failed decryption the temp file is mostly genuine plaintext.
+    /// If the delete afterwards fails (a virus scanner may hold the just-closed file), an emptied file is all that stays.
+    /// </remarks>
+    [SuppressMessage(
+        "Performance",
+        "CA1849:Call async methods when in an async method",
+        Justification = "Flush(flushToDisk: true) forces the data onto the disk (fsync). FlushAsync only empties the .NET buffer and has no to-disk version. It runs once per file.")]
+    private static async Task FillAsync(FileStream tempFile, bool hide, Func<Stream, Task> writeContent)
+    {
+        bool isFilled = false;
+        try
+        {
+            if (hide)
+            {
+                SetHidden(tempFile, hidden: true);
+            }
+
+            await writeContent(tempFile).ConfigureAwait(false);
+            // Stryker disable once Statement,Boolean : only a power cut right after the move could show the difference; checked by review (G9)
+            tempFile.Flush(flushToDisk: true);
+
+            // A move keeps the attributes, so the hidden mark is taken off before the file gets its final name.
+            if (hide)
+            {
+                SetHidden(tempFile, hidden: false);
+            }
+
+            isFilled = true;
+        }
+        finally
+        {
+            if (!isFilled)
+            {
+                // Best effort, like the delete: it must not replace the real error.
+                _ = TryEmpty(tempFile);
+            }
+        }
+    }
+
+    /// <summary>Cuts an open file to 0 bytes, without throwing.</summary>
+    /// <param name="file">The open temp file.</param>
+    /// <returns><see langword="true"/> when the file is now empty.</returns>
+    private static bool TryEmpty(FileStream file)
+    {
+        try
+        {
+            file.SetLength(0);
+            // Stryker disable once Boolean : the caller discards the result (like TryDeleteFile's in WriteAsync); equivalent mutant
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>Adds or removes the <i>hidden</i> attribute through the open handle (no second lookup by path).</summary>
+    /// <param name="file">The open temp file.</param>
+    /// <param name="hidden">Whether the file should be hidden.</param>
+    /// <remarks>Only called on Windows, and only for a temp file that is to be hidden.</remarks>
+    private static void SetHidden(FileStream file, bool hidden)
+    {
+        FileAttributes attributes = File.GetAttributes(file.SafeFileHandle);
+        File.SetAttributes(file.SafeFileHandle, hidden ? attributes | FileAttributes.Hidden : attributes & ~FileAttributes.Hidden);
+    }
+
     /// <summary>Creates the empty temp file, refusing to open a file that already exists.</summary>
     /// <param name="tempFilePath">The new file's path.</param>
+    /// <param name="isSensitive">On Linux and macOS: create it readable and writable by its owner only.</param>
     /// <returns>The open stream; the caller disposes it.</returns>
-    private static FileStream CreateTempFile(string tempFilePath)
+    /// <remarks>
+    /// On Linux and macOS the default (usually 0644) lets every local user read the file, and <see cref="FileShare.None"/>
+    /// is only an advisory lock there (Review Board 1.6, M2). Windows has no Unix mode, so it is set only elsewhere.
+    /// </remarks>
+    private static FileStream CreateTempFile(string tempFilePath, bool isSensitive)
     {
-        return new FileStream(tempFilePath, new FileStreamOptions
+        var options = new FileStreamOptions
         {
             Mode = FileMode.CreateNew,
             Access = FileAccess.Write,
             Share = FileShare.None,
             Options = FileOptions.Asynchronous,
             BufferSize = 0, // the callers write in large chunks from their own buffer; a second buffer only copies
-        });
+        };
+
+        // Stryker disable once all : only observable on Linux and macOS, where CI checks it (AtomicFileWriterTests)
+        if (isSensitive && !OperatingSystem.IsWindows())
+        {
+            options.UnixCreateMode = UnixFileMode.UserRead | UnixFileMode.UserWrite;
+        }
+
+        return new FileStream(tempFilePath, options);
     }
 
     /// <summary>Builds the temp file path: <c>.~&lt;output name&gt;.&lt;8 random hex&gt;.securefile-tmp</c> in the output folder.</summary>

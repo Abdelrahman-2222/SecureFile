@@ -25,7 +25,7 @@ public sealed class AtomicFileWriterTests : IDisposable
     {
         string output = PathInFolder("result.enc");
 
-        await AtomicFileWriter.WriteAsync(output, overwriteExisting: false, stream => stream.WriteAsync(new byte[] { 1, 2, 3 }, Ct).AsTask());
+        await AtomicFileWriter.WriteAsync(output, overwriteExisting: false, isSensitive: false, stream => stream.WriteAsync(new byte[] { 1, 2, 3 }, Ct).AsTask());
 
         Assert.Equal([1, 2, 3], await File.ReadAllBytesAsync(output, Ct));
         Assert.Equal(["result.enc"], FileNamesInFolder());
@@ -37,7 +37,7 @@ public sealed class AtomicFileWriterTests : IDisposable
         string output = PathInFolder("result.enc");
         string[] namesWhileWriting = [];
 
-        await AtomicFileWriter.WriteAsync(output, overwriteExisting: false, _ =>
+        await AtomicFileWriter.WriteAsync(output, overwriteExisting: false, isSensitive: false, _ =>
         {
             namesWhileWriting = FileNamesInFolder();
             return Task.CompletedTask;
@@ -54,7 +54,7 @@ public sealed class AtomicFileWriterTests : IDisposable
         string output = PathInFolder("result.enc");
 
         InvalidOperationException thrown = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => AtomicFileWriter.WriteAsync(output, overwriteExisting: false, async stream =>
+            () => AtomicFileWriter.WriteAsync(output, overwriteExisting: false, isSensitive: false, async stream =>
             {
                 await stream.WriteAsync(new byte[] { 1 }, Ct);
                 throw new InvalidOperationException("writer failed");
@@ -71,7 +71,7 @@ public sealed class AtomicFileWriterTests : IDisposable
         await File.WriteAllTextAsync(output, "keep", Ct);
 
         await Assert.ThrowsAsync<IOException>(
-            () => AtomicFileWriter.WriteAsync(output, overwriteExisting: false, stream => stream.WriteAsync(new byte[] { 9 }, Ct).AsTask()));
+            () => AtomicFileWriter.WriteAsync(output, overwriteExisting: false, isSensitive: false, stream => stream.WriteAsync(new byte[] { 9 }, Ct).AsTask()));
 
         Assert.Equal("keep", await File.ReadAllTextAsync(output, Ct));
         Assert.Equal(["result.enc"], FileNamesInFolder());
@@ -83,9 +83,68 @@ public sealed class AtomicFileWriterTests : IDisposable
         string output = PathInFolder("result.enc");
         await File.WriteAllTextAsync(output, "old", Ct);
 
-        await AtomicFileWriter.WriteAsync(output, overwriteExisting: true, stream => stream.WriteAsync(new byte[] { 9 }, Ct).AsTask());
+        await AtomicFileWriter.WriteAsync(output, overwriteExisting: true, isSensitive: false, stream => stream.WriteAsync(new byte[] { 9 }, Ct).AsTask());
 
         Assert.Equal([9], await File.ReadAllBytesAsync(output, Ct));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task WriteAsync_Sensitive_HidesTheTempFileOnWindowsButNeverTheResult(bool isSensitive)
+    {
+        string output = PathInFolder("result.txt");
+        bool tempWasHidden = false;
+
+        await AtomicFileWriter.WriteAsync(output, overwriteExisting: false, isSensitive, _ =>
+        {
+            tempWasHidden = _folder.GetFiles().Single().Attributes.HasFlag(FileAttributes.Hidden);
+            return Task.CompletedTask;
+        });
+
+        if (OperatingSystem.IsWindows()) // on Linux and macOS .NET reports every dot-name as hidden
+        {
+            Assert.Equal(isSensitive, tempWasHidden);
+        }
+
+        Assert.False(File.GetAttributes(output).HasFlag(FileAttributes.Hidden));
+    }
+
+    [Fact]
+    [System.Runtime.Versioning.UnsupportedOSPlatform("windows")] // for the analyzer (CA1416); the skip below keeps it off Windows
+    public async Task WriteAsync_SensitiveOnLinuxOrMacOS_IsReadableByTheOwnerOnly()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "Windows has no Unix file mode.");
+        string output = PathInFolder("result.txt");
+        UnixFileMode tempMode = default;
+
+        await AtomicFileWriter.WriteAsync(output, overwriteExisting: false, isSensitive: true, _ =>
+        {
+            tempMode = File.GetUnixFileMode(_folder.GetFiles().Single().FullName);
+            return Task.CompletedTask;
+        });
+
+        Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, tempMode);
+        Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(output));
+    }
+
+    [Fact]
+    public async Task WriteAsync_WriterFailsAndTheTempFileCannotBeDeleted_LeavesItEmpty()
+    {
+        // Windows refuses to delete a read-only file, standing in for a virus scanner that holds it (Review Board 1.6, M1).
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "Only Windows refuses to delete a read-only file.");
+        string output = PathInFolder("result.txt");
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => AtomicFileWriter.WriteAsync(output, overwriteExisting: false, isSensitive: true, async stream =>
+            {
+                await stream.WriteAsync(new byte[] { 1, 2, 3 }, Ct);
+                File.SetAttributes(_folder.GetFiles().Single().FullName, FileAttributes.ReadOnly | FileAttributes.Hidden);
+                throw new InvalidOperationException("writer failed");
+            }));
+
+        FileInfo leftover = Assert.Single(_folder.GetFiles());
+        Assert.Equal(0, leftover.Length);
     }
 
     [Fact]
@@ -94,7 +153,7 @@ public sealed class AtomicFileWriterTests : IDisposable
         string output = Path.Combine(_folder.FullName, "missing", "result.enc");
 
         await Assert.ThrowsAsync<DirectoryNotFoundException>(
-            () => AtomicFileWriter.WriteAsync(output, overwriteExisting: false, _ => Task.CompletedTask));
+            () => AtomicFileWriter.WriteAsync(output, overwriteExisting: false, isSensitive: false, _ => Task.CompletedTask));
     }
 
     [Fact]
@@ -108,6 +167,16 @@ public sealed class AtomicFileWriterTests : IDisposable
         Assert.NotEqual(first, second);
         Assert.Equal(_folder.FullName, Path.GetDirectoryName(first));
         Assert.Matches(@"^\.~report\.pdf\.enc\.[0-9a-f]{8}\.securefile-tmp$", Path.GetFileName(first));
+    }
+
+    [Fact]
+    public void CreateTempFilePath_RandomPart_IsAlwaysLowercaseHex()
+    {
+        // 50 draws: one draw is all digits ~2 % of the time, which would hide an upper-case bug (found by Stryker, 1.6).
+        for (int draw = 0; draw < 50; draw++)
+        {
+            Assert.Matches(@"\.[0-9a-f]{8}\.securefile-tmp$", AtomicFileWriter.CreateTempFilePath(PathInFolder("a.enc")));
+        }
     }
 
     [Fact]

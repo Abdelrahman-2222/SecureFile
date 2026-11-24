@@ -45,6 +45,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - `PercentageProgress` (internal): turns processed bytes into at most 101 whole-percent reports.
 - Tests: golden file computed with Python and OpenSSL, chunked output equal to a one-call reference at block and
   chunk boundaries, a stream that returns short reads, progress, cancel and failure cleanup.
+- File decryption (`FileEncryptionService.DecryptAsync`, on `IFileEncryptionService`): checks the header and length
+  before any work, streams the ciphertext through the HMAC and AES in one pass to a temp file that is hidden on
+  Windows, compares the tag in constant time and finishes the last block only after it matched; wrong password,
+  tampering, truncation and cancel leave no output and no temp file.
+- `AuthenticationFailedException`: wrong password, or the file was changed or damaged.
+- `AtomicFileWriter` protects sensitive temp files (decryption): hidden on Windows, owner-only (0600) on Linux and
+  macOS, and emptied before the delete when anything fails, so a failed delete leaves no plaintext.
+- `docs/NEXT_STEP_PROMPT.md`: a ready-to-paste prompt for starting the next step in a new chat.
 - `stryker-config.json`: mutation testing ignores `ConfigureAwait` arguments (no test can observe them).
 - `SECURITY.md`: how to report a vulnerability privately, and what is in scope.
 

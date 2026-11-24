@@ -5,8 +5,8 @@ using SecureFile.Core.Files;
 namespace SecureFile.Core.Cryptography;
 
 /// <summary>
-/// Encrypts files into SecureFile format version 1: PBKDF2 → HKDF keys, AES-256-CBC/PKCS7, HMAC-SHA256 over the
-/// header and the ciphertext (encrypt-then-MAC), written through a temp file and an atomic move.
+/// Encrypts and decrypts files in SecureFile format version 1: PBKDF2 → HKDF keys, AES-256-CBC/PKCS7, HMAC-SHA256
+/// over the header and the ciphertext (encrypt-then-MAC), written through a temp file and an atomic move.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -15,6 +15,11 @@ namespace SecureFile.Core.Cryptography;
 /// through <see cref="ICryptoTransform.TransformFinalBlock"/>, which adds the padding. No <c>CryptoStream</c> (it hides
 /// when the last block is processed, which decryption must control), and no one-shot <c>EncryptCbc</c> per chunk
 /// (chaining the IV by hand is new risk for no gain).
+/// </para>
+/// <para>
+/// <b>Decryption is verify-then-commit (§5.4):</b> the same loop in reverse, with the HMAC over the ciphertext; the
+/// decryptor always holds back the last block, and <see cref="ICryptoTransform.TransformFinalBlock"/> runs only after
+/// the tag matched. Unverified plaintext goes only to a hidden temp file, which is deleted on any failure.
 /// </para>
 /// <para>
 /// <b>Key derivation runs on a thread-pool thread</b> (<c>Task.Run</c>): it is about 0.5 s of pure computing and
@@ -65,6 +70,104 @@ public sealed class FileEncryptionService : IFileEncryptionService
         IProgress<int>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        (string fullInputPath, string fullOutputPath) = GetCheckedFullPaths(inputFilePath, outputFilePath, password, overwriteExisting);
+        return EncryptCoreAsync(fullInputPath, fullOutputPath, password, overwriteExisting, progress, cancellationToken);
+    }
+
+    /// <inheritdoc/>
+    /// <remarks>
+    /// Not <see langword="async"/> on purpose, like <see cref="EncryptAsync"/>: wrong arguments throw at the call. The
+    /// work itself is in <see cref="DecryptCoreAsync"/>.
+    /// </remarks>
+    public Task DecryptAsync(
+        string inputFilePath,
+        string outputFilePath,
+        string password,
+        bool overwriteExisting,
+        IProgress<int>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        (string fullInputPath, string fullOutputPath) = GetCheckedFullPaths(inputFilePath, outputFilePath, password, overwriteExisting);
+        return DecryptCoreAsync(fullInputPath, fullOutputPath, password, overwriteExisting, progress, cancellationToken);
+    }
+
+    /// <summary>
+    /// Reads the first 41 bytes of an encrypted file and checks them as a header (§5.4 step 1).
+    /// </summary>
+    /// <param name="input">The encrypted file, at its start.</param>
+    /// <param name="cancellationToken">Cancels the read.</param>
+    /// <returns>The checked header; the stream is left right after it, at the ciphertext.</returns>
+    /// <exception cref="InvalidEncryptedFileException">The data is not a SecureFile header (see <see cref="EncryptedFileHeader.Read"/>).</exception>
+    /// <remarks>
+    /// <c>throwOnEndOfStream: false</c> and only the bytes actually read are passed on, so a 3-byte text file is
+    /// reported as "not an encrypted file" instead of a disk error (Review Board 1.2, R1). Internal for the
+    /// short-read test.
+    /// </remarks>
+    internal static async Task<EncryptedFileHeader> ReadHeaderAsync(Stream input, CancellationToken cancellationToken)
+    {
+        byte[] headerBytes = new byte[EncryptedFileFormat.HeaderLength];
+        int bytesRead = await input.ReadAtLeastAsync(
+            headerBytes, EncryptedFileFormat.HeaderLength, throwOnEndOfStream: false, cancellationToken).ConfigureAwait(false);
+        return EncryptedFileHeader.Read(headerBytes.AsSpan(0, bytesRead));
+    }
+
+    /// <summary>
+    /// Decrypts the ciphertext and tag that follow the header in <paramref name="input"/> and writes the plaintext to
+    /// <paramref name="output"/>, finishing the last block only after the tag matched (§5.4 steps 2–6).
+    /// </summary>
+    /// <param name="input">The encrypted file, positioned right after the header.</param>
+    /// <param name="output">Where the plaintext is written (the temp file).</param>
+    /// <param name="header">The file's checked header.</param>
+    /// <param name="ciphertextLength">How many ciphertext bytes follow the header (checked: whole blocks, at least one).</param>
+    /// <param name="password">The password.</param>
+    /// <param name="progress">Optional progress receiver.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when all plaintext is written.</returns>
+    /// <exception cref="AuthenticationFailedException">The tag does not match: wrong password, or a changed file.</exception>
+    /// <exception cref="EndOfStreamException">The file became shorter while it was read.</exception>
+    /// <exception cref="CryptographicException">
+    /// The tag matched but the padding is invalid: the file was made by another program that knows the password
+    /// (cannot happen for files this app wrote).
+    /// </exception>
+    /// <remarks>Internal so a test can feed a stream that returns only a few bytes per read.</remarks>
+    internal static async Task WriteDecryptedFileAsync(
+        Stream input,
+        Stream output,
+        EncryptedFileHeader header,
+        long ciphertextLength,
+        string password,
+        IProgress<int>? progress,
+        CancellationToken cancellationToken)
+    {
+        using FileKeys keys = await Task.Run(() => KeyDerivation.DeriveKeys(password, header), cancellationToken).ConfigureAwait(false);
+        using ICryptoTransform decryptor = AesCbc.CreateDecryptor(keys.EncryptionKey, header.Iv.Span);
+        using var hmac = IncrementalHash.CreateHMAC(HashAlgorithmName.SHA256, keys.AuthenticationKey);
+
+        // Read accepted only values that WriteTo writes back unchanged, so these are exactly the 41 bytes in the file.
+        byte[] headerBytes = new byte[EncryptedFileFormat.HeaderLength];
+        header.WriteTo(headerBytes);
+        hmac.AppendData(headerBytes);
+
+        await DecryptContentAsync(input, output, decryptor, hmac, new PercentageProgress(progress, ciphertextLength), ciphertextLength, cancellationToken).ConfigureAwait(false);
+        await VerifyTagAsync(input, hmac, cancellationToken).ConfigureAwait(false);
+
+        await WriteLastBlockAsync(output, decryptor, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Checks the arguments shared by <see cref="EncryptAsync"/> and <see cref="DecryptAsync"/> and makes the paths full.
+    /// </summary>
+    /// <param name="inputFilePath">The input path as given.</param>
+    /// <param name="outputFilePath">The output path as given.</param>
+    /// <param name="password">The password.</param>
+    /// <param name="overwriteExisting">Whether an existing output file may be replaced.</param>
+    /// <returns>The full input and output paths.</returns>
+    /// <exception cref="ArgumentNullException">A path or the password is <see langword="null"/>.</exception>
+    /// <exception cref="ArgumentException">A path or the password is empty, or the output path is unusable.</exception>
+    /// <exception cref="IOException">The output file exists and may not be replaced.</exception>
+    private static (string FullInputPath, string FullOutputPath) GetCheckedFullPaths(
+        string inputFilePath, string outputFilePath, string password, bool overwriteExisting)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(inputFilePath);
         ArgumentException.ThrowIfNullOrWhiteSpace(outputFilePath);
         ArgumentException.ThrowIfNullOrEmpty(password);
@@ -72,8 +175,7 @@ public sealed class FileEncryptionService : IFileEncryptionService
         string fullInputPath = Path.GetFullPath(inputFilePath);
         string fullOutputPath = Path.GetFullPath(outputFilePath);
         ThrowIfOutputPathIsUnusable(fullInputPath, fullOutputPath, overwriteExisting);
-
-        return EncryptCoreAsync(fullInputPath, fullOutputPath, password, overwriteExisting, progress, cancellationToken);
+        return (fullInputPath, fullOutputPath);
     }
 
     /// <summary>
@@ -161,9 +263,60 @@ public sealed class FileEncryptionService : IFileEncryptionService
         IProgress<int>? progress,
         CancellationToken cancellationToken)
     {
-        // FileShare.Read: others may read the file meanwhile, but nobody may change it while we encrypt it.
+        FileStream input = OpenInputFile(inputFilePath);
+        await using (input.ConfigureAwait(false))
+        {
+            EncryptedFileHeader header = _createHeader();
+            await AtomicFileWriter.WriteAsync(
+                outputFilePath,
+                overwriteExisting,
+                isSensitive: false, // ciphertext only
+                output => WriteEncryptedFileAsync(input, output, header, password, progress, cancellationToken)).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Opens the encrypted input, checks its header and length, then decrypts it through a hidden temp file (ADR-07).</summary>
+    /// <param name="inputFilePath">Full input path.</param>
+    /// <param name="outputFilePath">Full output path.</param>
+    /// <param name="password">The password (already checked as not empty).</param>
+    /// <param name="overwriteExisting">Whether the final move may replace an existing file.</param>
+    /// <param name="progress">Optional progress receiver.</param>
+    /// <param name="cancellationToken">Cancels the operation.</param>
+    /// <returns>A task that completes when the decrypted file is in place.</returns>
+    /// <remarks>
+    /// The header is checked <b>before</b> the length, so a short text file is "not an encrypted file" rather than
+    /// "damaged"; and both are checked before the temp file and the slow key derivation, so a wrong file is reported at
+    /// once and nothing is created.
+    /// </remarks>
+    private static async Task DecryptCoreAsync(
+        string inputFilePath,
+        string outputFilePath,
+        string password,
+        bool overwriteExisting,
+        IProgress<int>? progress,
+        CancellationToken cancellationToken)
+    {
+        FileStream input = OpenInputFile(inputFilePath);
+        await using (input.ConfigureAwait(false))
+        {
+            EncryptedFileHeader header = await ReadHeaderAsync(input, cancellationToken).ConfigureAwait(false);
+            long ciphertextLength = EncryptedFileFormat.GetCiphertextLength(input.Length);
+            await AtomicFileWriter.WriteAsync(
+                outputFilePath,
+                overwriteExisting,
+                isSensitive: true, // not-yet-verified plaintext: hidden on Windows, owner-only on Linux/macOS
+                output => WriteDecryptedFileAsync(input, output, header, ciphertextLength, password, progress, cancellationToken)).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>Opens a file for reading in large sequential chunks.</summary>
+    /// <param name="inputFilePath">Full input path.</param>
+    /// <returns>The open stream; the caller disposes it.</returns>
+    private static FileStream OpenInputFile(string inputFilePath)
+    {
+        // FileShare.Read: others may read the file meanwhile, but nobody may change it while we work on it.
         // Stryker disable once Initializer,Bitwise : the options only tune speed (no extra buffer, sequential-read hint); no test can observe them
-        FileStream input = new(inputFilePath, new FileStreamOptions
+        return new FileStream(inputFilePath, new FileStreamOptions
         {
             Mode = FileMode.Open,
             Access = FileAccess.Read,
@@ -171,14 +324,99 @@ public sealed class FileEncryptionService : IFileEncryptionService
             Options = FileOptions.Asynchronous | FileOptions.SequentialScan,
             BufferSize = 0, // we read 1 MiB at a time into our own buffer; a second buffer only copies
         });
+    }
 
-        await using (input.ConfigureAwait(false))
+    /// <summary>
+    /// The decrypt loop: read exactly the ciphertext in chunks, add each to the HMAC, decrypt its blocks (the decryptor
+    /// holds back the last one), write the plaintext, report progress.
+    /// </summary>
+    /// <param name="input">The encrypted file, at the ciphertext.</param>
+    /// <param name="output">The temp file.</param>
+    /// <param name="decryptor">The AES-256-CBC decryptor for this file.</param>
+    /// <param name="hmac">The running HMAC (already holds the header).</param>
+    /// <param name="progress">Turns processed ciphertext bytes into percentages.</param>
+    /// <param name="ciphertextLength">How many ciphertext bytes to read.</param>
+    /// <param name="cancellationToken">Passed to every read and write.</param>
+    /// <returns>A task that completes when all ciphertext is processed (the last block still held back).</returns>
+    /// <remarks>
+    /// The length is known from the header check, so each read asks for an exact amount (<c>ReadExactlyAsync</c>): a
+    /// short read is waited out, and a file that shrank meanwhile throws <see cref="EndOfStreamException"/>. The HMAC
+    /// gets the ciphertext <b>before</b> it is decrypted: encrypt-then-MAC authenticates what is stored.
+    /// </remarks>
+    private static async Task DecryptContentAsync(
+        Stream input,
+        Stream output,
+        ICryptoTransform decryptor,
+        IncrementalHash hmac,
+        PercentageProgress progress,
+        long ciphertextLength,
+        CancellationToken cancellationToken)
+    {
+        // One pooled buffer: the first half receives the ciphertext, the second half the plaintext.
+        byte[] buffer = ArrayPool<byte>.Shared.Rent(2 * ChunkLength);
+        try
         {
-            EncryptedFileHeader header = _createHeader();
-            await AtomicFileWriter.WriteAsync(
-                outputFilePath,
-                overwriteExisting,
-                output => WriteEncryptedFileAsync(input, output, header, password, progress, cancellationToken)).ConfigureAwait(false);
+            for (long remaining = ciphertextLength; remaining > 0; remaining -= ChunkLength)
+            {
+                int chunkLength = (int)Math.Min(ChunkLength, remaining);
+                await input.ReadExactlyAsync(buffer.AsMemory(0, chunkLength), cancellationToken).ConfigureAwait(false);
+                hmac.AppendData(buffer, 0, chunkLength);
+                int plaintextLength = decryptor.TransformBlock(buffer, 0, chunkLength, buffer, ChunkLength);
+                await output.WriteAsync(buffer.AsMemory(ChunkLength, plaintextLength), cancellationToken).ConfigureAwait(false);
+                progress.Advance(chunkLength);
+            }
+        }
+        // Stryker disable once Block : returning and clearing a pooled buffer is not observable by a test; checked by review (G9)
+        finally
+        {
+            // The buffer held the user's plaintext: clear it before the next borrower gets it.
+            // Stryker disable once Statement,Boolean : returning and clearing a pooled buffer is not observable by a test; checked by review (G9)
+            ArrayPool<byte>.Shared.Return(buffer, clearArray: true);
+        }
+    }
+
+    /// <summary>
+    /// Decrypts the held-back last block, which checks and removes the padding, and writes it. Call it only after the
+    /// tag matched (ADR-06), so the padding of an unverified file is never examined.
+    /// </summary>
+    /// <param name="output">The temp file.</param>
+    /// <param name="decryptor">The decryptor holding the last block.</param>
+    /// <param name="cancellationToken">Cancels the write.</param>
+    /// <returns>A task that completes when the last plaintext bytes are written.</returns>
+    /// <exception cref="CryptographicException">The padding is invalid (only possible for a file another program wrote).</exception>
+    private static async Task WriteLastBlockAsync(Stream output, ICryptoTransform decryptor, CancellationToken cancellationToken)
+    {
+        byte[] lastPlaintext = decryptor.TransformFinalBlock([], 0, 0);
+        try
+        {
+            await output.WriteAsync(lastPlaintext, cancellationToken).ConfigureAwait(false);
+        }
+        // Stryker disable once Block : wiping a temporary is not observable by a test; checked by review (G9)
+        finally
+        {
+            // Stryker disable once Statement : wiping a temporary is not observable by a test; checked by review (G9)
+            CryptographicOperations.ZeroMemory(lastPlaintext);
+        }
+    }
+
+    /// <summary>Reads the stored tag and compares it in constant time with the computed one.</summary>
+    /// <param name="input">The encrypted file, at the tag.</param>
+    /// <param name="hmac">The HMAC over the header and all ciphertext.</param>
+    /// <param name="cancellationToken">Cancels the read.</param>
+    /// <returns>A task that completes when the tag matched.</returns>
+    /// <exception cref="AuthenticationFailedException">The tags differ.</exception>
+    /// <remarks>
+    /// <see cref="CryptographicOperations.FixedTimeEquals"/> takes the same time wherever the first difference is, so
+    /// timing cannot reveal how many leading bytes of a forged tag were right.
+    /// </remarks>
+    private static async Task VerifyTagAsync(Stream input, IncrementalHash hmac, CancellationToken cancellationToken)
+    {
+        byte[] storedTag = new byte[EncryptedFileFormat.AuthenticationTagLength];
+        await input.ReadExactlyAsync(storedTag, cancellationToken).ConfigureAwait(false);
+
+        if (!CryptographicOperations.FixedTimeEquals(hmac.GetHashAndReset(), storedTag))
+        {
+            throw new AuthenticationFailedException();
         }
     }
 
