@@ -405,7 +405,7 @@ Why does Core not reference WPF? What does `TreatWarningsAsErrors` buy us?
 
 | Step | Goal | Done when | Status |
 |---|---|---|---|
-| 1.1 | `FileDetails` (name, size in bytes, extension, last modified) + `FileSizeFormatter` (`1.5 MB`). | Unit tests for 0 B, 1023 B, 1 KB, >4 GB, no extension, `.tar.gz`, `.bashrc`. | ⬜ |
+| 1.1 | `FileDetails` (name, size in bytes, extension, last modified) + `FileSizeFormatter` (`1.5 MB`). | Unit tests for 0 B, 1023 B, 1 KB, >4 GB, no extension, `.tar.gz`, `.bashrc`. | 🟨 done (31 tests, 100 % coverage) — self-check pending |
 | 1.2 | `EncryptedFileFormat` constants + `EncryptedFileHeader` (write/read/validate). | Tests: round-trip, wrong magic, unknown version, iterations out of range, file too short. | ⬜ |
 | 1.3 | `KeyDerivation`: PBKDF2 → HKDF (§5.2), NFC normalization, key wiping. | Known-answer tests: RFC 7914 §11 (PBKDF2-HMAC-SHA256), RFC 5869 test case 1 (HKDF-SHA256). | ⬜ |
 | 1.4 | AES-CBC check against NIST: prove we call `Aes` correctly. | NIST SP 800-38A F.2.5/F.2.6 (CBC-AES256) vectors pass (with `PaddingMode.None` for the vector). | ⬜ |
@@ -888,3 +888,4 @@ whether the WPF Fluent `ThemeMode` API is still marked experimental in .NET 10, 
 | 2026-11-24 | Planning | Task analysed; six phases defined; UI decision: WPF (required) + Avalonia (bonus); crypto design agreed; this plan written. |
 | 2026-11-24 | Environment check | SDKs installed: 9.0.308, 11.0.100 (no 10.0 SDK). Runtime 10.0.15 present. Existing `EncryptionHandling` = empty WinForms template. Not a git repo. |
 | 2026-11-24 | Stage 0 | .NET 10 SDK 10.0.404 + GitHub CLI installed; solution, projects, shared build rules, packages, editorconfig, gitattributes, local tools, CI, docs created. Build: 0 warnings. Walkthrough in LEARNING_LOG.md. |
+| 2026-11-24 | Step 1.1 | FileDetails, IFileDetailsReader, FileDetailsReader, FileSizeFormatter + 31 tests (incl. property-based), 100 % coverage. Style rules refined: interface members, static readonly naming. |

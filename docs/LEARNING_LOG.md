@@ -323,3 +323,166 @@ after reading, that tells us which part to explain again.
 6. Why did we remove `StartupUri` and create the window in `OnStartup`?
 7. Why must `*.enc` files be marked `binary` in `.gitattributes`?
 8. What does the CI do on every push, and why do Ubuntu and macOS only build part of the solution?
+
+---
+
+## Stage 1 — Core library
+
+Stage 1 builds `SecureFile.Core`: everything the app *does*, with no screen. It is built in 8 small steps
+(PROJECT_PLAN §7). Every step: **lesson → code → walkthrough → self-check.**
+
+## Step 1.1 — File details and file size text (requirement R2) · 2026-11-24
+
+### Lesson 1.1 — the concepts used in this step
+
+**1. `record` — a type for holding data.**
+A `class` is a general type: it has behaviour and state that can change. A `record` is a short way to write a type
+whose job is to *hold values*. The compiler writes for us: a constructor, read-only properties, equality by value
+(two `FileDetails` with the same values are equal), and a readable `ToString()`.
+*Analogy:* a printed receipt — once printed, its contents don't change, and two receipts with the same lines are "the same receipt".
+*Why here:* file details are pure data shown on screen; they must not be changed by accident.
+
+**2. `sealed` — nobody may inherit from this class.**
+States clearly that the class is complete as it is. It prevents accidental changes of behaviour through inheritance
+and lets .NET call its methods slightly faster. The analyzer (CA1852) requires it when nothing inherits.
+
+**3. Interface — a contract without code.**
+`IFileDetailsReader` says *"there is a method `Read(path)` that returns `FileDetails`"* but not *how*.
+`FileDetailsReader` is the real implementation that reads the disk.
+*Why:* in Stage 2 the ViewModel will depend on the **interface**. Its tests can then pass a fake reader that returns
+prepared details instantly, without real files. *Analogy:* a wall socket (interface) — any device with the right plug
+works; you can test the lamp with a battery pack instead of the power grid.
+
+**4. `static` class — functions without an object.**
+`FileSizeFormatter.Format(...)` needs no stored state: same input → same output. A `static` class cannot be
+created with `new`; you call its methods directly. *Why not an interface here?* There is nothing to fake —
+formatting a number is pure calculation and is fast to test directly.
+
+**5. Exceptions and guard clauses.**
+A *guard clause* checks the inputs at the start of a method and stops with a clear exception if they are wrong:
+- `ArgumentException.ThrowIfNullOrWhiteSpace(filePath)` → `ArgumentNullException` for `null`, `ArgumentException` for `""` or `"   "`.
+- `ArgumentOutOfRangeException.ThrowIfNegative(size)` → a size cannot be negative.
+- `FileNotFoundException` → the path does not lead to a file.
+*Why:* fail **early and clearly** at the place of the mistake, instead of a confusing error somewhere later.
+These are the .NET built-in "throw helpers": one line each, standard messages.
+
+**6. `FileInfo` — .NET's view of one file.**
+`new FileInfo(path)` gives `Name`, `Extension`, `Length` (size in bytes), `FullName` (full path), `LastWriteTimeUtc`
+and `Exists`. Note: `Exists` is `false` both for a missing file **and** for a folder, so one check covers both.
+
+**7. UTC time.**
+UTC (Coordinated Universal Time) is the world reference time with no time zone or daylight-saving changes.
+We store UTC and convert to local time only when showing it. *Why:* a value stored in local time becomes ambiguous
+when the clock changes or the file moves to another time zone.
+
+**8. Binary units and culture.**
+- 1 KB = **1,024** bytes here (binary, 2¹⁰), as Windows File Explorer shows. (macOS and disk makers use 1,000.)
+- **Culture** = the number and date rules of a language/region. English writes `1.5`, German `1,5`.
+  `IFormatProvider` is the parameter that carries these rules. The UI will pass the user's culture; tests pass
+  `CultureInfo.InvariantCulture` (a fixed, region-neutral culture) so results are the same on every machine.
+- `string.Create(formatProvider, $"...")` builds the text using exactly that culture (analyzer CA1305 requires
+  stating the culture whenever numbers become text).
+
+**9. Unit tests with xUnit.**
+- `[Fact]` = one test with fixed data. `[Theory]` + `[InlineData(...)]` = the same test run once per data row.
+- **Arrange – Act – Assert:** prepare the input, call the method once, check the result. Blank lines separate the three parts.
+- **Test names** say *Method_Situation_ExpectedResult*, e.g. `Read_MissingFile_ThrowsFileNotFoundException`.
+- **Property-based test** (CsCheck): instead of a few examples, generate thousands of random inputs and check a rule
+  that must *always* hold ("the number shown is always below 1024"). It finds edge cases a human would not think of.
+- **Temporary folder per test:** xUnit creates a new test-class object for every test; the constructor makes a fresh
+  folder and `Dispose()` deletes it. Tests never see each other's files.
+- **Code coverage** = the share of code lines/branches that the tests executed. Step 1.1: **100 %**.
+
+### Walkthrough — `src/SecureFile.Core/Files/`
+
+**`FileDetails.cs`**
+
+| Code | Meaning |
+|---|---|
+| `namespace SecureFile.Core.Files;` | File-scoped namespace: everything in this file belongs to `SecureFile.Core.Files` (the "file" features of Core). Folder name = namespace. |
+| `/// <param name="FullPath">…` | XML docs for each value of the record (shown in IntelliSense). |
+| `public sealed record FileDetails(string FullPath, string Name, string Extension, long SizeInBytes, DateTime LastModifiedUtc);` | A **positional record**: the list in brackets creates five read-only properties and a constructor in one line. |
+| `long SizeInBytes` | `long` (64-bit) not `int` (32-bit): `int` stops at ~2 GB; files can be bigger. |
+| `DateTime LastModifiedUtc` | The name says the time is UTC, so nobody mixes it with local time. |
+
+**`IFileDetailsReader.cs`**
+
+| Code | Meaning |
+|---|---|
+| `public interface IFileDetailsReader` | The contract. Name starts with `I` (naming rule). |
+| `FileDetails Read(string filePath);` | One method. No `public` keyword: interface members are always public. |
+| `<exception cref="...">` docs | Tell the caller exactly which errors to expect and when — part of the contract. |
+
+**`FileDetailsReader.cs`**
+
+| Line | Meaning |
+|---|---|
+| `public sealed class FileDetailsReader : IFileDetailsReader` | The real implementation; `: IFileDetailsReader` = "fulfils that contract". |
+| `/// <inheritdoc/>` | Reuse the interface's documentation instead of copying it. |
+| `ArgumentException.ThrowIfNullOrWhiteSpace(filePath);` | Guard clause: reject `null`, `""`, `"   "`. |
+| `FileInfo fileInfo = new(filePath);` | Create .NET's description of the file (type written out, then target-typed `new()`). |
+| `if (!fileInfo.Exists) { throw new FileNotFoundException("...", filePath); }` | Missing file **or** folder → clear error that also carries the path. |
+| `return new FileDetails(FullPath: fileInfo.FullName, ...);` | Build the record. **Named arguments** (`FullPath:`) make it impossible to mix up the order of the five values. |
+
+**`FileSizeFormatter.cs`**
+
+| Line | Meaning |
+|---|---|
+| `public static class FileSizeFormatter` | Pure calculation, no state → static. |
+| `private const int BytesPerUnitStep = 1024;` | Named constant instead of the "magic number" 1024. |
+| `private const int MaximumDecimalPlaces = 2;` | At most two decimals shown. |
+| `private static readonly string[] UnitNames = ["bytes", "KB", ...];` | The unit labels; `[...]` is a C# 12 collection expression. `static readonly` = created once, never replaced. |
+| `ArgumentOutOfRangeException.ThrowIfNegative(sizeInBytes);` | Guard: negative sizes are impossible. |
+| `ArgumentNullException.ThrowIfNull(formatProvider);` | Guard: the culture must be given. |
+| `if (sizeInBytes == 1) { return "1 byte"; }` | Grammar: "1 byte", not "1 bytes". |
+| `double size = sizeInBytes; int unitIndex = 0;` | Work with a decimal number; start at the "bytes" unit (index 0). |
+| `while (unitIndex < UnitNames.Length - 1 && Math.Round(size, 2, AwayFromZero) >= 1024)` | Keep moving to the next unit while the number **as it would be shown** is still ≥ 1024 — and stop at the last unit (EB). Rounding first avoids the ugly result "1024 KB" for 1,048,575 bytes. `AwayFromZero` is the same rounding the text formatting uses, so the check and the display always agree. |
+| `size /= BytesPerUnitStep; unitIndex++;` | Divide by 1024 and step to the next unit name. |
+| `return string.Create(formatProvider, $"{size:0.##} {UnitNames[unitIndex]}");` | Build the text with the given culture. Format `0.##`: at most two decimals, no trailing zeros (`1.5`, not `1.50`). |
+
+### Walkthrough — the tests (`tests/SecureFile.Core.Tests/Files/`)
+
+| Test | What it proves |
+|---|---|
+| `Format_KnownSizes_ReturnsExpectedText` (12 rows) | 0 B, 1 byte, 1023 bytes, exact KB/MB/GB, 1.5 KB/MB, the 1,048,575 rounding edge, > 4 GB, and the largest possible `long` (8 EB). |
+| `Format_GermanCulture_UsesCommaAsDecimalSeparator` | Culture is respected (`1,5 KB`). |
+| `Format_NegativeSize_…` / `Format_NullFormatProvider_…` | Guard clauses work. |
+| `Format_AnyValidSize_ShowsNumberBelow1024WithKnownUnit` | Property test over random sizes from 0 to `long.MaxValue`. |
+| `Read_ExistingFile_ReturnsNameExtensionAndSize` | The R2 values are correct. |
+| `Read_EmptyFile_ReturnsZeroSize` | 0-byte files work. |
+| `Read_VariousFileNames_ReturnsExpectedExtension` (6 rows) | No extension, `.tar.gz` → `.gz`, `.bashrc`, upper-case `.JPG`, spaces/brackets, **Arabic name**. |
+| `Read_PathLongerThan260Characters_ReturnsDetails` | Long Windows paths work. |
+| `Read_ExistingFile_ReturnsLastModifiedTimeInUtc` | The time is read in UTC. |
+| `Read_MissingFile_…` / `Read_FolderInsteadOfFile_…` | Clear `FileNotFoundException`, including for folders. |
+| `Read_NullPath_…` / `Read_EmptyOrWhiteSpacePath_…` | Guard clauses work. |
+
+`null!` in a test: the `!` tells the nullable checker "I am passing null on purpose" — needed to test the guard.
+
+### Two rule adjustments made in this step (and why)
+
+1. **Interface members** no longer need `public` written (`for_non_interface_members`): they are public by definition.
+2. **`static readonly` fields** use `PascalCase` like constants (e.g. `UnitNames`), not `_camelCase`.
+   `dotnet format` caught this — which is why CI runs it on every push.
+
+Also: the "zero tests ran" exception was removed from Core.Tests (it now has tests) and kept only on the three
+still-empty test projects, each with a note to remove it when their first test arrives.
+
+### Results
+
+| Check | Result |
+|---|---|
+| Build | 0 warnings, 0 errors |
+| Tests | 31 passed, 0 failed |
+| Core coverage | 100 % lines, 100 % branches (8/8), 100 % methods |
+| Format | clean |
+
+### Self-check 1.1 (open book)
+
+1. Why is `FileDetails` a `record` and not a normal `class`?
+2. Why is `SizeInBytes` a `long` and not an `int`?
+3. Why does the reader have an interface, while the formatter is a static class without one?
+4. What does `FileInfo.Exists` return for a folder, and how does our code use that?
+5. Why does the loop round the number *before* comparing it with 1024? Give the example.
+6. Why do the tests pass `CultureInfo.InvariantCulture`, while the app will pass the user's culture?
+7. What is the difference between `[Fact]` and `[Theory]`?
+8. What does the property-based test check, and why is that stronger than examples alone?

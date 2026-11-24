@@ -8,6 +8,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- File details for the selected file: name, extension, size in bytes, full path and last change time (UTC)
+  (`FileDetails`, `IFileDetailsReader`, `FileDetailsReader`).
+- `FileSizeFormatter`: human-readable sizes (`1.5 MB`) with binary units and culture-aware decimals.
 - Solution `SecureFile.slnx` with projects `SecureFile.Core`, `SecureFile.Presentation`, `SecureFile.Wpf`
   and test projects for core, presentation, integration and architecture tests.
 - `SecureFile.CrossPlatform.slnf` solution filter for building on macOS and Linux.
