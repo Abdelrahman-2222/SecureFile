@@ -80,9 +80,18 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Gets the details of the chosen file, or <see langword="null"/> when no file is chosen.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(FileSummary), nameof(PasswordHint), nameof(IsEncryptOffered), nameof(IsDecryptOffered))]
+    [NotifyPropertyChangedFor(nameof(FileSummary), nameof(PasswordHint), nameof(IsEncryptOffered), nameof(IsDecryptOffered), nameof(IsEncrypting), nameof(IsDecrypting))]
     [NotifyCanExecuteChangedFor(nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand))]
     public partial FileDetails? SelectedFile { get; private set; }
+
+    /// <summary>Gets a value indicating whether a normal file is chosen, so a new password is being created (confirm box, strength, warning).</summary>
+    public bool IsEncrypting => SelectedFile is { IsEncrypted: false };
+
+    /// <summary>Gets a value indicating whether an encrypted file is chosen, so an existing password is being entered.</summary>
+    public bool IsDecrypting => SelectedFile is { IsEncrypted: true };
+
+    /// <summary>Gets a value indicating whether the password and its confirmation are the same (and not empty).</summary>
+    public bool PasswordsMatch => Password.Length > 0 && string.Equals(Password, ConfirmPassword, StringComparison.Ordinal);
 
     /// <summary>Gets a value indicating whether the window offers the Encrypt button: not for a file that is already encrypted.</summary>
     /// <remarks>
@@ -115,13 +124,13 @@ public sealed partial class MainViewModel : ObservableObject
     /// <c>PasswordBox.Password</c> cannot be data-bound on purpose.
     /// </remarks>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(Strength), nameof(StrengthText), nameof(StrengthPercent), nameof(PasswordMatchText))]
+    [NotifyPropertyChangedFor(nameof(Strength), nameof(StrengthText), nameof(StrengthPercent), nameof(PasswordMatchText), nameof(PasswordsMatch))]
     [NotifyCanExecuteChangedFor(nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand))]
     public partial string Password { get; set; } = string.Empty;
 
     /// <summary>Gets or sets the password typed a second time; it is only checked when encrypting (a typo there loses the file for good).</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(PasswordMatchText))]
+    [NotifyPropertyChangedFor(nameof(PasswordMatchText), nameof(PasswordsMatch))]
     public partial string ConfirmPassword { get; set; } = string.Empty;
 
     /// <summary>Gets the rating of the typed password (advice; only "too short" is enforced, and only when encrypting).</summary>

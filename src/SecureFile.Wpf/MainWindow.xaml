@@ -78,7 +78,7 @@
 
             <!-- Only when a password is being chosen (encrypting): strength advice and the confirmation box. Decrypting
                  asks for the old password once and applies no rules to it. -->
-            <StackPanel Visibility="{Binding IsEncryptOffered, Converter={StaticResource BoolToVisibility}}">
+            <StackPanel Visibility="{Binding IsEncrypting, Converter={StaticResource BoolToVisibility}}">
                 <ProgressBar AutomationProperties.AutomationId="PasswordStrengthBar" AutomationProperties.Name="Password strength"
                              Value="{Binding StrengthPercent, Mode=OneWay}" Minimum="0" Maximum="100" Height="6" Margin="0,8,0,0">
                     <ProgressBar.Style>
@@ -100,8 +100,33 @@
                         </Style>
                     </ProgressBar.Style>
                 </ProgressBar>
+                <!-- The text takes the colour of the bar; the words carry the meaning too, colour is only an extra cue. -->
                 <TextBlock x:Name="StrengthLabel" AutomationProperties.AutomationId="PasswordStrengthText"
-                           Text="{Binding StrengthText}" TextWrapping="Wrap" Margin="0,4,0,0" />
+                           Text="{Binding StrengthText}" TextWrapping="Wrap" Margin="0,4,0,0">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="FontSize" Value="14" />
+                            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Strength}" Value="TooShort">
+                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Strength}" Value="Weak">
+                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Strength}" Value="Fair">
+                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Strength}" Value="Strong">
+                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding StrengthText}" Value="">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
 
                 <Label Content="Con_firm password" Target="{Binding ElementName=ConfirmInput}" Margin="0,12,0,4" Padding="0" FontSize="14" />
                 <Grid>
@@ -133,6 +158,12 @@
                             <Setter Property="FontSize" Value="14" />
                             <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
                             <Style.Triggers>
+                                <DataTrigger Binding="{Binding PasswordsMatch}" Value="True">
+                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding PasswordsMatch}" Value="False">
+                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                </DataTrigger>
                                 <DataTrigger Binding="{Binding PasswordMatchText}" Value="">
                                     <Setter Property="Visibility" Value="Collapsed" />
                                 </DataTrigger>
@@ -154,8 +185,14 @@
                 <Border.Style>
                     <Style TargetType="Border">
                         <Setter Property="Background" Value="Transparent" />
+                        <!-- Nothing to say until a file is chosen. -->
+                        <Setter Property="Visibility" Value="Collapsed" />
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding IsEncryptOffered}" Value="True">
+                            <DataTrigger Binding="{Binding IsDecrypting}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsEncrypting}" Value="True">
+                                <Setter Property="Visibility" Value="Visible" />
                                 <Setter Property="Background" Value="{DynamicResource SystemFillColorCautionBackgroundBrush}" />
                                 <Setter Property="BorderBrush" Value="{DynamicResource SystemFillColorCautionBrush}" />
                             </DataTrigger>
@@ -168,7 +205,7 @@
                             <Style TargetType="TextBlock">
                                 <Setter Property="Visibility" Value="Collapsed" />
                                 <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsEncryptOffered}" Value="True">
+                                    <DataTrigger Binding="{Binding IsEncrypting}" Value="True">
                                         <Setter Property="Visibility" Value="Visible" />
                                     </DataTrigger>
                                 </Style.Triggers>
@@ -182,7 +219,7 @@
                                 <Setter Property="FontSize" Value="14" />
                                 <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
                                 <Style.Triggers>
-                                    <DataTrigger Binding="{Binding IsEncryptOffered}" Value="True">
+                                    <DataTrigger Binding="{Binding IsEncrypting}" Value="True">
                                         <Setter Property="FontWeight" Value="SemiBold" />
                                     </DataTrigger>
                                 </Style.Triggers>

@@ -29,13 +29,7 @@ internal sealed partial class MainWindow : Window
         _viewModel = viewModel;
         DataContext = viewModel;
         viewModel.PropertyChanged += OnViewModelPropertyChanged;
-        foreach (System.Windows.Controls.Control box in new System.Windows.Controls.Control[] { PasswordInput, PasswordVisibleInput, ConfirmInput, ConfirmVisibleInput })
-        {
-            box.PreviewKeyUp += UpdateCapsLockWarning;
-            box.GotKeyboardFocus += UpdateCapsLockWarning;
-            box.LostKeyboardFocus += UpdateCapsLockWarning;
-        }
-
+        WirePasswordBoxes();
 #if DEBUG
         // Test hook for the global safety net (ADR-13 Layer 3): Ctrl+Shift+F12 throws an unexpected exception.
         InputBindings.Add(new System.Windows.Input.KeyBinding(
@@ -43,6 +37,19 @@ internal sealed partial class MainWindow : Window
             System.Windows.Input.Key.F12,
             System.Windows.Input.ModifierKeys.Control | System.Windows.Input.ModifierKeys.Shift));
 #endif
+    }
+
+    /// <summary>Connects what binding cannot: no copying out of the visible boxes, and the Caps Lock check on all four boxes.</summary>
+    private void WirePasswordBoxes()
+    {
+        BlockCopyOut(PasswordVisibleInput);
+        BlockCopyOut(ConfirmVisibleInput);
+        foreach (System.Windows.Controls.Control box in new System.Windows.Controls.Control[] { PasswordInput, PasswordVisibleInput, ConfirmInput, ConfirmVisibleInput })
+        {
+            box.PreviewKeyUp += UpdateCapsLockWarning;
+            box.GotKeyboardFocus += UpdateCapsLockWarning;
+            box.LostKeyboardFocus += UpdateCapsLockWarning;
+        }
     }
 
     /// <summary>Opens the About dialog.</summary>
@@ -185,6 +192,19 @@ internal sealed partial class MainWindow : Window
         {
             _syncingPassword = false;
         }
+    }
+
+    /// <summary>Stops a visible password from being copied, cut or dragged out of its text box.</summary>
+    /// <param name="box">The plain text box that shows a password while "Show password" is on.</param>
+    /// <remarks>
+    /// The hidden <c>PasswordBox</c> already refuses copy and cut; the text box used for "Show password" would not,
+    /// and a password on the clipboard stays there (clipboard history and cloud sync can keep it). Pasting stays
+    /// allowed, so a password manager still works. The context menu is removed because its Copy and Cut would do nothing.
+    /// </remarks>
+    private static void BlockCopyOut(System.Windows.Controls.TextBox box)
+    {
+        DataObject.AddCopyingHandler(box, (_, args) => args.CancelCommand());
+        box.ContextMenu = null;
     }
 
     /// <summary>Shows the Caps Lock warning while a password box has the focus and Caps Lock is on.</summary>

@@ -101,6 +101,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
   confirmation box. No symbol/digit rules on purpose.
 - The window height now follows its content: it grows when text appears (match line, messages, the confirm box) and
   shrinks when it goes away, up to the screen height, after which it scrolls.
+- The confirm box, strength bar and the password warning appear only once a normal file is chosen (not with no file, not
+  for an encrypted file); the strength and match texts are coloured to match their meaning; a visible password cannot be
+  copied or cut (paste still works).
 - Decryption reports invalid padding after a valid tag (only possible for a file another program wrote) as
   `InvalidEncryptedFileException(Damaged)` with the original `CryptographicException` inside, so callers handle one
   documented type (Step 1.7). New constructor `InvalidEncryptedFileException(message, reason, innerException)`.

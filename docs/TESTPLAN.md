@@ -34,6 +34,7 @@ Result column: ✅ pass · ❌ fail (write the bug id) · ➖ not applicable.
 | A15 | Type `blue river coffee lamp` in both boxes. | Bar green, "Strong.", "Passwords match."; Encrypt works. A short password for Decrypt of an old file is accepted (no rules, no confirmation box). | |
 | A16 | Turn Caps Lock on and click into any password box; press a key. | "Caps Lock is on." appears while the box has focus and disappears when Caps Lock is off or focus leaves. | |
 | A17 | Tick "Show password". | Both boxes show their text; typing in either still works; unticking hides them again with the text kept. | |
+| A18 | With "Show password" ticked, select the text and press Ctrl+C, Ctrl+X, right-click, and drag it out. | Nothing is copied; no context menu; pasting into the box still works. Without a file chosen, no confirm box, strength bar or warning is shown. | |
 
 ## B. Keyboard only (T-41) — do not touch the mouse
 

@@ -227,6 +227,35 @@ public sealed class MainViewModelTests
         Assert.Equal("Passwords match.", viewModel.PasswordMatchText);
     }
 
+    [Theory]
+    [InlineData("report.pdf", true, false)]
+    [InlineData("report.pdf.enc", false, true)]
+    public async Task IsEncryptingAndIsDecrypting_FollowTheChosenFile_AndAreBothOffWithoutOne(string name, bool encrypting, bool decrypting)
+    {
+        MainViewModel viewModel = CreateViewModel();
+        Assert.False(viewModel.IsEncrypting); // no file: no confirm box, no strength, no warning
+        Assert.False(viewModel.IsDecrypting);
+
+        viewModel = await CreateWithFileAsync(Path.Combine(Path.GetTempPath(), name));
+
+        Assert.Equal(encrypting, viewModel.IsEncrypting);
+        Assert.Equal(decrypting, viewModel.IsDecrypting);
+    }
+
+    [Fact]
+    public void PasswordsMatch_IsTrueOnlyWhenBothAreTheSameAndNotEmpty()
+    {
+        MainViewModel viewModel = CreateViewModel();
+        Assert.False(viewModel.PasswordsMatch); // both empty is not a match
+
+        viewModel.Password = "blue river";
+        Assert.False(viewModel.PasswordsMatch);
+        viewModel.ConfirmPassword = "blue river";
+        Assert.True(viewModel.PasswordsMatch);
+        viewModel.ConfirmPassword = "Blue river";
+        Assert.False(viewModel.PasswordsMatch);
+    }
+
     [Fact]
     public async Task Encrypt_OnFailure_KeepsFileAndPasswordAndMarksTheMessageAsFailed()
     {
