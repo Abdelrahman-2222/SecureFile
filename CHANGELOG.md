@@ -8,6 +8,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Vertical slice: a first working Windows app window (Browse, password, Encrypt, Decrypt, progress, status text) that
+  encrypts and decrypts a real file; `ErrorMessageProvider` turns each expected error into a fixed plain message
+  (ADR-13 Layer 2); `MainViewModel` logs and shows them; the WPF app adds a local error log
+  (`%LOCALAPPDATA%\SecureFile\logs\securefile.log`) and global safety nets (ADR-13 Layer 3).
+- First integration test: the ViewModel with the real encryption service encrypts then decrypts a file; bytes equal.
 - File details for the selected file: name, extension, size in bytes, full path and last change time (UTC)
   (`FileDetails`, `IFileDetailsReader`, `FileDetailsReader`).
 - `FileSizeFormatter`: human-readable sizes (`1.5 MB`) with binary units and culture-aware decimals.

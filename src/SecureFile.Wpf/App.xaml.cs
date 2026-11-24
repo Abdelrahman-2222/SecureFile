@@ -39,12 +39,12 @@ internal sealed partial class App : Application
     /// </remarks>
     protected override void OnStartup(StartupEventArgs e)
     {
-        base.OnStartup(e);
-
         _errorLog = new FileErrorLog();
         DispatcherUnhandledException += OnDispatcherUnhandledException;
         AppDomain.CurrentDomain.UnhandledException += OnDomainUnhandledException;
         TaskScheduler.UnobservedTaskException += OnUnobservedTaskException;
+
+        base.OnStartup(e);
 
         _viewModel = new MainViewModel(new FileEncryptionService(), new FileDetailsReader(), new WpfFileDialogService(), _errorLog);
         MainWindow mainWindow = new(_viewModel);
@@ -107,6 +107,6 @@ internal sealed partial class App : Application
     /// <returns><see langword="true"/> for errors such as out of memory or an invalid program.</returns>
     private static bool IsFatal(Exception exception)
     {
-        return exception is OutOfMemoryException or InvalidProgramException or AccessViolationException or StackOverflowException;
+        return exception is OutOfMemoryException or InvalidProgramException or AccessViolationException;
     }
 }

@@ -48,6 +48,7 @@ public static class ErrorMessageProvider
     /// <summary>Gets the message to show the user for an expected exception.</summary>
     /// <param name="exception">The exception that ended the user's action.</param>
     /// <returns>A fixed plain-text message; never the raw exception message.</returns>
+    /// <remarks>The fallback message for unknown types says details were logged: callers must log the exception first.</remarks>
     /// <exception cref="ArgumentNullException"><paramref name="exception"/> is <see langword="null"/>.</exception>
     public static string GetMessage(Exception exception)
     {

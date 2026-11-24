@@ -712,7 +712,7 @@ Why `FixedTimeEquals` instead of `==`? Why HKDF instead of 64 bytes from PBKDF2?
 | 2.3 | Commands: Browse, Encrypt, Decrypt, Cancel, Generate password, Open folder; `CanExecute` rules. | Buttons enable/disable correctly in tests. | 🟨 slice form — Browse, Encrypt, Decrypt with CanExecute (file + password + not busy); Save dialog suggests `.enc` added/removed; Cancel, Generate password, Open folder come in 3.5/1.8 |
 | 2.4 | Auto-detect: if the file starts with `SFEN`, suggest Decrypt; otherwise Encrypt. A small Core method takes the path and returns `true`/`false` (built on `EncryptedFileFormat.HasSignature`), so the ViewModel never reads file bytes itself (Review Board 1.2, R8). | Tests for both cases. | ⬜ |
 | 2.5 | ViewModel tests with fake services (no window needed). | Presentation coverage ≥ 85%. | ⬜ |
-| 2.6 | `ErrorMessageProvider` + per-command `try/catch` with specific catches (ADR-13 Layer 2). | Every exception in the ADR-13 table gives its message; unexpected exceptions are **not** caught here. | ⬜ |
+| 2.6 | `ErrorMessageProvider` + per-command `try/catch` with specific catches (ADR-13 Layer 2). | Every exception in the ADR-13 table gives its message; unexpected exceptions are **not** caught here. | ✅ |
 
 **Checkpoint 2:** What is MVVM and what lives in each part? What is data binding? What does
 `[ObservableProperty]` generate? Why can we test a ViewModel without opening a window?
@@ -721,7 +721,7 @@ Why `FixedTimeEquals` instead of `==`? Why HKDF instead of 64 bytes from PBKDF2?
 
 | Step | Goal | Done when | Status |
 |---|---|---|---|
-| 3.1 | `App.xaml` + pure-DI composition in `OnStartup` (ADR-09) + **global exception safety nets and local log** (ADR-13 Layer 3). | App starts; a forced test exception shows the friendly dialog, is logged, and the app keeps running. | ⬜ |
+| 3.1 | `App.xaml` + pure-DI composition in `OnStartup` (ADR-09) + **global exception safety nets and local log** (ADR-13 Layer 3). | App starts; a forced test exception shows the friendly dialog, is logged, and the app keeps running. | ✅ |
 | 3.2 | Main window layout per §11 (drop zone, file card, password, output, actions, progress, status). | Matches the UX spec screenshot. | ⬜ |
 | 3.3 | Fluent theme, light/dark following Windows, consistent spacing and sizes. | Looks right at 100%, 150%, 200% scaling. | ⬜ |
 | 3.4 | Drag-and-drop, native Open/Save dialogs, keyboard shortcuts, `AutomationProperties.Name` on all controls. | Full flow possible with keyboard only. | ⬜ |

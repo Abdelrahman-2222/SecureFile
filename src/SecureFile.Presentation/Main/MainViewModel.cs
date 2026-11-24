@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using SecureFile.Core;
@@ -147,6 +148,17 @@ public sealed partial class MainViewModel : ObservableObject
     /// </remarks>
     public void ResetAfterUnexpectedError()
     {
+        if (State == MainViewState.Working)
+        {
+            return; // an operation is really running (the error came from elsewhere): do not re-enable the buttons under it
+        }
+
+        ResetToIdle();
+    }
+
+    /// <summary>Sets the idle state that matches whether a file is chosen.</summary>
+    private void ResetToIdle()
+    {
         ProgressPercentage = 0;
         State = SelectedFile is null ? MainViewState.NoFile : MainViewState.FileSelected;
         StatusMessage = SelectedFile is null
@@ -192,6 +204,15 @@ public sealed partial class MainViewModel : ObservableObject
         {
             Fail(exception, clearSelectionOnFailure);
         }
+        finally
+        {
+            // An unexpected exception (not caught above) ends the action while State is still Working; the global safety
+            // net shows the dialog, and here the window is made usable again, because the operation is over.
+            if (State == MainViewState.Working)
+            {
+                ResetToIdle();
+            }
+        }
     }
 
     /// <summary>Logs a handled exception and shows its plain message.</summary>
@@ -220,6 +241,11 @@ public sealed partial class MainViewModel : ObservableObject
     /// </remarks>
     private async Task RunFileOperationAsync(bool encrypt)
     {
+        if (RejectUnusablePassword())
+        {
+            return;
+        }
+
         string inputPath = SelectedFile!.FullPath;
         string? outputPath = AskForOutputPath(encrypt, inputPath);
         if (outputPath is null)
@@ -234,6 +260,40 @@ public sealed partial class MainViewModel : ObservableObject
 
         State = MainViewState.Succeeded;
         StatusMessage = SuccessMessage(encrypt, Path.GetFileName(outputPath));
+    }
+
+    /// <summary>Fails the action with a message when the password cannot be used.</summary>
+    /// <returns><see langword="true"/> when the password was refused and the action must stop.</returns>
+    private bool RejectUnusablePassword()
+    {
+        if (IsPasswordEncodable(Password))
+        {
+            return false;
+        }
+
+        State = MainViewState.Failed;
+        StatusMessage = "The password contains a character that can't be used. Please type it again.";
+        return true;
+    }
+
+    /// <summary>Checks that the password can be turned into UTF-8 (a lone surrogate, for example from a bad paste, cannot).</summary>
+    /// <param name="password">The typed password.</param>
+    /// <returns><see langword="true"/> when Core will accept the password.</returns>
+    /// <remarks>
+    /// Core refuses such a password with an <see cref="ArgumentException"/> (a programming error). A user can reach it
+    /// by pasting, so the ViewModel checks first and shows a message instead of the unexpected-error dialog.
+    /// </remarks>
+    private static bool IsPasswordEncodable(string password)
+    {
+        try
+        {
+            _ = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true).GetByteCount(password);
+            return true;
+        }
+        catch (EncoderFallbackException)
+        {
+            return false;
+        }
     }
 
     /// <summary>Starts encryption or decryption with progress reported to <see cref="ProgressPercentage"/>.</summary>

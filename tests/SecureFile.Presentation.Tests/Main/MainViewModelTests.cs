@@ -236,6 +236,42 @@ public sealed class MainViewModelTests
         Assert.True(viewModel.EncryptCommand.CanExecute(null));
     }
 
+    [Fact]
+    public async Task Encrypt_PasswordWithLoneSurrogate_ShowsMessageAndDoesNotCallCore()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        char loneSurrogate = (char)0xD800; // lives in the body: xUnit v3 cannot serialize it in InlineData
+        viewModel.Password = new string(['a', 'b', loneSurrogate]);
+
+        await viewModel.EncryptCommand.ExecuteAsync(null);
+
+        Assert.Equal(MainViewState.Failed, viewModel.State);
+        Assert.Empty(_encryption.Calls);
+        Assert.Contains("password", viewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Encrypt_UnexpectedException_LeavesTheWindowUsable()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        _dialogs.SaveResult = InputPath + ".enc";
+        _encryption.ExceptionToThrow = new ArgumentException("bug");
+
+        await Assert.ThrowsAsync<ArgumentException>(() => viewModel.EncryptCommand.ExecuteAsync(null));
+
+        Assert.Equal(MainViewState.FileSelected, viewModel.State);
+    }
+
+    [Fact]
+    public void ResetAfterUnexpectedError_WithoutFile_ReturnsToNoFile()
+    {
+        MainViewModel viewModel = CreateViewModel();
+
+        viewModel.ResetAfterUnexpectedError();
+
+        Assert.Equal(MainViewState.NoFile, viewModel.State);
+    }
+
     private MainViewModel CreateViewModel()
     {
         return new MainViewModel(_encryption, _detailsReader, _dialogs, _errorLog);

@@ -1700,3 +1700,53 @@ Confirmed fine by the reviewer: check order (header → length → temp → KDF)
 4. Why one pass to a temp file instead of two passes? What is the price, and how do the hidden attribute, 0600 and "empty on failure" reduce it?
 5. Why can't the app tell "wrong password" from "changed file"?
 6. Why is the hidden attribute removed before the move?
+
+---
+
+## Vertical slice (Steps 2.1–2.6, 3.1) — 2026-11-24
+
+**Built.** A working app end to end: `ErrorMessageProvider` (ADR-13 Layer 2 table, IOException split by HResult),
+`MainViewModel` with specific catches, `ResetAfterUnexpectedError`, a plain WPF window, `FileErrorLog`
+(`%LOCALAPPDATA%\SecureFile\logs\securefile.log`, lock, rotation at 1 MB, never throws), `WpfFileDialogService`, and the
+Layer 3 safety nets in `App.OnStartup` (composition root). First integration test: ViewModel + real Core, encrypt then
+decrypt, bytes equal.
+
+**Decisions.** CryptographicException after a valid tag is wrapped as `InvalidEncryptedFileException(Damaged)`;
+`EndOfStreamException` stays an `IOException`; a lone-surrogate password is refused (Core throws; the ViewModel checks
+first and shows a message); the slice uses `IFileDialogService` + `IErrorLog` only; status text instead of
+`IMessageService`; the Save dialog's overwrite prompt means `overwriteExisting: true`; the ViewModel pre-checks
+input == output; `RunGuardedAsync` is the one place with the catches (never `Exception`/`ArgumentException`).
+
+**Review (Sonnet, all §1.8 roles).**
+
+| Finding | Severity | Action |
+|---|---|---|
+| Lone-surrogate password reached Layer 3 | High | Fixed: ViewModel check + test |
+| Log only caught IO/Unauthorized | Medium | Fixed: also NotSupported/Argument |
+| Log unbounded | Medium | Fixed: rotate at 1 MB; path-in-log noted in docs |
+| Handlers registered after `base.OnStartup` | Medium | Fixed: moved first |
+| Reset could re-enable buttons during a running operation | Medium | Fixed: no-op while Working; `finally` resets after an unexpected exception |
+| No Cancel path (OperationCanceledException unused) | Medium | Deferred to Step 3.5 (Cancel) |
+| PasswordBox without MaxLength | Medium | Fixed: 1024 |
+| Errno values on Unix, `IsSameFile` case rule, progress bar at 0 during Browse, FileErrorLog tests, DateTime vs Stopwatch | Low | Deferred (Avalonia stage / 3.2 / 3.5) |
+
+**Manual smoke (UI Automation, Debug build).** Browse shows "note.txt (.txt) · 8.79 KB": pass. Encrypt writes
+`note.txt.enc`, message says the original is unchanged: pass. Save cancel changes nothing: pass. Wrong password shows
+"Wrong password, or the file was changed or damaged." and writes no output: pass. Correct decrypt: bytes equal: pass.
+Ctrl+Shift+F12: friendly dialog, app keeps running, exception line in the log: pass.
+
+**Gate.**
+
+| Check | Result |
+|---|---|
+| Build Release (warnings = errors) | pass |
+| Presentation tests | pass |
+| Integration test | pass |
+| `verify.ps1` | run by pre-push (see CI) |
+
+**Questions to be able to answer.**
+1. Why does the ViewModel catch only specific exception types and never `Exception`?
+2. Why are the user messages fixed text instead of `exception.Message`?
+3. Why are the safety nets registered before `base.OnStartup`, and when must the app close instead of continue?
+4. Why is `overwriteExisting: true` safe in the ViewModel?
+5. Why can `ResetAfterUnexpectedError` not simply set the state when an operation is Working?
