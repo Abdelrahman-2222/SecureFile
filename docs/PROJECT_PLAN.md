@@ -391,7 +391,7 @@ the bonus (Stage 7) comes after.
 |---|---|---|---|---|
 | 0.1 | Install the **.NET 10 SDK** (LTS) and add `global.json`. | This machine has SDK 9 and 11 only. Pinning the SDK makes every build identical (your PC, CI, reviewer). | `dotnet --version` shows 10.0.x inside the repo. | 🟨 done — checkpoint pending |
 | 0.2 | `git init`, `.gitignore`, first commit. | History shows your process; safe rollback. | First commit exists. | 🟨 done — checkpoint pending |
-| 0.3 | Decide what to do with the old `EncryptionHandling` WinForms template (empty). | We replace it with WPF (ADR-01). **Ask before deleting.** | Archived or removed with your OK. | ⬜ waiting for your decision |
+| 0.3 | Decide what to do with the old `EncryptionHandling` WinForms template (empty). | We replace it with WPF (ADR-01). **Ask before deleting.** | Archived or removed with your OK. | 🟨 done — old template deleted with your OK — checkpoint pending |
 | 0.4 | Create the solution and projects (§6). | Layers keep logic reusable and testable (E4). | `dotnet build` succeeds. | 🟨 done — checkpoint pending |
 | 0.5 | `Directory.Build.props`: `Nullable`, `AnalysisLevel=latest-all`, `TreatWarningsAsErrors`, `EnforceCodeStyleInBuild`, `GenerateDocumentationFile`. `Directory.Packages.props` for versions. | Quality rules apply to every project automatically; security analyzers (CA53xx) block weak crypto. | Build is clean with rules on. | 🟨 done — checkpoint pending |
 | 0.6 | `.editorconfig` + `dotnet format --verify-no-changes`. | One consistent style; checked automatically. | Command passes. | 🟨 done — checkpoint pending |
