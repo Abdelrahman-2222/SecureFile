@@ -57,13 +57,13 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Gets the current state; it decides which commands can run (see <see cref="MainViewState"/>).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsBusy))]
-    [NotifyCanExecuteChangedFor(nameof(BrowseCommand), nameof(EncryptCommand), nameof(DecryptCommand))]
+    [NotifyCanExecuteChangedFor(nameof(BrowseCommand), nameof(OpenFileCommand), nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand))]
     public partial MainViewState State { get; private set; } = MainViewState.NoFile;
 
     /// <summary>Gets the details of the chosen file, or <see langword="null"/> when no file is chosen.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(FileSummary))]
-    [NotifyCanExecuteChangedFor(nameof(EncryptCommand), nameof(DecryptCommand))]
+    [NotifyCanExecuteChangedFor(nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand))]
     public partial FileDetails? SelectedFile { get; private set; }
 
     /// <summary>Gets or sets the password typed by the user. Spaces count as characters and are never trimmed.</summary>
@@ -73,7 +73,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <c>PasswordBox.Password</c> cannot be data-bound on purpose.
     /// </remarks>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(EncryptCommand), nameof(DecryptCommand))]
+    [NotifyCanExecuteChangedFor(nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand))]
     public partial string Password { get; set; } = string.Empty;
 
     /// <summary>Gets how much of the running operation is done, 0–100.</summary>
@@ -111,11 +111,40 @@ public sealed partial class MainViewModel : ObservableObject
     private async Task BrowseCoreAsync()
     {
         string? path = _fileDialogs.ShowOpenFileDialog();
-        if (path is null)
+        if (path is not null)
         {
-            return;
+            await LoadFileAsync(path).ConfigureAwait(true);
         }
+    }
 
+    /// <summary>Shows the details of a file dropped onto the window (the same as choosing it with Browse).</summary>
+    /// <param name="path">The full path of the dropped file; <see langword="null"/> or empty is ignored.</param>
+    /// <returns>A task that completes when the details are shown.</returns>
+    [RelayCommand(CanExecute = nameof(CanBrowse))]
+    private Task OpenFileAsync(string? path)
+    {
+        return string.IsNullOrEmpty(path)
+            ? Task.CompletedTask
+            : RunGuardedAsync(() => LoadFileAsync(path), clearSelectionOnFailure: true);
+    }
+
+    /// <summary>
+    /// Encrypts or decrypts depending on the chosen file: a name ending in <c>.enc</c> is decrypted, anything else is
+    /// encrypted. This is what Enter in the password box does (PROJECT_PLAN §11.2: Enter = primary action).
+    /// </summary>
+    /// <returns>A task that completes when the operation has ended.</returns>
+    [RelayCommand(CanExecute = nameof(CanRunFileOperation))]
+    private Task RunPrimaryAsync()
+    {
+        bool decrypt = SelectedFile!.Name.EndsWith(EncryptedFileFormat.FileExtension, StringComparison.OrdinalIgnoreCase);
+        return decrypt ? DecryptAsync() : EncryptAsync();
+    }
+
+    /// <summary>Reads a chosen file's details off the UI thread and selects it.</summary>
+    /// <param name="path">The file to show.</param>
+    /// <returns>A task that completes when the details are shown.</returns>
+    private async Task LoadFileAsync(string path)
+    {
         State = MainViewState.Working;
         StatusMessage = "Reading the file details…";
         SelectedFile = await Task.Run(() => _fileDetailsReader.Read(path)).ConfigureAwait(true);

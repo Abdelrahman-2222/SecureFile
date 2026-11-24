@@ -236,6 +236,54 @@ public sealed class MainViewModelTests
         Assert.True(viewModel.EncryptCommand.CanExecute(null));
     }
 
+    // ---- Drop and primary action (Step 3.4) ------------------------------------------------------------------------
+
+    [Fact]
+    public async Task OpenFile_DroppedPath_SelectsItWithoutTheDialog()
+    {
+        MainViewModel viewModel = CreateViewModel();
+
+        await viewModel.OpenFileCommand.ExecuteAsync(InputPath);
+
+        Assert.Equal(MainViewState.FileSelected, viewModel.State);
+        Assert.Equal(InputPath, viewModel.SelectedFile?.FullPath);
+    }
+
+    [Fact]
+    public async Task OpenFile_ReadFails_ShowsTheMessage()
+    {
+        MainViewModel viewModel = CreateViewModel();
+        _detailsReader.ExceptionToThrow = new UnauthorizedAccessException();
+
+        await viewModel.OpenFileCommand.ExecuteAsync(InputPath);
+
+        Assert.Equal(MainViewState.Failed, viewModel.State);
+        Assert.Null(viewModel.SelectedFile);
+    }
+
+    [Theory]
+    [InlineData("report.pdf", "Encrypt")]
+    [InlineData("report.pdf.enc", "Decrypt")]
+    [InlineData("REPORT.ENC", "Decrypt")]
+    public async Task RunPrimary_ChoosesTheOperationFromTheFileName(string fileName, string expectedOperation)
+    {
+        string path = Path.Combine(Path.GetTempPath(), fileName);
+        MainViewModel viewModel = await CreateWithFileAsync(path);
+        _dialogs.SaveResult = Path.Combine(Path.GetTempPath(), "out.bin");
+
+        await viewModel.RunPrimaryCommand.ExecuteAsync(null);
+
+        Assert.Equal(expectedOperation, Assert.Single(_encryption.Calls).Operation);
+    }
+
+    [Fact]
+    public void RunPrimary_WithoutFileOrPassword_CannotRun()
+    {
+        MainViewModel viewModel = CreateViewModel();
+
+        Assert.False(viewModel.RunPrimaryCommand.CanExecute(null));
+    }
+
     [Fact]
     public async Task Encrypt_PasswordWithLoneSurrogate_ShowsMessageAndDoesNotCallCore()
     {

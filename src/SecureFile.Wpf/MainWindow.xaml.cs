@@ -34,6 +34,30 @@ internal sealed partial class MainWindow : Window
 #endif
     }
 
+    /// <summary>Shows the "copy" cursor over the drop zone for files, and "not allowed" for anything else.</summary>
+    /// <param name="sender">The drop zone.</param>
+    /// <param name="e">The drag information.</param>
+    private void OnDragOver(object sender, DragEventArgs e)
+    {
+        e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
+        e.Handled = true;
+    }
+
+    /// <summary>Hands the first dropped file to the ViewModel; the ViewModel decides whether it can be used.</summary>
+    /// <param name="sender">The drop zone.</param>
+    /// <param name="e">The drop information.</param>
+    /// <remarks>Only the first file is used: the app works on one file at a time.</remarks>
+    private void OnFileDropped(object sender, DragEventArgs e)
+    {
+        if (e.Data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } paths
+            && _viewModel.OpenFileCommand.CanExecute(paths[0]))
+        {
+            _viewModel.OpenFileCommand.Execute(paths[0]);
+        }
+
+        e.Handled = true;
+    }
+
     /// <summary>Copies the typed password to the ViewModel.</summary>
     /// <param name="sender">The password box.</param>
     /// <param name="e">Unused.</param>
