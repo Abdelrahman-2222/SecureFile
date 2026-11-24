@@ -28,6 +28,12 @@ internal static class AtomicFileWriter
     /// <summary>The ending of every temp file, so a leftover after a crash is easy to recognise.</summary>
     internal const string TempFileSuffix = ".securefile-tmp";
 
+    /// <summary>How many times deleting a temp file is tried before giving up (see <see cref="TryDeleteFile"/>).</summary>
+    private const int DeleteAttempts = 5;
+
+    /// <summary>The pause before the second try; each further pause is this much longer (40, 80, 120, 160 ms).</summary>
+    private static readonly TimeSpan DeleteRetryStep = TimeSpan.FromMilliseconds(40);
+
     /// <summary>The start of every temp file name: a dot hides the file on Linux and macOS; "~" marks it as temporary.</summary>
     internal const string TempFilePrefix = ".~";
 
@@ -226,10 +232,34 @@ internal static class AtomicFileWriter
     /// <param name="path">The file to delete. A missing file counts as deleted.</param>
     /// <returns><see langword="true"/> when the file is gone; <see langword="false"/> when it could not be deleted.</returns>
     /// <remarks>
-    /// On Windows a virus scanner may still hold the just-closed file for a moment, so deleting can fail. The file then
-    /// stays behind with its recognisable name; it is never a valid result because it was never moved into place.
+    /// On Windows a virus scanner may still hold the just-closed file for a moment, so deleting can fail. It is tried up to
+    /// <c>DeleteAttempts</c> times with growing pauses (about 0.4 seconds in all, only when it fails), which is normally
+    /// enough for the scanner to let go. If it still fails, the file stays behind with its recognisable name; it is never
+    /// a valid result because it was never moved into place.
     /// </remarks>
     internal static bool TryDeleteFile(string path)
+    {
+        for (int attempt = 1; attempt <= DeleteAttempts; attempt++)
+        {
+            if (TryDeleteOnce(path))
+            {
+                return true;
+            }
+
+            if (attempt < DeleteAttempts)
+            {
+                // Only on the failure path, and a few tenths of a second at most: a scanner usually lets go within that.
+                Thread.Sleep(DeleteRetryStep * attempt);
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>One try to delete a file, without throwing.</summary>
+    /// <param name="path">The file to delete. A missing file counts as deleted.</param>
+    /// <returns><see langword="true"/> when the file is gone.</returns>
+    private static bool TryDeleteOnce(string path)
     {
         try
         {

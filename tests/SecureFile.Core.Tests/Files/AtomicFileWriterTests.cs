@@ -251,6 +251,39 @@ public sealed class AtomicFileWriterTests : IDisposable
         Assert.True(File.Exists(path));
     }
 
+    [Fact]
+    public async Task TryDeleteFile_FileHeldBrieflyByAnotherHandle_SucceedsOnALaterTry()
+    {
+        // A scanner that holds a just-closed file for a moment: Windows refuses the delete while the handle is open.
+        // (On Linux and macOS an open file can be deleted at once, so the first try succeeds and the test still holds.)
+        string path = PathInFolder("held.bin");
+        await File.WriteAllTextAsync(path, "x", Ct);
+        await using var holder = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
+        var release = Task.Run(async () =>
+        {
+            await Task.Delay(150, Ct);
+            await holder.DisposeAsync();
+        }, Ct);
+
+        bool deleted = AtomicFileWriter.TryDeleteFile(path);
+        await release;
+
+        Assert.True(deleted);
+        Assert.False(File.Exists(path));
+    }
+
+    [Fact]
+    public void TryDeleteFile_FileHeldForGoodOnWindows_GivesUpAndReturnsFalse()
+    {
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "Only Windows refuses to delete a file that is open.");
+        string path = PathInFolder("held-forever.bin");
+        File.WriteAllText(path, "x");
+        using FileStream holder = new(path, FileMode.Open, FileAccess.Read, FileShare.None);
+
+        Assert.False(AtomicFileWriter.TryDeleteFile(path)); // all tries refused, no exception
+        Assert.True(File.Exists(path));
+    }
+
     /// <summary>The test run's token (xUnit1051).</summary>
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
