@@ -1,0 +1,59 @@
+namespace SecureFile.Core.Files;
+
+/// <summary>
+/// Reads file details from the real file system using <see cref="FileInfo"/>.
+/// </summary>
+/// <remarks>
+/// Complexity: O(p) time and space, where p is the length of the path (path normalisation), plus one metadata
+/// request to the operating system (two when the path is a symbolic link). Independent of the file size.
+/// </remarks>
+public sealed class FileDetailsReader : IFileDetailsReader
+{
+    /// <inheritdoc/>
+    public FileDetails Read(string filePath)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(filePath);
+
+        FileInfo selectedFile = new(filePath);
+
+        // FileInfo.Exists is false for folders as well as for missing files,
+        // so a folder path is rejected here too.
+        if (!selectedFile.Exists)
+        {
+            throw new FileNotFoundException("No file exists at the given path.", filePath);
+        }
+
+        // For a symbolic link, the size and change time must come from the file it points to
+        // (on Windows the link itself reports 0 bytes). The name stays the one the user selected.
+        FileInfo contentFile = ResolveFinalTarget(selectedFile, filePath);
+
+        return new FileDetails(
+            FullPath: selectedFile.FullName,
+            Name: selectedFile.Name,
+            Extension: selectedFile.Extension,
+            SizeInBytes: contentFile.Length,
+            LastModifiedUtc: contentFile.LastWriteTimeUtc);
+    }
+
+    /// <summary>
+    /// Returns the file that actually holds the content: the file itself, or the final target of a link chain.
+    /// </summary>
+    /// <param name="selectedFile">The file the user selected (already known to exist).</param>
+    /// <param name="filePath">The original path, used in the error message.</param>
+    /// <returns>The file whose size and change time describe the content.</returns>
+    /// <exception cref="FileNotFoundException">The link points to a missing file or to a folder.</exception>
+    private static FileInfo ResolveFinalTarget(FileInfo selectedFile, string filePath)
+    {
+        if (selectedFile.LinkTarget is null)
+        {
+            return selectedFile;
+        }
+
+        if (selectedFile.ResolveLinkTarget(returnFinalTarget: true) is not FileInfo target || !target.Exists)
+        {
+            throw new FileNotFoundException("The link points to a file that does not exist.", filePath);
+        }
+
+        return target;
+    }
+}

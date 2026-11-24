@@ -6,6 +6,99 @@
         Width="800" Height="560"
         MinWidth="640" MinHeight="480"
         WindowStartupLocation="CenterScreen">
-    <!-- The real layout (drop zone, file card, password, output, actions) is built in Stage 3.2. -->
-    <Grid />
+    <Window.InputBindings>
+        <!-- Ctrl+O = Browse (PROJECT_PLAN §11.2). Enter in the password box runs the primary action (below). -->
+        <KeyBinding Key="O" Modifiers="Control" Command="{Binding BrowseCommand}" />
+        <KeyBinding Key="Escape" Command="{Binding CancelCommand}" />
+    </Window.InputBindings>
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
+        <!-- 4/8 px grid; 14 px body text; 40 px high main actions (PROJECT_PLAN §11.2). Colours and the Fluent theme come in 3.3. -->
+        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="MinHeight" Value="40" />
+            <Setter Property="Padding" Value="16,6" />
+        </Style>
+        <Style TargetType="TextBlock">
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
+        </Style>
+    </Window.Resources>
+
+    <!-- Top to bottom, as in PROJECT_PLAN §11.1. Mode switch, confirm password, output "Change…", MB/s, Cancel and
+         Open folder arrive in Steps 3.4/3.5 together with the ViewModel support they need. -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="24">
+
+            <!-- 1. Drop zone (drag-and-drop itself: Step 3.4) -->
+            <Border x:Name="DropZone" AutomationProperties.AutomationId="DropZone"
+                    BorderBrush="{DynamicResource ControlStrongStrokeColorDefaultBrush}" BorderThickness="2" CornerRadius="8" Padding="24" Background="Transparent"
+                    AllowDrop="True" DragOver="OnDragOver" Drop="OnFileDropped">
+                <StackPanel HorizontalAlignment="Center">
+                    <TextBlock Text="Choose a file to encrypt or decrypt" FontSize="18" HorizontalAlignment="Center" />
+                    <Button x:Name="BrowseButton" AutomationProperties.AutomationId="BrowseButton"
+                            AutomationProperties.Name="Browse for a file"
+                            Content="_Browse…" ToolTip="Browse (Ctrl+O)" Command="{Binding BrowseCommand}"
+                            HorizontalAlignment="Center" Margin="0,12,0,0" MinWidth="140" />
+                </StackPanel>
+            </Border>
+
+            <!-- 2. File card -->
+            <Border BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,16,0,0">
+                <TextBlock x:Name="FileSummaryText" AutomationProperties.AutomationId="FileSummary"
+                           Text="{Binding FileSummary}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+            </Border>
+
+            <!-- 4. Password -->
+            <Label Content="_Password" Target="{Binding ElementName=PasswordInput}" Margin="0,16,0,4" Padding="0" FontSize="14" />
+            <PasswordBox x:Name="PasswordInput" AutomationProperties.AutomationId="PasswordInput"
+                         AutomationProperties.Name="Password"
+                         MinHeight="32" FontSize="14" VerticalContentAlignment="Center"
+                         IsEnabled="{Binding CanEditInputs}"
+                         MaxLength="1024" PasswordChanged="OnPasswordChanged">
+                <PasswordBox.InputBindings>
+                    <KeyBinding Key="Return" Command="{Binding RunPrimaryCommand}" />
+                </PasswordBox.InputBindings>
+            </PasswordBox>
+            <TextBlock Text="If you forget this password, the file cannot be recovered. Nobody can reset it."
+                       TextWrapping="Wrap" Margin="0,8,0,0" />
+
+            <!-- 6. Primary actions -->
+            <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                <Button x:Name="EncryptButton" AutomationProperties.AutomationId="EncryptButton"
+                        AutomationProperties.Name="Encrypt file"
+                        Content="Encrypt file" Command="{Binding EncryptCommand}" Margin="0,0,8,0" MinWidth="140" />
+                <Button x:Name="DecryptButton" AutomationProperties.AutomationId="DecryptButton"
+                        AutomationProperties.Name="Decrypt file"
+                        Content="Decrypt file" Command="{Binding DecryptCommand}" MinWidth="140" />
+            </StackPanel>
+
+            <!-- 7. Progress: shown only while an operation or a file read is running -->
+            <Grid Margin="0,16,0,0" Visibility="{Binding IsBusy, Converter={StaticResource BoolToVisibility}}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel>
+                    <ProgressBar x:Name="OperationProgress" AutomationProperties.AutomationId="OperationProgress"
+                                 AutomationProperties.Name="Progress"
+                                 Value="{Binding ProgressPercentage, Mode=OneWay}" Minimum="0" Maximum="100" Height="12"
+                                 IsIndeterminate="{Binding IsProgressIndeterminate, Mode=OneWay}" />
+                    <TextBlock x:Name="ProgressDetailText" AutomationProperties.AutomationId="ProgressText"
+                               Text="{Binding ProgressText}" Margin="0,8,0,0" />
+                </StackPanel>
+                <Button x:Name="CancelButton" Grid.Column="1" AutomationProperties.AutomationId="CancelButton"
+                        AutomationProperties.Name="Cancel"
+                        Content="Cancel" ToolTip="Cancel (Esc)" Command="{Binding CancelCommand}" Margin="16,0,0,0" />
+            </Grid>
+
+            <!-- 8. Result / status -->
+            <TextBlock x:Name="StatusText" AutomationProperties.AutomationId="StatusMessage"
+                       AutomationProperties.LiveSetting="Polite"
+                       Text="{Binding StatusMessage}" TextWrapping="Wrap" Margin="0,16,0,0" />
+            <Button x:Name="OpenFolderButton" AutomationProperties.AutomationId="OpenFolderButton"
+                    AutomationProperties.Name="Open folder"
+                    Content="Open _folder" Command="{Binding OpenFolderCommand}" HorizontalAlignment="Left" Margin="0,12,0,0"
+                    Visibility="{Binding IsSucceeded, Converter={StaticResource BoolToVisibility}}" />
+        </StackPanel>
+    </ScrollViewer>
 </Window>

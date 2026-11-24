@@ -13,6 +13,8 @@
 
 # Shell scripts must keep Unix line endings (LF) or they fail on Linux/macOS.
 *.sh      text eol=lf
+# Git hooks are shell scripts without an extension: same rule.
+.githooks/*  text eol=lf
 
 # Binary files: never touched. IMPORTANT for encrypted test fixtures ("golden files", T-28):
 # a single changed byte would break their HMAC and the tests.

@@ -19,11 +19,6 @@
       CA1707: allow underscores in test method names for that readable naming style.
     -->
     <NoWarn>$(NoWarn);CS1591;CA1707</NoWarn>
-    <!--
-      Exit code 8 = "zero tests ran". Ignored ONLY while the test projects are still empty (Stage 0).
-      Remove this line in Stage 1.1 when the first real tests are added.
-    -->
-    <TestingPlatformCommandLineArguments>$(TestingPlatformCommandLineArguments) --ignore-exit-code 8</TestingPlatformCommandLineArguments>
   </PropertyGroup>
 
   <ItemGroup>

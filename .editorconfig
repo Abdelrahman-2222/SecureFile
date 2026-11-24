@@ -51,8 +51,9 @@ csharp_style_expression_bodied_properties = true:suggestion
 # Prefer clear modern null checks.
 csharp_style_prefer_pattern_matching = true:suggestion
 dotnet_style_prefer_is_null_check_over_reference_equality_method = true:warning
-# Always write the access modifier (public/private/...) explicitly.
-dotnet_style_require_accessibility_modifiers = always:warning
+# Always write the access modifier (public/private/...) explicitly — except on interface members,
+# which are always public by definition (writing "public" there is noise).
+dotnet_style_require_accessibility_modifiers = for_non_interface_members:warning
 # Fields that are never reassigned must be readonly.
 dotnet_style_readonly_field = true:warning
 # Use "this." never (it is noise).
@@ -83,7 +84,15 @@ dotnet_naming_rule.constants_pascal.severity = warning
 dotnet_naming_symbols.constant_symbols.applicable_kinds = field
 dotnet_naming_symbols.constant_symbols.required_modifiers = const
 
-# Private fields: _camelCase.
+# "static readonly" fields are fixed values that behave like constants: PascalCase (e.g. UnitNames).
+# This rule is more specific (two required modifiers), so it wins over the private-field rule below.
+dotnet_naming_rule.static_readonly_pascal.symbols = static_readonly_symbols
+dotnet_naming_rule.static_readonly_pascal.style = pascal_style
+dotnet_naming_rule.static_readonly_pascal.severity = warning
+dotnet_naming_symbols.static_readonly_symbols.applicable_kinds = field
+dotnet_naming_symbols.static_readonly_symbols.required_modifiers = static, readonly
+
+# Private (instance) fields: _camelCase.
 dotnet_naming_rule.private_fields_underscore.symbols = private_field_symbols
 dotnet_naming_rule.private_fields_underscore.style = underscore_camel_style
 dotnet_naming_rule.private_fields_underscore.severity = warning
@@ -108,6 +117,11 @@ dotnet_naming_symbols.async_method_symbols.required_modifiers = async
 dotnet_naming_style.async_suffix_style.required_suffix = Async
 dotnet_naming_style.async_suffix_style.capitalization = pascal_case
 
+# --- Code-metric limits (quality gate G11); thresholds are in CodeMetricsConfig.txt ---
+# These rules are not switched on by AnalysisLevel=latest-all, so they are enabled here explicitly.
+dotnet_diagnostic.CA1502.severity = warning   # Avoid excessive complexity (cyclomatic complexity > 10)
+dotnet_diagnostic.CA1505.severity = warning   # Avoid unmaintainable code (Maintainability Index < 60)
+
 # --- Security analyzers (CA53xx): weak crypto is always an error, never just a suggestion ---
 dotnet_diagnostic.CA5350.severity = error   # Do not use weak algorithms (TripleDES, SHA1, RIPEMD160)
 dotnet_diagnostic.CA5351.severity = error   # Do not use broken algorithms (DES, MD5, RC2)
@@ -127,3 +141,9 @@ dotnet_diagnostic.CA2007.severity = none
 # Test code: xUnit recommends NOT using ConfigureAwait(false) in tests.
 [tests/**.cs]
 dotnet_diagnostic.CA2007.severity = none
+# Maintainability Index counts [InlineData] rows (test DATA tables) as code volume, which says nothing about
+# test logic. The complexity limit (CA1502) still applies to tests.
+dotnet_diagnostic.CA1505.severity = none
+# Test names already follow Method_Condition_Result (e.g. EncryptAsync_AlreadyCancelled_ThrowsAndWritesNothing); the
+# runner calls them, never a person, so an "Async" suffix would add noise without telling a caller anything.
+dotnet_naming_rule.async_methods_end_in_async.severity = none

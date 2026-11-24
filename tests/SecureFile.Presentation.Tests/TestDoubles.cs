@@ -1,0 +1,103 @@
+using SecureFile.Core.Cryptography;
+using SecureFile.Core.Files;
+using SecureFile.Presentation.Dialogs;
+using SecureFile.Presentation.Errors;
+
+namespace SecureFile.Presentation.Tests;
+
+/// <summary>Returns prepared answers instead of showing dialogs, and remembers what it was asked.</summary>
+internal sealed class FakeFileDialogService : IFileDialogService
+{
+    public string? OpenResult { get; set; }
+
+    public string? SaveResult { get; set; }
+
+    public string? SuggestedSavePath { get; private set; }
+
+    public string? ShowOpenFileDialog()
+    {
+        return OpenResult;
+    }
+
+    public string? ShowSaveFileDialog(string suggestedFilePath)
+    {
+        SuggestedSavePath = suggestedFilePath;
+        return SaveResult;
+    }
+}
+
+/// <summary>Records each call; finishes at once, throws a prepared exception, or waits until the test releases it.</summary>
+internal sealed class FakeFileEncryptionService : IFileEncryptionService
+{
+    public List<(string Operation, string Input, string Output, string Password, bool Overwrite)> Calls { get; } = [];
+
+    public Exception? ExceptionToThrow { get; set; }
+
+    /// <summary>When set, the operation stays running until this task completes.</summary>
+    public Task? WaitFor { get; set; }
+
+    public Task EncryptAsync(string inputFilePath, string outputFilePath, string password, bool overwriteExisting, IProgress<int>? progress = null, CancellationToken cancellationToken = default)
+    {
+        return RunAsync("Encrypt", inputFilePath, outputFilePath, password, overwriteExisting, cancellationToken);
+    }
+
+    public Task DecryptAsync(string inputFilePath, string outputFilePath, string password, bool overwriteExisting, IProgress<int>? progress = null, CancellationToken cancellationToken = default)
+    {
+        return RunAsync("Decrypt", inputFilePath, outputFilePath, password, overwriteExisting, cancellationToken);
+    }
+
+    private async Task RunAsync(string operation, string input, string output, string password, bool overwrite, CancellationToken cancellationToken)
+    {
+        Calls.Add((operation, input, output, password, overwrite));
+        if (WaitFor is not null)
+        {
+            await WaitFor.WaitAsync(cancellationToken);
+        }
+
+        if (ExceptionToThrow is not null)
+        {
+            throw ExceptionToThrow;
+        }
+    }
+}
+
+/// <summary>Remembers the path it was asked to show; returns a prepared answer.</summary>
+internal sealed class FakeFolderOpener : IFolderOpener
+{
+    public bool Result { get; set; } = true;
+
+    public string? OpenedPath { get; private set; }
+
+    public bool OpenContainingFolder(string filePath)
+    {
+        OpenedPath = filePath;
+        return Result;
+    }
+}
+
+/// <summary>Collects the exceptions it is given instead of writing a log file.</summary>
+internal sealed class FakeErrorLog : IErrorLog
+{
+    public List<Exception> Exceptions { get; } = [];
+
+    public void Write(Exception exception)
+    {
+        Exceptions.Add(exception);
+    }
+}
+
+/// <summary>Returns details made from the path, or throws a prepared exception, like the real reader's contract.</summary>
+internal sealed class FakeFileDetailsReader : IFileDetailsReader
+{
+    public Exception? ExceptionToThrow { get; set; }
+
+    public FileDetails Read(string filePath)
+    {
+        if (ExceptionToThrow is not null)
+        {
+            throw ExceptionToThrow;
+        }
+
+        return new FileDetails(filePath, Path.GetFileName(filePath), Path.GetExtension(filePath), 1536, DateTime.UnixEpoch);
+    }
+}

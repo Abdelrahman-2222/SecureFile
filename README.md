@@ -3,8 +3,8 @@
 A desktop application that encrypts and decrypts files with **AES-256-CBC**, built with **C# / .NET 10** and **WPF**.
 Files are protected with a password, and any tampering or wrong password is detected (HMAC-SHA256).
 
-> **Status:** 🚧 Stage 0 complete — project setup. Features are being built step by step;
-> see [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md).
+> **Status:** 🚧 Stage 1 (Core library) in progress — Steps 1.1–1.4 (file details, file header, key derivation, AES-CBC) done and reviewed.
+> See [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md).
 
 ## Features (planned for v1.0)
 
@@ -27,8 +27,15 @@ optionally Visual Studio 2026.
 
 ```powershell
 dotnet tool restore
+git config core.hooksPath .githooks   # once per clone: enables the quality-gate hooks
 dotnet build SecureFile.slnx -c Release
 dotnet test --solution SecureFile.slnx -c Release
+```
+
+Before every push, the `pre-push` hook runs the full quality gate. Run it manually any time:
+
+```powershell
+pwsh -File scripts/verify.ps1
 ```
 
 ## Repository layout
@@ -46,4 +53,5 @@ dotnet test --solution SecureFile.slnx -c Release
 - [Project plan](docs/PROJECT_PLAN.md) — phases, steps, decisions
 - [Learning log](docs/LEARNING_LOG.md) — line-by-line explanation of every step
 - [Architecture decisions](docs/adr/README.md)
+- [References](docs/REFERENCES.md) — every source used, and what it was used for
 - [Changelog](CHANGELOG.md)

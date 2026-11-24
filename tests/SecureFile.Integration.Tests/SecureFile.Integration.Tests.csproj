@@ -7,6 +7,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\SecureFile.Core\SecureFile.Core.csproj" />
+    <ProjectReference Include="..\..\src\SecureFile.Presentation\SecureFile.Presentation.csproj" />
   </ItemGroup>
 
 </Project>

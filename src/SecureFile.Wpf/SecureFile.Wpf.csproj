@@ -9,6 +9,8 @@
     <AssemblyName>SecureFile</AssemblyName>
     <!-- Per-monitor DPI awareness and long-path support are declared in app.manifest. -->
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- WPF0001: the Fluent theme (Application.ThemeMode) is experimental in .NET 10 but is the supported way to get it. -->
+    <NoWarn>$(NoWarn);WPF0001</NoWarn>
   </PropertyGroup>
 
   <ItemGroup>
