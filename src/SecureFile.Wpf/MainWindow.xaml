@@ -9,12 +9,13 @@
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibility" />
         <!-- 4/8 px grid; 14 px body text; 40 px high main actions (PROJECT_PLAN §11.2). Colours and the Fluent theme come in 3.3. -->
-        <Style TargetType="Button">
+        <Style TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
             <Setter Property="MinHeight" Value="40" />
             <Setter Property="Padding" Value="16,6" />
         </Style>
         <Style TargetType="TextBlock">
             <Setter Property="FontSize" Value="14" />
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}" />
         </Style>
     </Window.Resources>
 
@@ -24,7 +25,7 @@
         <StackPanel Margin="24">
 
             <!-- 1. Drop zone (drag-and-drop itself: Step 3.4) -->
-            <Border BorderBrush="Gray" BorderThickness="2" CornerRadius="8" Padding="24" Background="Transparent">
+            <Border BorderBrush="{DynamicResource ControlStrongStrokeColorDefaultBrush}" BorderThickness="2" CornerRadius="8" Padding="24" Background="Transparent">
                 <StackPanel HorizontalAlignment="Center">
                     <TextBlock Text="Choose a file to encrypt or decrypt" FontSize="18" HorizontalAlignment="Center" />
                     <Button x:Name="BrowseButton" AutomationProperties.AutomationId="BrowseButton"
@@ -35,7 +36,7 @@
             </Border>
 
             <!-- 2. File card -->
-            <Border BorderBrush="LightGray" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,16,0,0">
+            <Border BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,16,0,0">
                 <TextBlock x:Name="FileSummaryText" AutomationProperties.AutomationId="FileSummary"
                            Text="{Binding FileSummary}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
             </Border>
