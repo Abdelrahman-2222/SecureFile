@@ -21,6 +21,14 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - CI runs the full quality gate on Windows, a gitleaks secrets scan over the whole history, and pins every action
   to a commit SHA without keeping the token on disk.
 - `docs/REFERENCES.md`: every source used and what it was used for.
+- Encrypted file format version 1 (`EncryptedFileFormat`): the 41-byte header layout, the `SFEN` signature check
+  (`HasSignature`), the accepted iteration range (100,000–10,000,000) and the file-length check.
+- `EncryptedFileHeader` (internal): creates headers with a fresh cryptographic random salt and IV, writes them as
+  fixed little-endian bytes and reads them back with full validation of untrusted input.
+- Error model: `SecureFileException` (base) and `InvalidEncryptedFileException` with a `Reason`
+  (not an encrypted file / newer version / damaged), so the app can tell the user what to do.
+- Tests with golden bytes, boundary values, property-based round trips and fuzzing (random input never causes an
+  undocumented exception).
 
 ### Changed
 
