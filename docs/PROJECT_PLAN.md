@@ -726,8 +726,8 @@ Why `FixedTimeEquals` instead of `==`? Why HKDF instead of 64 bytes from PBKDF2?
 | 3.3 | Fluent theme, light/dark following Windows, consistent spacing and sizes. | Looks right at 100%, 150%, 200% scaling. | ✅ |
 | 3.4 | Drag-and-drop, native Open/Save dialogs, keyboard shortcuts, `AutomationProperties.Name` on all controls. | Full flow possible with keyboard only. | ✅ |
 | 3.5 | Progress (%, MB/s, time left), Cancel, success panel (Open folder), friendly errors. | Manual flow test passes. | ✅ |
-| 3.6 | App icon, title, About (version), minimum window size. | Done. | ⬜ |
-| 3.7 | FlaUI smoke test + Accessibility Insights FastPass. | 0 accessibility failures. | ⬜ |
+| 3.6 | App icon, title, About (version), minimum window size. | Done. | ✅ |
+| 3.7 | FlaUI smoke test + Accessibility Insights FastPass. | 0 accessibility failures. | ✅ FlaUI tests (4) pass; FastPass automated checks: 0 failures. Tab stops, Narrator, dark mode and scaling not verified |
 
 **Checkpoint 3:** What is XAML? How does a button reach the ViewModel's command? How does the UI stay
 responsive during a 4 GB encryption? Why do sizes/spacing follow a 4/8 px grid?

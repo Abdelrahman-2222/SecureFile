@@ -15,6 +15,13 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Main window (Steps 3.2–3.5): layout following the UX flow; Fluent theme that follows Windows light/dark; drop a
   file on the window; Ctrl+O to browse and Enter in the password box to encrypt or decrypt; progress with speed and
   time left; Cancel (Esc) that leaves no output file; "Open folder" after success; inputs locked while working.
+- App icon (padlock) for the executable and both windows, and an About dialog (button or F1) that shows the version
+  read from the assembly (`0.1.0`).
+- The pre-push hook now also refuses pushes straight to main, branch deletions and force-pushes (a local stand-in for
+  branch protection, which GitHub does not enforce on private repositories without a paid plan).
+- UI tests with FlaUI (`tests/SecureFile.Wpf.UiTests`): the real app encrypts and decrypts a file, shows the friendly
+  wrong-password message, every control has an accessible name, and the About dialog opens with F1. They run only
+  with `SECUREFILE_UI_TESTS=1`. Accessibility Insights automated checks on the window: 0 failures.
 - The wrong-password message now suggests checking Caps Lock, the keyboard language and spaces.
 - First integration test: the ViewModel with the real encryption service encrypts then decrypts a file; bytes equal.
 - File details for the selected file: name, extension, size in bytes, full path and last change time (UTC)

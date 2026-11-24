@@ -12,6 +12,11 @@ namespace SecureFile.Wpf.Services;
 internal sealed class ExplorerFolderOpener : IFolderOpener
 {
     /// <inheritdoc />
+    /// <remarks>
+    /// <see langword="true"/> means only that Explorer was started: <c>explorer.exe</c> exits with code 1 even when it
+    /// succeeded, so its exit code is not used. The argument is built as one string because Explorer wants the exact
+    /// form <c>/select,"path"</c>, which <see cref="ProcessStartInfo.ArgumentList"/> would quote differently.
+    /// </remarks>
     public bool OpenContainingFolder(string filePath)
     {
         ArgumentNullException.ThrowIfNull(filePath);

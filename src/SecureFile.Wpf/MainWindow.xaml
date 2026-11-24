@@ -3,9 +3,11 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="SecureFile"
+        Icon="Assets/SecureFile.ico"
         Width="800" Height="560"
         MinWidth="640" MinHeight="480"
-        WindowStartupLocation="CenterScreen">
+        WindowStartupLocation="CenterScreen"
+        PreviewKeyDown="OnWindowKeyDown">
     <Window.InputBindings>
         <!-- Ctrl+O = Browse (PROJECT_PLAN §11.2). Enter in the password box runs the primary action (below). -->
         <KeyBinding Key="O" Modifiers="Control" Command="{Binding BrowseCommand}" />
@@ -99,6 +101,10 @@
                     AutomationProperties.Name="Open folder"
                     Content="Open _folder" Command="{Binding OpenFolderCommand}" HorizontalAlignment="Left" Margin="0,12,0,0"
                     Visibility="{Binding IsSucceeded, Converter={StaticResource BoolToVisibility}}" />
+
+            <Button x:Name="AboutButton" AutomationProperties.AutomationId="AboutButton"
+                    AutomationProperties.Name="About SecureFile"
+                    Content="_About" ToolTip="About (F1)" Click="OnAboutClick" HorizontalAlignment="Right" Margin="0,24,0,0" />
         </StackPanel>
     </ScrollViewer>
 </Window>

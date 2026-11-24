@@ -9,5 +9,6 @@
     <Project Path="tests/SecureFile.Core.Tests/SecureFile.Core.Tests.csproj" />
     <Project Path="tests/SecureFile.Integration.Tests/SecureFile.Integration.Tests.csproj" />
     <Project Path="tests/SecureFile.Presentation.Tests/SecureFile.Presentation.Tests.csproj" />
+    <Project Path="tests/SecureFile.Wpf.UiTests/SecureFile.Wpf.UiTests.csproj" />
   </Folder>
 </Solution>

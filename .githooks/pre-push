@@ -1,6 +1,32 @@
 #!/bin/sh
-# pre-push hook: runs the full quality gate (scripts/verify.ps1) before anything leaves this machine.
+# pre-push hook: (1) a local stand-in for branch protection on main, (2) the full quality gate (scripts/verify.ps1).
 # If any check fails, the push is cancelled. Enabled once per clone with:  git config core.hooksPath .githooks
+#
+# Why (1) exists: GitHub does not enforce branch rules on a private repository without a paid plan, so this hook
+# refuses what the rules would have refused: pushing straight to main/master, deleting a branch, and force-pushing.
+# It can be skipped with --no-verify, like any local hook; it protects against mistakes, not against intent.
+
+zero=0000000000000000000000000000000000000000
+
+# Git feeds one line per ref being pushed: <local ref> <local sha> <remote ref> <remote sha>
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$remote_ref" in
+    refs/heads/main | refs/heads/master)
+      echo "pre-push: pushing directly to ${remote_ref#refs/heads/} is blocked. Push a branch and open a pull request." >&2
+      exit 1
+      ;;
+  esac
+
+  if [ "$local_sha" = "$zero" ]; then
+    echo "pre-push: deleting the remote branch ${remote_ref#refs/heads/} from the command line is blocked. Use the GitHub page after merging." >&2
+    exit 1
+  fi
+
+  if [ "$remote_sha" != "$zero" ] && ! git merge-base --is-ancestor "$remote_sha" "$local_sha" 2>/dev/null; then
+    echo "pre-push: this push would rewrite history on ${remote_ref#refs/heads/} (not a fast-forward). Force-pushes are blocked." >&2
+    exit 1
+  fi
+done
 
 echo "pre-push: running the quality gate (scripts/verify.ps1)..."
 pwsh -NoProfile -File scripts/verify.ps1

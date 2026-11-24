@@ -34,6 +34,26 @@ internal sealed partial class MainWindow : Window
 #endif
     }
 
+    /// <summary>Opens the About dialog.</summary>
+    /// <param name="sender">The About button.</param>
+    /// <param name="e">Unused.</param>
+    private void OnAboutClick(object sender, RoutedEventArgs e)
+    {
+        new AboutWindow { Owner = this }.ShowDialog();
+    }
+
+    /// <summary>F1 opens the About dialog (the usual key for help and information).</summary>
+    /// <param name="sender">The window.</param>
+    /// <param name="e">The key that was pressed.</param>
+    private void OnWindowKeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+    {
+        if (e.Key == System.Windows.Input.Key.F1)
+        {
+            OnAboutClick(sender, e);
+            e.Handled = true;
+        }
+    }
+
     /// <summary>Shows the "copy" cursor over the drop zone for files, and "not allowed" for anything else.</summary>
     /// <param name="sender">The drop zone.</param>
     /// <param name="e">The drag information.</param>
