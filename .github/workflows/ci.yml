@@ -1,0 +1,86 @@
+# Continuous Integration: every push and pull request is built and tested automatically.
+# Job 1 (Windows) checks the whole solution, including the WPF app.
+# Job 2 (Ubuntu + macOS) checks the cross-platform projects, proving the Core works on every OS (Phase 5).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch: # allows a manual run from the GitHub "Actions" tab
+
+# Read-only access is enough: this workflow never writes to the repository.
+permissions:
+  contents: read
+
+# A newer push to the same branch cancels the older, still-running build.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  windows:
+    name: Windows (full solution)
+    runs-on: windows-latest
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v7
+
+      - name: Install the .NET SDK from global.json
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore packages and local tools
+        run: |
+          dotnet restore SecureFile.slnx
+          dotnet tool restore
+
+      - name: Check code formatting
+        run: dotnet format SecureFile.slnx --verify-no-changes --no-restore
+
+      - name: Build (warnings are errors)
+        run: dotnet build SecureFile.slnx -c Release --no-restore
+
+      - name: Test with code coverage
+        run: dotnet test --solution SecureFile.slnx -c Release --no-build --coverage --coverage-output-format cobertura --results-directory TestResults
+
+      - name: Create the coverage report
+        if: always()
+        run: dotnet reportgenerator -reports:"TestResults/**/*.cobertura.xml" -targetdir:CoverageReport -reporttypes:"Html;MarkdownSummaryGithub"
+
+      - name: Upload the coverage report
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: CoverageReport
+          if-no-files-found: ignore
+
+  cross-platform:
+    name: ${{ matrix.os }} (Core + tests)
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@v7
+
+      - name: Install the .NET SDK from global.json
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Build
+        run: dotnet build SecureFile.CrossPlatform.slnf -c Release
+
+      - name: Test
+        run: dotnet test --solution SecureFile.CrossPlatform.slnf -c Release --no-build

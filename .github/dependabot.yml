@@ -1,0 +1,21 @@
+# Dependabot: GitHub checks weekly for newer package versions and security fixes,
+# and opens a pull request for each update (which CI then builds and tests).
+version: 2
+updates:
+  - package-ecosystem: nuget
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: build
+      include: scope
+    groups:
+      test-packages:
+        patterns: ["xunit*", "Microsoft.Testing.*", "NetArchTest*", "CsCheck"]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
