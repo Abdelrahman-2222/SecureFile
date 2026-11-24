@@ -142,7 +142,7 @@ pwsh -File scripts/verify.ps1
 | G9 | Exceptions | Every thrown exception is documented (`<exception>`); messages contain no secrets; cleanup in `using`/`finally` (ADR-13) | Review | Manual |
 | G10 | Modularity | Layer rule holds (Core → no UI; Presentation → no UI framework); Core classes sealed | Architecture tests | ✅ (tests) |
 | G11 | Modularity / quality | Cyclomatic complexity ≤ 10 per method; Maintainability Index ≥ 60 per type **and** method | Built-in analyzers CA1502/CA1505 with `CodeMetricsConfig.txt` (same numbers as VS *Calculate Code Metrics*) | ✅ build |
-| G12 | Test strength | Mutation score ≥ 80 % on changed Core code (target 100 %). A line may be excluded only with `// Stryker disable once <mutator> : reason` when no test can observe it (wiping memory, pinning) or it can never run; every exclusion is listed in the step's gate table | `dotnet stryker` | Manual (per step) |
+| G12 | Test strength | Mutation score ≥ 80 % on Core (target 100 %), measured in the final hardening phase. A line may be excluded only with `// Stryker disable once <mutator> : reason` when no test can observe it (wiping memory, pinning) or it can never run; every exclusion is listed in the step's gate table | `dotnet stryker` | Manual (final hardening) |
 | G13 | Performance | No whole-file loading; no needless allocations in loops; measured when the step is performance-relevant | Review + quick measurement / BenchmarkDotNet (Stage 5) | Manual |
 | G14 | Documentation | XML docs on all public members (build-enforced); CHANGELOG; LEARNING_LOG lesson + walkthrough; plan status | Build (CS1591) + review | Partly |
 | G15 | Git | Conventional Commit message; **no AI attribution**; one logical change per commit | `commit-msg` hook + verify.ps1 | ✅ hooks |
@@ -152,18 +152,43 @@ pwsh -File scripts/verify.ps1
 
 **One-time setup per clone:** `git config core.hooksPath .githooks` (enables the `commit-msg` and `pre-push` hooks).
 
-The results of the manual items (G1, G9, G11–G13, G16–G18) are written in the step's "Quality gate" table in
+The results of the manual items (G1, G9, G11–G13, G16–G18) are written in the **stage's** "Quality gate" table in
 `docs/LEARNING_LOG.md`.
 
-### 1.8 Review Board — independent reviewers for every step
+#### Cadence — risk-based testing, stage-level reviews (decided 2026-11-24, after Step 1.6)
+
+Per-step reviews, mutation runs and long write-ups cost too much time for the number of stages left. The rule from
+now on: **test where bugs are expensive, automate everything that is cheap, and review once per stage.**
+
+| Level | Scope | Testing |
+|---|---|---|
+| **A — Core** | Crypto, file I/O, error model (Stage 1) | Full tests as built in Steps 1.2–1.6: boundaries, tampering, cancel, no partial output. |
+| **B — ViewModels** | State, commands, error messages (Stage 2) | A few tests per ViewModel, written in the same session as the code: main path, state changes, one error case. No mutation testing. |
+| **C — UI** | XAML, layout, dialogs (Stage 3+) | No unit tests. One end-to-end integration test (encrypt → decrypt a real file) + a short manual smoke checklist run in the app. |
+
+| Item | When |
+|---|---|
+| `verify.ps1` (G2–G8, G10, G11, G15), pre-push hook, CI | **Every commit / push** — unchanged |
+| G1, G4 review, G9, G13 | Every step, by the author, without a write-up unless a decision is made |
+| §1.9 / §1.10 checklists | Followed silently; only real decisions are recorded |
+| Reviewer agent (§1.8) — G16–G18 | **Once per stage**, one agent with all roles, on the whole stage's changes |
+| Stryker (G12) | **Once, in the final hardening phase** (full Core run, ≥ 80 %) |
+| LEARNING_LOG | **One short section per stage**: what was built, key decisions, review table, gate table, ~5 self-check questions |
+| Steps per chat | Several steps per chat (e.g. a whole slice), one commit per step, one hand-off prompt (`docs/NEXT_STEP_PROMPT.md`) at the end |
+
+**Final hardening phase** (before the presentation): full Stryker run, one security review, performance measured on
+large files, manual end-to-end pass on a clean Windows machine, then the explanation guide and the Team Lead PPT.
+
+### 1.8 Review Board — independent reviewers for every stage
 
 **Goal:** production-ready code that would impress a Team Lead, a senior engineer and an end user. One author
 checking their own work misses things, so every step is reviewed by **independent reviewers with different
 viewpoints** (run as separate AI reviewer agents that read the code fresh and only report — they never edit).
 The author then fixes each finding or records why not.
 
-**When:** (1) a short **design review before coding** (Architect, PM, End user) — is this the right thing, built the right way?
-(2) a full **code review after the step is green**, before the step is committed as done.
+**When (since 2026-11-24, see §1.7 Cadence):** **one reviewer agent per stage**, covering all roles below, on the
+whole stage's changes after its tests are green. Steps 1.1–1.6 had per-step reviews; that level of review returns
+only in the final hardening phase.
 
 | Role | Looks at | Key questions |
 |---|---|---|
@@ -1165,4 +1190,5 @@ whether the WPF Fluent `ThemeMode` API is still marked experimental in .NET 10, 
 | 2026-11-24 | Step 1.3 | Key derivation: NFC → UTF-8 → PBKDF2-HMAC-SHA256 → HKDF-Expand into two keys; `FileKeys` wipes keys on dispose. RFC 7914 / RFC 5869 vectors + Python-computed golden keys; PBKDF2 600k measured at ≈0.46 s. Review Board: 0 High, 3 Medium fixed (fail-closed normalisation, error naming, mutation exclusions with reasons). Gate passed, mutation 100 %. |
 | 2026-11-24 | Step 1.5 | `FileEncryptionService.EncryptAsync`: own `TransformBlock` loop over one pooled 2 MiB buffer, HMAC over header + ciphertext, PBKDF2 in `Task.Run`, whole-percent progress, cancel; `AtomicFileWriter` (temp in output folder, fsync, atomic move, cleanup). Golden file from Python + OpenSSL; 76 new tests. Review Board (design + 2 code reviewers): 1 High (short-read test gap) + Medium findings fixed. Gate passed, mutation 100 %. |
 | 2026-11-24 | Step 1.6 | `FileEncryptionService.DecryptAsync`: header and length checked before any work; one pass through HMAC + `TransformBlock` to a protected temp file (hidden on Windows, 0600 on Linux/macOS, emptied on failure); `FixedTimeEquals` before `TransformFinalBlock`; `AuthenticationFailedException` pulled forward from 1.7. 50 new tests (every bit-flip, truncation, wrong password, cancel leaves nothing). One reviewer (lean mode): 0 High, 2 Medium fixed. Gate passed, mutation 96.67 % (both survivors explained). |
+| 2026-11-24 | Decision | Process: risk-based testing (Core full, ViewModels light, UI end-to-end + manual smoke), reviewer and LEARNING_LOG once per stage, Stryker once in a final hardening phase; automated gate unchanged on every push (§1.7 Cadence). |
 | 2026-11-24 | Step 1.4 | `AesCbc` factory returns ready AES-256-CBC/PKCS7 encryptor/decryptor for (key, IV). NIST SP 800-38A F.2.5/F.2.6 + OpenSSL-checked padding cases. Review Board: 1 High for the 1.6 design recorded (no decrypting CryptoStream; finish last block only after HMAC check), 3 Medium fixed. Gate passed, mutation 100 %. |
