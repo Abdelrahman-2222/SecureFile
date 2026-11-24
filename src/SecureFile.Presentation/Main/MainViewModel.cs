@@ -79,17 +79,24 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Gets the details of the chosen file, or <see langword="null"/> when no file is chosen.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(FileSummary), nameof(PasswordHint), nameof(IsEncryptOffered))]
+    [NotifyPropertyChangedFor(nameof(FileSummary), nameof(PasswordHint), nameof(IsEncryptOffered), nameof(IsDecryptOffered))]
     [NotifyCanExecuteChangedFor(nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand))]
     public partial FileDetails? SelectedFile { get; private set; }
 
     /// <summary>Gets a value indicating whether the window offers the Encrypt button: not for a file that is already encrypted.</summary>
     /// <remarks>
     /// Only the button is switched off; the command itself still works, because encrypting an encrypted file is
-    /// allowed by the design (T-26) and is tested through the command. Decrypt stays on for every file, so a renamed
-    /// encrypted file can still be opened.
+    /// allowed by the design (T-26) and is tested through the command.
     /// </remarks>
     public bool IsEncryptOffered => !IsEncryptedFileSelected();
+
+    /// <summary>Gets a value indicating whether the window offers the Decrypt button: only for a file that is encrypted (or while none is chosen).</summary>
+    /// <remarks>
+    /// "Encrypted" is decided by the file's content (its SecureFile signature), not its name, so a renamed encrypted
+    /// file is still offered. The command itself still works on any file and reports a plain message for a file that
+    /// is not ours (T-08).
+    /// </remarks>
+    public bool IsDecryptOffered => SelectedFile is null || SelectedFile.IsEncrypted;
 
     /// <summary>Gets the note under the password box: a warning when a password is being chosen, a reminder when decrypting.</summary>
     /// <remarks>
@@ -189,12 +196,11 @@ public sealed partial class MainViewModel : ObservableObject
         return IsEncryptedFileSelected() ? DecryptAsync() : EncryptAsync();
     }
 
-    /// <summary>Tells whether the chosen file's name ends in <c>.enc</c>, which means it is decrypted rather than encrypted.</summary>
-    /// <returns><see langword="true"/> when a file is chosen and it ends in <c>.enc</c>.</returns>
+    /// <summary>Tells whether the chosen file is a SecureFile-encrypted file (by content), so it is decrypted rather than encrypted.</summary>
+    /// <returns><see langword="true"/> when a file is chosen and it starts with the SecureFile signature.</returns>
     private bool IsEncryptedFileSelected()
     {
-        return SelectedFile is not null
-            && SelectedFile.Name.EndsWith(EncryptedFileFormat.FileExtension, StringComparison.OrdinalIgnoreCase);
+        return SelectedFile is { IsEncrypted: true };
     }
 
     /// <summary>Reads a chosen file's details off the UI thread and selects it.</summary>

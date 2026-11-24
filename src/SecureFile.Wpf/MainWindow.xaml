@@ -88,7 +88,8 @@
                         ToolTip="An encrypted file is not encrypted again. Use Decrypt." Margin="0,0,8,0" MinWidth="140" />
                 <Button x:Name="DecryptButton" AutomationProperties.AutomationId="DecryptButton"
                         AutomationProperties.Name="Decrypt file"
-                        Content="Decrypt file" Command="{Binding DecryptCommand}" MinWidth="140" />
+                        Content="Decrypt file" Command="{Binding DecryptCommand}" IsEnabled="{Binding IsDecryptOffered}"
+                        ToolTip="This file is not encrypted by SecureFile. Use Encrypt." MinWidth="140" />
             </StackPanel>
 
             <!-- 7. Progress: shown only while an operation or a file read is running -->

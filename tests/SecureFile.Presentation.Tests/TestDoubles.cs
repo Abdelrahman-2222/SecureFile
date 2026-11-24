@@ -98,6 +98,8 @@ internal sealed class FakeFileDetailsReader : IFileDetailsReader
             throw ExceptionToThrow;
         }
 
-        return new FileDetails(filePath, Path.GetFileName(filePath), Path.GetExtension(filePath), 1536, DateTime.UnixEpoch);
+        // The fake decides "encrypted" by name, which is enough here; the real reader's content check has its own tests.
+        bool encrypted = filePath.EndsWith(".enc", StringComparison.OrdinalIgnoreCase);
+        return new FileDetails(filePath, Path.GetFileName(filePath), Path.GetExtension(filePath), 1536, DateTime.UnixEpoch, encrypted);
     }
 }

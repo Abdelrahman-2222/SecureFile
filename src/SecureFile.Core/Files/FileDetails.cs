@@ -11,6 +11,10 @@ namespace SecureFile.Core.Files;
 /// </param>
 /// <param name="SizeInBytes">The file size in bytes. Use <see cref="FileSizeFormatter"/> to display it.</param>
 /// <param name="LastModifiedUtc">When the file was last changed, in Coordinated Universal Time (UTC).</param>
+/// <param name="IsEncrypted">
+/// <see langword="true"/> when the file starts with the SecureFile signature, whatever its name: decided by content,
+/// so a renamed encrypted file is still recognised. Defaults to <see langword="false"/>.
+/// </param>
 /// <remarks>
 /// A <c>record</c> is a type made for holding data: two records with the same values are equal,
 /// and the values cannot be changed after creation (immutable), so the details shown on screen
@@ -21,4 +25,5 @@ public sealed record FileDetails(
     string Name,
     string Extension,
     long SizeInBytes,
-    DateTime LastModifiedUtc);
+    DateTime LastModifiedUtc,
+    bool IsEncrypted = false);

@@ -92,7 +92,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
   dialog's "Save as type" lists the file type and all files; a "Show password" check box reveals the typed password;
   the window is taller so the About button is not hidden behind a scroll bar; the "if you forget this password" warning
   is shown only when a password is being chosen (a `.enc` file shows "enter the password that was used" instead); the
-  Encrypt button is greyed out for a `.enc` file (Decrypt stays available).
+  Encrypt is greyed out for an encrypted file and Decrypt for a normal one; "encrypted" is decided by the file's
+  content (its SecureFile signature), so a renamed encrypted file is still recognised.
 - Decryption reports invalid padding after a valid tag (only possible for a file another program wrote) as
   `InvalidEncryptedFileException(Damaged)` with the original `CryptographicException` inside, so callers handle one
   documented type (Step 1.7). New constructor `InvalidEncryptedFileException(message, reason, innerException)`.

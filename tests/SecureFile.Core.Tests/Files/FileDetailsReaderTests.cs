@@ -32,6 +32,34 @@ public sealed class FileDetailsReaderTests : IDisposable
         Assert.Equal(Path.GetFullPath(filePath), details.FullPath);
     }
 
+    [Theory]
+    [InlineData("secret.enc", "SFEN-and-more", true)]  // our signature
+    [InlineData("renamed.bak", "SFEN-and-more", true)] // a renamed encrypted file is still recognised: content, not name
+    [InlineData("fake.enc", "not ours", false)]        // the name alone proves nothing
+    [InlineData("tiny.bin", "SF", false)]              // shorter than the signature
+    [InlineData("empty.bin", "", false)]
+    public void Read_DecidesEncryptedByContentNotByName(string fileName, string content, bool expected)
+    {
+        string filePath = Path.Combine(_temporaryFolder.FullName, fileName);
+        File.WriteAllText(filePath, content);
+
+        FileDetails details = _reader.Read(filePath);
+
+        Assert.Equal(expected, details.IsEncrypted);
+    }
+
+    [Fact]
+    public void Read_FileOpenedExclusivelyByAnotherProgram_StillReadsDetailsAndSaysNotEncrypted()
+    {
+        string filePath = CreateFile("locked.bin", sizeInBytes: 10);
+        using var holder = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.None);
+
+        FileDetails details = _reader.Read(filePath);
+
+        Assert.Equal(10L, details.SizeInBytes);
+        Assert.False(details.IsEncrypted);
+    }
+
     [Fact]
     public void Read_EmptyFile_ReturnsZeroSize()
     {

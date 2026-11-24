@@ -127,7 +127,9 @@ public sealed class MainViewModelTests
         MainViewModel viewModel = await CreateWithFileAsync(Path.Combine(Path.GetTempPath(), name));
 
         Assert.Equal(expected, viewModel.IsEncryptOffered);
-        Assert.True(viewModel.EncryptCommand.CanExecute(null)); // the command itself stays available (T-26)
+        Assert.Equal(!expected, viewModel.IsDecryptOffered); // exactly one of the two buttons is offered for a chosen file
+        Assert.True(viewModel.EncryptCommand.CanExecute(null)); // the commands themselves stay available (T-24, T-08)
+        Assert.True(viewModel.DecryptCommand.CanExecute(null));
     }
 
     [Fact]
