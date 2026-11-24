@@ -42,7 +42,7 @@ public sealed class SecureFileAppTests : IDisposable
         Window window = StartApp();
 
         ChooseFile(window, original);
-        EnterPassword(window, "ui-test-pass");
+        EnterNewPassword(window, "ui-test-pass");
         RunWithSaveDialog(window, "EncryptButton", encrypted);
         WaitForStatus(window, "Encrypted copy saved");
 
@@ -64,7 +64,7 @@ public sealed class SecureFileAppTests : IDisposable
         await File.WriteAllTextAsync(original, "secret text", TestContext.Current.CancellationToken);
         Window window = StartApp();
         ChooseFile(window, original);
-        EnterPassword(window, "right-pass");
+        EnterNewPassword(window, "right-pass");
         RunWithSaveDialog(window, "EncryptButton", encrypted);
         WaitForStatus(window, "Encrypted copy saved");
 
@@ -192,6 +192,13 @@ public sealed class SecureFileAppTests : IDisposable
     {
         AutomationElement box = Find(window, "PasswordInput");
         box.Patterns.Value.Pattern.SetValue(password);
+    }
+
+    /// <summary>Types a password in both boxes, as Encrypt needs (the confirmation box exists only when encrypting).</summary>
+    private static void EnterNewPassword(Window window, string password)
+    {
+        EnterPassword(window, password);
+        Find(window, "ConfirmInput").Patterns.Value.Pattern.SetValue(password);
     }
 
     /// <summary>Invokes a button that opens the Save dialog and types the output path into it.</summary>

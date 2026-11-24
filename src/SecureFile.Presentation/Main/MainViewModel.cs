@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using SecureFile.Core;
 using SecureFile.Core.Cryptography;
 using SecureFile.Core.Files;
+using SecureFile.Core.Passwords;
 using SecureFile.Presentation.Dialogs;
 using SecureFile.Presentation.Errors;
 
@@ -114,8 +115,42 @@ public sealed partial class MainViewModel : ObservableObject
     /// <c>PasswordBox.Password</c> cannot be data-bound on purpose.
     /// </remarks>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(Strength), nameof(StrengthText), nameof(StrengthPercent), nameof(PasswordMatchText))]
     [NotifyCanExecuteChangedFor(nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand))]
     public partial string Password { get; set; } = string.Empty;
+
+    /// <summary>Gets or sets the password typed a second time; it is only checked when encrypting (a typo there loses the file for good).</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(PasswordMatchText))]
+    public partial string ConfirmPassword { get; set; } = string.Empty;
+
+    /// <summary>Gets the rating of the typed password (advice; only "too short" is enforced, and only when encrypting).</summary>
+    public PasswordStrength Strength => PasswordStrengthEvaluator.Evaluate(Password);
+
+    /// <summary>Gets the strength as a bar fill from 0 to 100 for the window.</summary>
+    public int StrengthPercent => Strength switch
+    {
+        PasswordStrength.Empty => 0,
+        PasswordStrength.TooShort => 15,
+        PasswordStrength.Weak => 35,
+        PasswordStrength.Fair => 65,
+        _ => 100,
+    };
+
+    /// <summary>Gets the sentence that goes with the strength bar; empty while nothing is typed.</summary>
+    public string StrengthText => Strength switch
+    {
+        PasswordStrength.Empty => string.Empty,
+        PasswordStrength.TooShort => string.Create(CultureInfo.CurrentCulture, $"Too short: use at least {PasswordStrengthEvaluator.MinimumLength} characters."),
+        PasswordStrength.Weak => "Weak: a longer password or a few words is safer.",
+        PasswordStrength.Fair => "Fair.",
+        _ => "Strong.",
+    };
+
+    /// <summary>Gets whether the two typed passwords are the same, as a sentence; empty until the second one is started.</summary>
+    public string PasswordMatchText => ConfirmPassword.Length == 0
+        ? string.Empty
+        : string.Equals(Password, ConfirmPassword, StringComparison.Ordinal) ? "Passwords match." : "Passwords don't match yet.";
 
     /// <summary>Gets how much of the running operation is done, 0–100.</summary>
     [ObservableProperty]
@@ -364,7 +399,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// </remarks>
     private async Task RunFileOperationAsync(bool encrypt)
     {
-        if (RejectUnusablePassword())
+        if (RejectUnusablePassword() || (encrypt && RejectUnacceptableNewPassword()))
         {
             return;
         }
@@ -377,16 +412,24 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         await ExecuteOperationAsync(encrypt, inputPath, outputPath).ConfigureAwait(true);
+        ShowSuccess(encrypt, outputPath);
+    }
 
+    /// <summary>Shows the result and forgets the file and the passwords.</summary>
+    /// <param name="encrypt">Whether the finished operation was encryption.</param>
+    /// <param name="outputPath">The file that was written.</param>
+    /// <remarks>
+    /// The job is done, so the window shows the real new state (nothing chosen) and the passwords do not stay in memory
+    /// or on screen longer than needed. On failure they are kept on purpose: the user fixes the password and tries again.
+    /// </remarks>
+    private void ShowSuccess(bool encrypt, string outputPath)
+    {
         _lastOutputPath = outputPath;
         State = MainViewState.Succeeded;
         StatusMessage = SuccessMessage(encrypt, Path.GetFileName(outputPath));
-
-        // The job is done: forget the file and the password, so the window shows the real new state (nothing chosen)
-        // and the password does not stay in memory or on screen longer than needed. On failure both are kept on
-        // purpose: the user fixes the password and tries again.
         SelectedFile = null;
         Password = string.Empty;
+        ConfirmPassword = string.Empty;
     }
 
     /// <summary>Runs the operation with a cancellation token and a clock for the progress line.</summary>
@@ -456,6 +499,31 @@ public sealed partial class MainViewModel : ObservableObject
         State = MainViewState.Failed;
         StatusMessage = "The password contains a character that can't be used. Please type it again.";
         return true;
+    }
+
+    /// <summary>Fails the action when a password chosen for encryption is too short or was not typed the same twice.</summary>
+    /// <returns><see langword="true"/> when the password was refused and the action must stop.</returns>
+    /// <remarks>
+    /// Only for encryption: a file's password may come from elsewhere, so Decrypt accepts any password. A mismatch is
+    /// refused because a typo here would make the file impossible to open, and nobody can reset the password.
+    /// </remarks>
+    private bool RejectUnacceptableNewPassword()
+    {
+        if (Password.Length < PasswordStrengthEvaluator.MinimumLength)
+        {
+            State = MainViewState.Failed;
+            StatusMessage = string.Create(CultureInfo.CurrentCulture, $"The password is too short. Use at least {PasswordStrengthEvaluator.MinimumLength} characters.");
+            return true;
+        }
+
+        if (!string.Equals(Password, ConfirmPassword, StringComparison.Ordinal))
+        {
+            State = MainViewState.Failed;
+            StatusMessage = "The two passwords are not the same. Type the password again in both boxes.";
+            return true;
+        }
+
+        return false;
     }
 
     /// <summary>Checks that the password can be turned into UTF-8 (a lone surrogate, for example from a bad paste, cannot).</summary>

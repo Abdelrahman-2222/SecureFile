@@ -29,6 +29,13 @@ internal sealed partial class MainWindow : Window
         _viewModel = viewModel;
         DataContext = viewModel;
         viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        foreach (System.Windows.Controls.Control box in new System.Windows.Controls.Control[] { PasswordInput, PasswordVisibleInput, ConfirmInput, ConfirmVisibleInput })
+        {
+            box.PreviewKeyUp += UpdateCapsLockWarning;
+            box.GotKeyboardFocus += UpdateCapsLockWarning;
+            box.LostKeyboardFocus += UpdateCapsLockWarning;
+        }
+
 #if DEBUG
         // Test hook for the global safety net (ADR-13 Layer 3): Ctrl+Shift+F12 throws an unexpected exception.
         InputBindings.Add(new System.Windows.Input.KeyBinding(
@@ -87,7 +94,16 @@ internal sealed partial class MainWindow : Window
     /// <param name="e">Unused.</param>
     private void OnPasswordChanged(object sender, RoutedEventArgs e)
     {
-        if (!_syncingPassword)
+        if (_syncingPassword)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(sender, ConfirmInput))
+        {
+            _viewModel.ConfirmPassword = ConfirmInput.Password;
+        }
+        else
         {
             _viewModel.Password = PasswordInput.Password;
         }
@@ -98,30 +114,46 @@ internal sealed partial class MainWindow : Window
     /// <param name="e">Unused.</param>
     private void OnVisiblePasswordChanged(object sender, System.Windows.Controls.TextChangedEventArgs e)
     {
-        if (!_syncingPassword)
+        if (_syncingPassword)
+        {
+            return;
+        }
+
+        if (ReferenceEquals(sender, ConfirmVisibleInput))
+        {
+            _viewModel.ConfirmPassword = ConfirmVisibleInput.Text;
+        }
+        else
         {
             _viewModel.Password = PasswordVisibleInput.Text;
         }
     }
 
-    /// <summary>Swaps the hidden and the visible password box when "Show password" changes, keeping the text.</summary>
+    /// <summary>Swaps the hidden and the visible boxes (password and confirmation) when "Show password" changes, keeping the text.</summary>
     /// <param name="sender">The check box.</param>
     /// <param name="e">Unused.</param>
     private void OnShowPasswordChanged(object sender, RoutedEventArgs e)
     {
         bool show = ShowPasswordCheck.IsChecked == true;
-        SetBoxes(_viewModel.Password);
-        PasswordVisibleInput.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
-        PasswordInput.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
+        SetBoxes(_viewModel.Password, _viewModel.ConfirmPassword);
+        SwapVisibility(PasswordInput, PasswordVisibleInput, show);
+        SwapVisibility(ConfirmInput, ConfirmVisibleInput, show);
         if (show)
         {
-            PasswordVisibleInput.Focus();
             PasswordVisibleInput.CaretIndex = PasswordVisibleInput.Text.Length;
         }
-        else
-        {
-            PasswordInput.Focus();
-        }
+
+        (show ? PasswordVisibleInput : (System.Windows.Controls.Control)PasswordInput).Focus();
+    }
+
+    /// <summary>Shows either the hidden (dots) or the visible (text) box of one field, never both.</summary>
+    /// <param name="hiddenBox">The password box.</param>
+    /// <param name="visibleBox">The plain text box in the same place.</param>
+    /// <param name="showText"><see langword="true"/> to show the text box.</param>
+    private static void SwapVisibility(System.Windows.Controls.Control hiddenBox, System.Windows.Controls.Control visibleBox, bool showText)
+    {
+        visibleBox.Visibility = showText ? Visibility.Visible : Visibility.Collapsed;
+        hiddenBox.Visibility = showText ? Visibility.Collapsed : Visibility.Visible;
     }
 
     /// <summary>When the ViewModel changes the password (it clears it after a success), brings both boxes in line.</summary>
@@ -129,26 +161,46 @@ internal sealed partial class MainWindow : Window
     /// <param name="e">The name of the changed property.</param>
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(MainViewModel.Password) && PasswordInput.Password != _viewModel.Password)
+        bool relevant = e.PropertyName is nameof(MainViewModel.Password) or nameof(MainViewModel.ConfirmPassword);
+        if (relevant && (PasswordInput.Password != _viewModel.Password || ConfirmInput.Password != _viewModel.ConfirmPassword))
         {
-            SetBoxes(_viewModel.Password);
+            SetBoxes(_viewModel.Password, _viewModel.ConfirmPassword);
         }
     }
 
-    /// <summary>Writes the same text into both password boxes without sending it back to the ViewModel.</summary>
-    /// <param name="password">The password to show (empty clears both).</param>
-    private void SetBoxes(string password)
+    /// <summary>Writes the texts into the hidden and visible boxes of both fields without sending them back to the ViewModel.</summary>
+    /// <param name="password">The password to show (empty clears both of its boxes).</param>
+    /// <param name="confirmation">The confirmation to show (empty clears both of its boxes).</param>
+    private void SetBoxes(string password, string confirmation)
     {
         _syncingPassword = true;
         try
         {
             PasswordInput.Password = password;
             PasswordVisibleInput.Text = password;
+            ConfirmInput.Password = confirmation;
+            ConfirmVisibleInput.Text = confirmation;
         }
         finally
         {
             _syncingPassword = false;
         }
+    }
+
+    /// <summary>Shows the Caps Lock warning while a password box has the focus and Caps Lock is on.</summary>
+    /// <param name="sender">One of the password boxes.</param>
+    /// <param name="e">Unused.</param>
+    /// <remarks>
+    /// Checked on focus and after every key release, which covers pressing Caps Lock inside the box. A wrong password
+    /// from Caps Lock is a common cause of "I can't open my file".
+    /// </remarks>
+    private void UpdateCapsLockWarning(object sender, RoutedEventArgs e)
+    {
+        bool boxFocused = PasswordInput.IsKeyboardFocusWithin || PasswordVisibleInput.IsKeyboardFocusWithin
+            || ConfirmInput.IsKeyboardFocusWithin || ConfirmVisibleInput.IsKeyboardFocusWithin;
+        CapsLockWarning.Visibility = boxFocused && System.Windows.Input.Keyboard.IsKeyToggled(System.Windows.Input.Key.CapsLock)
+            ? Visibility.Visible
+            : Visibility.Collapsed;
     }
 
 #if DEBUG

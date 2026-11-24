@@ -96,6 +96,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
   content (its SecureFile signature), so a renamed encrypted file is still recognised.
 - The "if you forget this password" note is an amber caution box with a warning symbol and bold text while a password is
   being chosen (not red: red is for errors).
+- Password rules when encrypting: at least 8 characters, a confirmation box that must match, an advisory strength bar and
+  text (`PasswordStrengthEvaluator`, plan Step 1.8), and a Caps Lock warning. Decrypting applies no rules and shows no
+  confirmation box. No symbol/digit rules on purpose.
 - Decryption reports invalid padding after a valid tag (only possible for a file another program wrote) as
   `InvalidEncryptedFileException(Damaged)` with the original `CryptographicException` inside, so callers handle one
   documented type (Step 1.7). New constructor `InvalidEncryptedFileException(message, reason, innerException)`.

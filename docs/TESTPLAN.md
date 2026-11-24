@@ -29,6 +29,11 @@ Result column: ✅ pass · ❌ fail (write the bug id) · ➖ not applicable.
 | A10 | Decrypt with a wrong passphrase. | Plain message ("wrong password or damaged file"), no output file, no crash, app stays usable. | |
 | A11 | Encrypt when the output file already exists. | The app asks before replacing; "No" keeps the old file; "Yes" replaces it. | |
 | A12 | Select an encrypted file, then a normal file, then rename an encrypted file to `x.bak` and select it. | Encrypted (any name): only Decrypt is enabled; normal file: only Encrypt is enabled (tooltips explain). Double encryption is covered by the integration test (T-26). | |
+| A13 | Select a normal file; type a 5-character password in both boxes; click Encrypt. | Red banner "too short, use at least 8 characters"; no file written. The strength bar is red with "Too short". | |
+| A14 | Type a valid password in the first box and a different one in the second. | "Passwords don't match yet." is shown; Encrypt shows a red "not the same" banner; no file written. | |
+| A15 | Type `blue river coffee lamp` in both boxes. | Bar green, "Strong.", "Passwords match."; Encrypt works. A short password for Decrypt of an old file is accepted (no rules, no confirmation box). | |
+| A16 | Turn Caps Lock on and click into any password box; press a key. | "Caps Lock is on." appears while the box has focus and disappears when Caps Lock is off or focus leaves. | |
+| A17 | Tick "Show password". | Both boxes show their text; typing in either still works; unticking hides them again with the text kept. | |
 
 ## B. Keyboard only (T-41) — do not touch the mouse
 

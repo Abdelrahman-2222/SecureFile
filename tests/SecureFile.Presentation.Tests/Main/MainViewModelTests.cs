@@ -13,6 +13,9 @@ public sealed class MainViewModelTests
 {
     private static readonly string InputPath = Path.Combine(Path.GetTempPath(), "report.pdf");
 
+    /// <summary>A password that Encrypt accepts: at least 8 characters, typed twice.</summary>
+    private const string ValidPassword = "secret-pass-1";
+
     private readonly FakeFileEncryptionService _encryption = new();
     private readonly FakeFileDialogService _dialogs = new();
     private readonly FakeFileDetailsReader _detailsReader = new();
@@ -87,7 +90,7 @@ public sealed class MainViewModelTests
         await viewModel.EncryptCommand.ExecuteAsync(null);
 
         Assert.Equal(output, _dialogs.SuggestedSavePath);
-        Assert.Equal([("Encrypt", InputPath, output, "secret", true)], _encryption.Calls);
+        Assert.Equal([("Encrypt", InputPath, output, ValidPassword, true)], _encryption.Calls);
         Assert.Equal(MainViewState.Succeeded, viewModel.State);
         Assert.Equal("Encrypted copy saved as \"report.pdf.enc\". Your original file was not changed.", viewModel.StatusMessage);
     }
@@ -132,6 +135,98 @@ public sealed class MainViewModelTests
         Assert.True(viewModel.DecryptCommand.CanExecute(null));
     }
 
+    // ---- Password rules when encrypting (Step 1.8 / UX spec §11.1) ------------------------------------------------
+
+    [Fact]
+    public async Task Encrypt_PasswordTooShort_IsRefusedWithAMessageAndDoesNotCallCore()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        viewModel.Password = "short7!";
+        viewModel.ConfirmPassword = "short7!";
+        _dialogs.SaveResult = InputPath + ".enc";
+
+        await viewModel.EncryptCommand.ExecuteAsync(null);
+
+        Assert.Empty(_encryption.Calls);
+        Assert.True(viewModel.IsFailed);
+        Assert.Contains("at least 8 characters", viewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Encrypt_PasswordsDoNotMatch_IsRefusedAndKeepsWhatWasTyped()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        viewModel.ConfirmPassword = ValidPassword + "x";
+        _dialogs.SaveResult = InputPath + ".enc";
+
+        await viewModel.EncryptCommand.ExecuteAsync(null);
+
+        Assert.Empty(_encryption.Calls);
+        Assert.True(viewModel.IsFailed);
+        Assert.Contains("not the same", viewModel.StatusMessage, StringComparison.Ordinal);
+        Assert.Equal(ValidPassword, viewModel.Password);
+    }
+
+    [Fact]
+    public async Task Encrypt_ConfirmationDiffersOnlyInCase_IsRefused()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        viewModel.ConfirmPassword = ValidPassword.ToUpperInvariant();
+        _dialogs.SaveResult = InputPath + ".enc";
+
+        await viewModel.EncryptCommand.ExecuteAsync(null);
+
+        Assert.Empty(_encryption.Calls);
+        Assert.True(viewModel.IsFailed);
+    }
+
+    [Fact]
+    public async Task Decrypt_AcceptsAShortPasswordWithoutConfirmation()
+    {
+        string encrypted = Path.Combine(Path.GetTempPath(), "report.pdf.enc");
+        MainViewModel viewModel = await CreateWithFileAsync(encrypted);
+        viewModel.Password = "old"; // set by another program or version: no rule is applied when decrypting
+        viewModel.ConfirmPassword = string.Empty;
+        _dialogs.SaveResult = Path.Combine(Path.GetTempPath(), "out.pdf");
+
+        await viewModel.DecryptCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.IsSucceeded);
+        Assert.Equal("old", Assert.Single(_encryption.Calls).Password);
+    }
+
+    [Fact]
+    public async Task Encrypt_OnSuccess_AlsoClearsTheConfirmation()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        _dialogs.SaveResult = InputPath + ".enc";
+
+        await viewModel.EncryptCommand.ExecuteAsync(null);
+
+        Assert.Equal(string.Empty, viewModel.ConfirmPassword);
+    }
+
+    [Fact]
+    public void StrengthAndMatchTexts_FollowWhatIsTyped()
+    {
+        MainViewModel viewModel = CreateViewModel();
+        Assert.Equal(string.Empty, viewModel.StrengthText);
+        Assert.Equal(string.Empty, viewModel.PasswordMatchText);
+
+        viewModel.Password = "abc";
+        Assert.Contains("Too short", viewModel.StrengthText, StringComparison.Ordinal);
+        Assert.Equal(15, viewModel.StrengthPercent);
+
+        viewModel.Password = "blue river coffee lamp";
+        Assert.Equal("Strong.", viewModel.StrengthText);
+        Assert.Equal(100, viewModel.StrengthPercent);
+
+        viewModel.ConfirmPassword = "blue river";
+        Assert.Contains("don't match", viewModel.PasswordMatchText, StringComparison.Ordinal);
+        viewModel.ConfirmPassword = "blue river coffee lamp";
+        Assert.Equal("Passwords match.", viewModel.PasswordMatchText);
+    }
+
     [Fact]
     public async Task Encrypt_OnFailure_KeepsFileAndPasswordAndMarksTheMessageAsFailed()
     {
@@ -142,7 +237,7 @@ public sealed class MainViewModelTests
 
         Assert.True(viewModel.IsFailed);
         Assert.NotNull(viewModel.SelectedFile);
-        Assert.Equal("secret", viewModel.Password);
+        Assert.Equal(ValidPassword, viewModel.Password);
     }
 
     [Theory]
@@ -437,13 +532,14 @@ public sealed class MainViewModelTests
         return new MainViewModel(_encryption, _detailsReader, _dialogs, _errorLog, _folderOpener);
     }
 
-    /// <summary>A ViewModel with <paramref name="path"/> chosen and the password "secret" typed.</summary>
+    /// <summary>A ViewModel with <paramref name="path"/> chosen and a valid password typed twice.</summary>
     private async Task<MainViewModel> CreateWithFileAsync(string path)
     {
         MainViewModel viewModel = CreateViewModel();
         _dialogs.OpenResult = path;
         await viewModel.BrowseCommand.ExecuteAsync(null);
-        viewModel.Password = "secret";
+        viewModel.Password = ValidPassword;
+        viewModel.ConfirmPassword = ValidPassword;
         return viewModel;
     }
 }

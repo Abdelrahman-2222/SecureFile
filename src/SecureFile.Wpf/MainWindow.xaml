@@ -4,7 +4,8 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="SecureFile"
         Icon="Assets/SecureFile.ico"
-        Width="800" Height="720"
+        Width="800" Height="860"
+        MaxHeight="{x:Static SystemParameters.MaximizedPrimaryScreenHeight}"
         MinWidth="640" MinHeight="480"
         WindowStartupLocation="CenterScreen"
         PreviewKeyDown="OnWindowKeyDown">
@@ -74,9 +75,66 @@
                     </TextBox.InputBindings>
                 </TextBox>
             </Grid>
+
+            <!-- Only when a password is being chosen (encrypting): strength advice and the confirmation box. Decrypting
+                 asks for the old password once and applies no rules to it. -->
+            <StackPanel Visibility="{Binding IsEncryptOffered, Converter={StaticResource BoolToVisibility}}">
+                <ProgressBar AutomationProperties.AutomationId="PasswordStrengthBar" AutomationProperties.Name="Password strength"
+                             Value="{Binding StrengthPercent, Mode=OneWay}" Minimum="0" Maximum="100" Height="6" Margin="0,8,0,0">
+                    <ProgressBar.Style>
+                        <Style TargetType="ProgressBar" BasedOn="{StaticResource {x:Type ProgressBar}}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding Strength}" Value="TooShort">
+                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Strength}" Value="Weak">
+                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Strength}" Value="Fair">
+                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding Strength}" Value="Strong">
+                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorSuccessBrush}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ProgressBar.Style>
+                </ProgressBar>
+                <TextBlock x:Name="StrengthLabel" AutomationProperties.AutomationId="PasswordStrengthText"
+                           Text="{Binding StrengthText}" TextWrapping="Wrap" Margin="0,4,0,0" />
+
+                <Label Content="Con_firm password" Target="{Binding ElementName=ConfirmInput}" Margin="0,12,0,4" Padding="0" FontSize="14" />
+                <Grid>
+                    <PasswordBox x:Name="ConfirmInput" AutomationProperties.AutomationId="ConfirmInput"
+                                 AutomationProperties.Name="Confirm password"
+                                 MinHeight="32" FontSize="14" VerticalContentAlignment="Center"
+                                 IsEnabled="{Binding CanEditInputs}"
+                                 MaxLength="1024" PasswordChanged="OnPasswordChanged">
+                        <PasswordBox.InputBindings>
+                            <KeyBinding Key="Return" Command="{Binding RunPrimaryCommand}" />
+                        </PasswordBox.InputBindings>
+                    </PasswordBox>
+                    <TextBox x:Name="ConfirmVisibleInput" AutomationProperties.AutomationId="ConfirmVisibleInput"
+                             AutomationProperties.Name="Confirm password (visible)"
+                             Visibility="Collapsed"
+                             MinHeight="32" FontSize="14" VerticalContentAlignment="Center"
+                             IsEnabled="{Binding CanEditInputs}"
+                             MaxLength="1024" TextChanged="OnVisiblePasswordChanged">
+                        <TextBox.InputBindings>
+                            <KeyBinding Key="Return" Command="{Binding RunPrimaryCommand}" />
+                        </TextBox.InputBindings>
+                    </TextBox>
+                </Grid>
+                <TextBlock AutomationProperties.AutomationId="PasswordMatchText" Text="{Binding PasswordMatchText}"
+                           TextWrapping="Wrap" Margin="0,4,0,0" />
+            </StackPanel>
+
             <CheckBox x:Name="ShowPasswordCheck" AutomationProperties.AutomationId="ShowPasswordCheck"
                       Content="_Show password" Margin="0,8,0,0"
                       Checked="OnShowPasswordChanged" Unchecked="OnShowPasswordChanged" />
+            <TextBlock x:Name="CapsLockWarning" AutomationProperties.AutomationId="CapsLockWarning"
+                       Text="Caps Lock is on." FontWeight="SemiBold" Visibility="Collapsed" Margin="0,8,0,0"
+                       Foreground="{DynamicResource SystemFillColorCautionBrush}" />
             <!-- When a password is being chosen the note is a caution (amber, bold, with a symbol), not an error (red):
                  red means "something failed". When decrypting it is a plain reminder. -->
             <Border CornerRadius="8" Padding="12,8" Margin="0,8,0,0" BorderThickness="1" BorderBrush="Transparent">
