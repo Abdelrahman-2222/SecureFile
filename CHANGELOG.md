@@ -104,6 +104,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - The confirm box, strength bar and the password warning appear only once a normal file is chosen (not with no file, not
   for an encrypted file); the strength and match texts are coloured to match their meaning; a visible password cannot be
   copied or cut (paste still works).
+- Encrypt (and Enter) stay disabled until the password has at least 8 characters and matches its confirmation; the
+  Encrypt/Decrypt tooltips appear only while the button is off because of the chosen file.
 - Decryption reports invalid padding after a valid tag (only possible for a file another program wrote) as
   `InvalidEncryptedFileException(Damaged)` with the original `CryptographicException` inside, so callers handle one
   documented type (Step 1.7). New constructor `InvalidEncryptedFileException(message, reason, innerException)`.

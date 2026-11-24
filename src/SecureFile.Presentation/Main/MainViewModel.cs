@@ -131,6 +131,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Gets or sets the password typed a second time; it is only checked when encrypting (a typo there loses the file for good).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(PasswordMatchText), nameof(PasswordsMatch))]
+    [NotifyCanExecuteChangedFor(nameof(EncryptCommand), nameof(RunPrimaryCommand))]
     public partial string ConfirmPassword { get; set; } = string.Empty;
 
     /// <summary>Gets the rating of the typed password (advice; only "too short" is enforced, and only when encrypting).</summary>
@@ -234,7 +235,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// encrypted. This is what Enter in the password box does (PROJECT_PLAN §11.2: Enter = primary action).
     /// </summary>
     /// <returns>A task that completes when the operation has ended.</returns>
-    [RelayCommand(CanExecute = nameof(CanRunFileOperation))]
+    [RelayCommand(CanExecute = nameof(CanRunPrimary))]
     private Task RunPrimaryAsync()
     {
         return IsEncryptedFileSelected() ? DecryptAsync() : EncryptAsync();
@@ -292,7 +293,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Encrypts the chosen file to a location the user picks (suggested: same folder, name + <c>.enc</c>).</summary>
     /// <returns>A task that completes when the encrypted file is in place.</returns>
-    [RelayCommand(CanExecute = nameof(CanRunFileOperation))]
+    [RelayCommand(CanExecute = nameof(CanEncrypt))]
     private Task EncryptAsync()
     {
         return RunGuardedAsync(() => RunFileOperationAsync(encrypt: true), clearSelectionOnFailure: false);
@@ -611,6 +612,24 @@ public sealed partial class MainViewModel : ObservableObject
     private bool CanBrowse()
     {
         return !IsBusy;
+    }
+
+    /// <summary>Encrypt also needs a password of at least the minimum length that was typed the same twice.</summary>
+    /// <returns><see langword="true"/> when the user may start encryption.</returns>
+    /// <remarks>
+    /// The button is disabled until then, with the strength and match texts saying why. The same two checks still run
+    /// when the operation starts (<see cref="RejectUnacceptableNewPassword"/>) as a safety net for any other caller.
+    /// </remarks>
+    private bool CanEncrypt()
+    {
+        return CanRunFileOperation() && Password.Length >= PasswordStrengthEvaluator.MinimumLength && PasswordsMatch;
+    }
+
+    /// <summary>Enter in the password box needs what the operation it would start needs.</summary>
+    /// <returns><see langword="true"/> when Enter may start Encrypt or Decrypt.</returns>
+    private bool CanRunPrimary()
+    {
+        return IsEncryptedFileSelected() ? CanRunFileOperation() : CanEncrypt();
     }
 
     /// <summary>Encrypt and Decrypt need a chosen file and a password, and no operation may be running.</summary>

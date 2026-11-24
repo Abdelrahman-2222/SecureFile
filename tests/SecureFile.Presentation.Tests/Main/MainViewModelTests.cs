@@ -297,8 +297,27 @@ public sealed class MainViewModelTests
         Assert.False(viewModel.DecryptCommand.CanExecute(null));
 
         viewModel.Password = " "; // spaces are characters, never trimmed
+        Assert.True(viewModel.DecryptCommand.CanExecute(null)); // Decrypt applies no password rules
+        Assert.False(viewModel.EncryptCommand.CanExecute(null)); // Encrypt also needs a long enough, confirmed password
+    }
+
+    [Fact]
+    public async Task Encrypt_IsDisabledUntilThePasswordIsLongEnoughAndConfirmed()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
         Assert.True(viewModel.EncryptCommand.CanExecute(null));
-        Assert.True(viewModel.DecryptCommand.CanExecute(null));
+        Assert.True(viewModel.RunPrimaryCommand.CanExecute(null));
+
+        viewModel.ConfirmPassword = ValidPassword + "x"; // typed differently
+        Assert.False(viewModel.EncryptCommand.CanExecute(null));
+        Assert.False(viewModel.RunPrimaryCommand.CanExecute(null)); // Enter must not bypass it
+
+        viewModel.ConfirmPassword = ValidPassword;
+        Assert.True(viewModel.EncryptCommand.CanExecute(null));
+
+        viewModel.Password = "short7!";
+        viewModel.ConfirmPassword = "short7!"; // matching but too short
+        Assert.False(viewModel.EncryptCommand.CanExecute(null));
     }
 
     [Fact]
