@@ -16,6 +16,17 @@ completely on your computer and needs no internet.
    encrypt files, because ransomware does too. Check that the zip you got matches the code you were sent (see "Check the
    download" below). If your antivirus blocks it, please tell me which one; do not turn it off.
 
+## Which computers
+
+| Your computer | In this beta |
+|---|---|
+| **Windows 10 or 11, 64-bit** | **Ready.** Follow "How to run it" below. |
+| **macOS** and **Linux** | **Not in this beta yet.** The window is built for Windows so far. The encryption engine itself is already tested on Ubuntu and macOS in the automated build, and a command-line version and a desktop version for both are planned. Your opinion on the idea still helps; tell me your system and I will send you the first build when it exists. |
+
+When the macOS and Linux builds arrive, expect these one-time steps (they are not signed yet): on a Mac, right-click the app,
+choose **Open**, then **Open** again (or run `xattr -d com.apple.quarantine <file>` in Terminal); on Linux, mark the file as
+executable (`chmod +x securefile`) and run it from a terminal.
+
 ## How to run it
 
 1. Unzip the folder anywhere (for example your Desktop).
@@ -45,7 +56,8 @@ Please answer as honestly as you like, short answers are great. Reply to the per
 4. Did Windows or your antivirus warn you? Which warning, which antivirus?
 5. Did the password rules (8 characters, confirm box) feel right, too strict, or too loose?
 6. Would you use it for real files? What is missing?
-7. Your computer (Windows 10 or 11, how big is the screen, light or dark mode) and what files you tried (types and sizes).
+7. Your computer: Windows, macOS or Linux (and which version), screen size, light or dark mode; and what files you tried
+   (types and sizes). If you are on macOS or Linux, would you use a command-line version, or do you need a window?
 8. A score from 1 (bad) to 10 (great), and one sentence why.
 
 Things I especially want to try: a very large file (over 1 GB), a file with an Arabic or emoji name, a USB stick or network
