@@ -194,7 +194,126 @@ than Linux/Windows minutes.
 | Test runner + coverage | `dotnet test --solution SecureFile.slnx -c Release --coverage` | ✅ runs (0 tests yet, expected) |
 | Cross-platform filter | `dotnet build SecureFile.CrossPlatform.slnf` | ✅ builds |
 
-### Checkpoint 0 — answer in your own words
+### 0.13 Packages per layer — and why Core has none
+
+Output of `dotnet list SecureFile.slnx package`:
+
+| Project | Packages | Why |
+|---|---|---|
+| **SecureFile.Core** | **none** | Everything it needs (AES, HMAC, PBKDF2, HKDF, random numbers, files, streams) is **built into .NET** in `System.Security.Cryptography` and `System.IO`. The task asks for the built-in .NET cryptographic APIs, so a crypto package would go *against* the task. |
+| **SecureFile.Presentation** | CommunityToolkit.Mvvm 8.4.2 | MVVM helpers (ADR-08). |
+| **SecureFile.Wpf** | none directly; CommunityToolkit.Mvvm appears as **transitive** | WPF itself is part of .NET (`UseWPF`). It gets the MVVM toolkit *through* its reference to Presentation ("transitive" = inherited from a referenced project). |
+| Test projects | xunit.v3.mtp-v2, Microsoft.Testing.Extensions.CodeCoverage (+ CsCheck in Core.Tests, NetArchTest.Rules in Architecture.Tests) | Testing, coverage, property tests, architecture rules. |
+
+**Rule: a package is added only when the step that uses it starts.** Every package is code we did not write,
+must trust, keep updated, and ship. Fewer packages means a smaller attack surface, a smaller `.exe` (graded: code size)
+and fewer things to explain. Packages planned for later steps:
+
+| Package | Added in | For |
+|---|---|---|
+| FlaUI.UIA3 | Stage 3.7 | Automated WPF UI test (clicks the real window) |
+| BenchmarkDotNet | Stage 5.1 | Performance measurements (MB/s, p95, allocations) |
+| Avalonia (+ Avalonia.Desktop, Avalonia.Themes.Fluent) | Stage 7 | Cross-platform bonus app |
+
+Packages we deliberately **do not** use: any third-party crypto library (task requires built-in .NET crypto);
+a DI container (pure DI is enough, ADR-09); logging frameworks (a small built-in log is enough for one desktop app).
+
+---
+
+## Stage 0 — Lesson: the concepts behind the setup
+
+Read this first; the checkpoint questions after it are a **self-check**, not an exam. If an answer is not clear
+after reading, that tells us which part to explain again.
+
+### Lesson 1 — The SDK, the runtime, and `global.json`
+
+- The **runtime** *runs* .NET programs. The **SDK** (Software Development Kit) *builds* them: compiler, `dotnet build`,
+  `dotnet test`, templates. Every SDK also contains a runtime.
+- Several SDKs can be installed side by side. Your PC has 9, 10 and 11. When you type `dotnet build`, the newest one
+  (11) is used **unless** a `global.json` file says otherwise.
+- `global.json` is a small note in the project folder: *"in this folder, use SDK 10.0.404 (or a newer 10.0 patch)"*.
+- **Why it matters:** the task targets .NET 10 (LTS = Long-Term Support, 3 years of security fixes). Without the pin,
+  your PC would build with SDK 11 and GitHub's CI might use another version → "works on my machine" problems.
+- **Analogy:** a recipe that says "bake at 180 °C in a gas oven" — not "use whatever oven is in the kitchen".
+
+### Lesson 2 — Target frameworks: `net10.0` vs `net10.0-windows`
+
+- A **target framework** says which set of APIs a project may use.
+- `net10.0` = only APIs that exist on **every** OS (files, crypto, math, collections…).
+- `net10.0-windows` = all of that **plus** Windows-only APIs such as WPF windows and buttons.
+- Core and Presentation are `net10.0`, so the same code runs on Windows, macOS and Linux — that is what lets the CI
+  test them on Ubuntu and macOS, and what lets Avalonia reuse them later. Only the WPF project is Windows-only.
+- **Analogy:** a phone charger with a universal USB-C plug (net10.0) vs one with a UK-only wall plug (net10.0-windows).
+  Put everything you can on the universal plug.
+
+### Lesson 3 — Layers and the dependency rule
+
+- The app is split into **layers**, each with one job:
+  - **Core** = *what* the app does (encrypt, decrypt, read file details). No buttons, no windows.
+  - **Presentation** = the *screen logic* (which file is selected, is the Encrypt button enabled, progress %) — still no real window.
+  - **Wpf** = the *actual window* (XAML layout, colors, dialogs).
+- **Dependency rule:** arrows go only one way: `Wpf → Presentation → Core`. Core never knows a UI exists.
+- **Why:**
+  1. **Reuse** — Avalonia or a command-line tool can use the same Core without changing it (graded: modularity).
+  2. **Testing** — Core can be tested with plain code, no window, on any OS.
+  3. **Change safety** — redesigning the screen can never break the encryption.
+- If Core referenced WPF, Core would become Windows-only, could not be tested on Linux/macOS, and could not be reused by Avalonia.
+- **Analogy:** a car engine (Core) does not depend on the dashboard (UI). You can put the same engine in a different car.
+
+### Lesson 4 — Warnings as errors and analyzers
+
+- **Analyzers** are rules that read your code during the build and point out problems: possible `null` crashes,
+  weak cryptography, unused code, naming mistakes. .NET has hundreds built in; `AnalysisLevel=latest-all` turns them all on.
+- Normally they produce **warnings**, which people ignore until there are hundreds. `TreatWarningsAsErrors` makes any
+  warning **stop the build**, so every problem is fixed the moment it appears.
+- **Benefit:** quality is enforced by a tool, not by memory — and it is measurable ("0 warnings").
+- **Cost:** sometimes a rule must be explained or turned off on purpose (we did that for test-name underscores, CA1707,
+  and wrote down why). You saw the benefit already: the rules found 3 real issues in Microsoft's own WPF template.
+
+### Lesson 5 — NuGet packages and Central Package Management
+
+- A **NuGet package** is a ready-made library someone else wrote (like a downloadable building block).
+- Normally each `.csproj` writes the package **and** its version. With many projects, versions drift apart
+  (project A on 8.3, project B on 8.4) → confusing bugs.
+- **Central Package Management:** versions live in **one** file, `Directory.Packages.props`. Projects only say *which*
+  package they use. Updating a version = one line, everywhere at once.
+- **Transitive package:** a package you get *through* another project (Wpf gets the MVVM toolkit through Presentation).
+- **Analogy:** one shared shopping list for a whole house, instead of every room buying its own different-brand light bulbs.
+
+### Lesson 6 — Why the window is created in `OnStartup` (and not by `StartupUri`)
+
+- The WPF template opened the window with `StartupUri="MainWindow.xaml"` — WPF creates the window *invisibly*, by name.
+- Problems: (1) the analyzer could not see the window being used (CA1812); (2) we cannot pass anything into the window,
+  but soon the window must receive its **ViewModel** (its screen logic).
+- So `App.OnStartup` now creates it in code: `MainWindow mainWindow = new(); mainWindow.Show();`
+- This one place where objects are created and connected is called the **composition root** (ADR-09).
+  In Stage 3 it will become: create Core services → create the ViewModel with them → create the window with the ViewModel.
+- **Analogy:** instead of a robot assembling the car hidden in a closed room, we assemble it on an open workbench where we
+  can choose and see every part that goes in.
+
+### Lesson 7 — Git basics used here: `.gitignore`, `.gitattributes`, commits
+
+- **Git** stores the history of the project: every **commit** is a saved snapshot with a message saying *what* and *why*.
+- **`.gitignore`** = files Git must never store: build output (`bin/`, `obj/`, re-created every build), Visual Studio's
+  private cache (`.vs/`), personal settings. Storing them bloats the repo and causes useless conflicts.
+- **`.gitattributes`** = how Git treats file *contents*. Text files can get their line endings converted
+  (Windows uses CRLF, Linux/macOS use LF). That is fine for code — but an **encrypted file** must never be touched:
+  changing even one byte breaks its HMAC seal and the decryption would correctly refuse it. So `*.enc` is marked `binary`.
+- **Conventional Commits:** `type(scope): subject`, e.g. `build: add solution structure` — readable history that tools understand.
+
+### Lesson 8 — CI (Continuous Integration)
+
+- **CI** = a computer at GitHub that, on every push, downloads the code and runs: format check → build → tests.
+- If anything fails, you see a red ❌ on GitHub; green ✅ means the code builds and passes on a **clean machine**,
+  not only on your PC.
+- Our CI has 3 machines: **Windows** builds everything (including WPF), **Ubuntu and macOS** build Core + Presentation + tests.
+  They cannot build the WPF project because WPF exists only on Windows — but they prove the encryption logic works on
+  Linux and macOS from day one (Phase 5).
+- **Dependabot** is a GitHub robot that checks weekly for newer package versions and opens a pull request for each.
+
+---
+
+### Checkpoint 0 — self-check (answer in your own words, open book)
 
 1. What does `global.json` do, and why did we need it on this machine specifically?
 2. What is the difference between `net10.0` and `net10.0-windows`? Why is Core `net10.0`?

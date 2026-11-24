@@ -44,10 +44,10 @@ So the code is written to be *read*, and every step follows the same loop.
 
 | # | What happens | Output |
 |---|---|---|
-| 1 | **Explain first.** Before code, a short explanation of the concept and the decision (with alternatives). | A few paragraphs in chat |
+| 1 | **Lesson first.** Before any code, a beginner-friendly lesson on every concept the step uses: plain definition, an everyday analogy, why we need it, and the alternatives. | "Lesson" section in `docs/LEARNING_LOG.md` + summary in chat |
 | 2 | **Small code.** One step = one small, focused piece (aim ≤ ~150 lines incl. tests). | Code + tests |
 | 3 | **Walkthrough.** Line-by-line explanation of the new code: every type, method, variable name, and why it is there. | Entry in `docs/LEARNING_LOG.md` |
-| 4 | **Checkpoint.** You answer the step's checkpoint questions *in your own words*; gaps get re-explained. | ✅ only when you can answer |
+| 4 | **Self-check (not an exam).** Open-book questions *after* the lesson; you answer in your own words, and any unclear answer just shows which part to explain again. | ✅ when the concepts are clear to you |
 | 5 | **Green.** Tests pass, analyzers clean. | Commit |
 
 ### 1.2 Code-readability rules (so every line is understandable)
