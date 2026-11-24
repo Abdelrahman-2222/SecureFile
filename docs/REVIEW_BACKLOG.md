@@ -18,6 +18,7 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 
 - **20** Cancelling the Save dialog left an old red message (test `Encrypt_SaveDialogCancelledAfterAFailure_ClearsTheOldErrorMessage`).
 - **12 (part)** A bad drop or Browse no longer clears the previous good selection (tests `OpenFile_BadDropAfterAGoodFile_KeepsThePreviousSelection`, `Browse_FileChosenAfterAFailure_...`).
+- **22 (part)** Remaining time over one hour reads "2 h 5 min" instead of "125 min 5 s" (tests `Format_MoreThanOneHourLeft_...`, `Format_ExactlyOneHourLeft_...`, culture and 99 % cases).
 - **B5, part** VM tests added: progress cleared after a failure, a bad drop keeping the old selection, Esc/Cancel with no operation, a file chosen after a failure, passwords surviving a file change; the misnamed `RunPrimary_...` test renamed.
 
 ## B. Open: from the review (grouped; do in this order)
@@ -38,7 +39,7 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 - **19** Save dialog: "choose a different name" comes only after Windows asks about replacing; Decrypt of `x.enc` suggests an extensionless name;
   `.lnk` differs between Browse and drop; the Open dialog has no filter; the read-only-target message does not name the file.
 - **21** File facts (size, encrypted or not) are read once when the file is chosen.
-- **22** Progress text: estimate includes key derivation, "125 min 5 s", "0.0 MB/s", mixed culture formats, whole-percent steps.
+- **22 (rest)** Progress text: estimate includes key derivation, "0.0 MB/s", mixed culture formats, whole-percent steps.
 - **24** Show password stays ticked for the next file; the visible box keeps an undo stack (`UndoLimit=0`); no clipboard clearing.
 - **25** Success text does not say the unencrypted original is still on disk, or the folder.
 - **28** USABILITY.md says "lock/unlock"; "Wrong password," is blunt; one vague message covers a deleted file, a folder and a broken link.
@@ -62,7 +63,7 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
   close-during-operation, or extract the sync into a testable class.
 - VM: (done in Step 5.6, see A2)
   operation; a file chosen after a failure; passwords surviving a file change. `RunPrimary_ChoosesTheOperationFromTheFileName` is misnamed.
-- `ProgressTextFormatter` above one hour, 99 % at a tiny `elapsed`, a comma-decimal culture. The Save filter (`BuildSaveFilter`). Close during an operation.
+- (`ProgressTextFormatter` tests done in Step 5.6.) Open: the Save filter (`BuildSaveFilter`). Close during an operation.
 - A "Cli is free of UI and network assemblies" rule in `SecureFile.Architecture.Tests` (the Cli project is not covered).
 
 ### B6. Documents still out of line
