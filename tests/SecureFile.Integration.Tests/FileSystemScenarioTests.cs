@@ -15,7 +15,7 @@ namespace SecureFile.Integration.Tests;
 /// </remarks>
 public sealed class FileSystemScenarioTests : IDisposable
 {
-    private const string Password = "scenario-pass";
+    private const string Password = "scenario test passphrase";
 
     private readonly TempFolderScenario _scenario = new();
 
@@ -73,7 +73,7 @@ public sealed class FileSystemScenarioTests : IDisposable
         MainViewModel viewModel = await SelectAsync(input);
         await _scenario.RunAsync(viewModel.EncryptCommand, encrypted);
         await _scenario.BrowseAsync(viewModel, encrypted);
-        viewModel.Password = "another-pass";
+        viewModel.Password = "a different passphrase";
 
         await _scenario.RunAsync(viewModel.DecryptCommand, _scenario.PathOf("secret.out.txt"));
 
