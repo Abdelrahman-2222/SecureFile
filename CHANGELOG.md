@@ -99,6 +99,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Password rules when encrypting: at least 8 characters, a confirmation box that must match, an advisory strength bar and
   text (`PasswordStrengthEvaluator`, plan Step 1.8), and a Caps Lock warning. Decrypting applies no rules and shows no
   confirmation box. No symbol/digit rules on purpose.
+- The window height now follows its content: it grows when text appears (match line, messages, the confirm box) and
+  shrinks when it goes away, up to the screen height, after which it scrolls.
 - Decryption reports invalid padding after a valid tag (only possible for a file another program wrote) as
   `InvalidEncryptedFileException(Damaged)` with the original `CryptographicException` inside, so callers handle one
   documented type (Step 1.7). New constructor `InvalidEncryptedFileException(message, reason, innerException)`.

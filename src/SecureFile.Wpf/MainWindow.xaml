@@ -4,7 +4,7 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="SecureFile"
         Icon="Assets/SecureFile.ico"
-        Width="800" Height="780"
+        Width="800" SizeToContent="Height"
         MaxHeight="{x:Static SystemParameters.MaximizedPrimaryScreenHeight}"
         MinWidth="640" MinHeight="480"
         WindowStartupLocation="CenterScreen"
