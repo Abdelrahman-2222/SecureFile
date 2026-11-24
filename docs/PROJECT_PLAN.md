@@ -117,6 +117,38 @@ which Visual Studio shows in IntelliSense and which can be turned into a browsab
 site with **DocFX** if wanted. If a REST API is ever added (for example a v2 server version), Swagger/OpenAPI
 becomes required for it.
 
+### 1.7 Quality gate — checked before EVERY commit and push (mandatory)
+
+No step is committed, pushed or marked done until **every** item below is checked. Automated items run with one
+command, and the `pre-push` Git hook runs them by itself, so a failing push is impossible:
+
+```powershell
+pwsh -File scripts/verify.ps1
+```
+
+| # | Area | Check | How it is verified | Automated |
+|---|---|---|---|---|
+| G1 | Requirements | The step's "Done when" is met; traceability (§15) still true | Review against §7 and §15 | Manual |
+| G2 | Code quality | Formatting matches `.editorconfig` | `dotnet format --verify-no-changes` | ✅ verify.ps1 |
+| G3 | Code quality / security | Build with **all analyzers** (incl. CA53xx crypto rules): 0 warnings | `dotnet build -c Release` | ✅ verify.ps1 |
+| G4 | Tests | All tests pass; new behaviour has tests for normal, edge and invalid cases | `dotnet test` + review of §9 catalog | ✅ + manual review |
+| G5 | Code quality | Core coverage ≥ 90 % lines, ≥ 85 % branches | Microsoft Code Coverage + ReportGenerator | ✅ verify.ps1 |
+| G6 | Security | 0 vulnerable NuGet packages (incl. indirect) | `dotnet list package --vulnerable --include-transitive` | ✅ verify.ps1 |
+| G7 | Security | No secrets, private keys or tokens in tracked files | Pattern scan (`git grep`) | ✅ verify.ps1 |
+| G8 | Exceptions / security | No `catch (Exception)` in Core/Presentation, no empty `catch`, no `throw ex;`, no `async void` in libraries, no `System.Random`, no whole-file reads in Core, no console output | Pattern scan | ✅ verify.ps1 |
+| G9 | Exceptions | Every thrown exception is documented (`<exception>`); messages contain no secrets; cleanup in `using`/`finally` (ADR-13) | Review | Manual |
+| G10 | Modularity | Layer rule holds (Core → no UI; Presentation → no UI framework); Core classes sealed | Architecture tests | ✅ (tests) |
+| G11 | Modularity / quality | Cyclomatic complexity ≤ 10 per method; Maintainability Index ≥ 60 per type **and** method | Built-in analyzers CA1502/CA1505 with `CodeMetricsConfig.txt` (same numbers as VS *Calculate Code Metrics*) | ✅ build |
+| G12 | Test strength | Mutation score ≥ 80 % on changed Core code | `dotnet stryker` | Manual (per step) |
+| G13 | Performance | No whole-file loading; no needless allocations in loops; measured when the step is performance-relevant | Review + quick measurement / BenchmarkDotNet (Stage 5) | Manual |
+| G14 | Documentation | XML docs on all public members (build-enforced); CHANGELOG; LEARNING_LOG lesson + walkthrough; plan status | Build (CS1591) + review | Partly |
+| G15 | Git | Conventional Commit message; **no AI attribution**; one logical change per commit | `commit-msg` hook + verify.ps1 | ✅ hooks |
+
+**One-time setup per clone:** `git config core.hooksPath .githooks` (enables the `commit-msg` and `pre-push` hooks).
+
+The results of the manual items (G1, G9, G11–G13) are written in the step's "Quality gate" table in
+`docs/LEARNING_LOG.md`.
+
 ---
 
 ## 2. The task: requirements and how we are graded
@@ -286,6 +318,70 @@ We need **two different keys**: one for AES, one for HMAC (never reuse one key f
 No telemetry and no network calls. A file-encryption tool that sends data out is a privacy risk.
 We measure performance locally (profilers, benchmarks), not with Datadog-style monitoring.
 
+### ADR-13 — Exception handling: three layers, "never crash, never lie"
+
+Based on Microsoft Learn: *Best practices for exceptions*, `Application.DispatcherUnhandledException` (WPF),
+`AppDomain.UnhandledException`, `TaskScheduler.UnobservedTaskException`, and `Application.ThreadException` (WinForms).
+Full record: [adr/0013-exception-handling.md](adr/0013-exception-handling.md).
+
+**Goal:** the app never crashes on any user action, never shows a stack trace, never leaves a half-written file,
+and never hides a real failure (no "swallowed" exceptions).
+
+| Option | Problem | Verdict |
+|---|---|---|
+| `try/catch (Exception)` around everything, show "Error" | Hides bugs, catches things that cannot be recovered, gives the user no useful message. Microsoft: *"if you can't recover, don't catch"*. | ❌ |
+| Catch nothing; rely on the default crash dialog | The app closes and the user loses their place. | ❌ |
+| Return error codes / `bool` everywhere instead of exceptions | Errors are easy to ignore by mistake; not the .NET convention. | ❌ (except `Try…` methods for *common* cases) |
+| **Three layers: Core throws precise exceptions → ViewModel catches expected ones at the user action → global safety nets log and show a friendly message for anything unexpected** | Each layer does one job; expected errors get specific messages; unexpected ones are logged, never silent. | ✅ |
+
+**Layer 1 — Core (throws, rarely catches)**
+
+| Rule (Microsoft guidance) | How we apply it |
+|---|---|
+| Validate inputs first with throw helpers | `ArgumentNullException.ThrowIfNull`, `ArgumentException.ThrowIfNullOrWhiteSpace`, `ArgumentOutOfRangeException.ThrowIfNegative`… |
+| Use predefined exception types | `ArgumentException` family, `FileNotFoundException`, `IOException`, `InvalidOperationException`, `OperationCanceledException`. |
+| Custom exceptions only when the caller must react differently | `SecureFileException` (base) → `InvalidEncryptedFileException` (not our file / damaged header), `AuthenticationFailedException` (wrong password or tampered). Names end in `Exception`; the three standard constructors. (Step 1.7) |
+| If you can't recover, don't catch | Core never catches `Exception`. It catches only to clean up and rethrow with `throw;` (keeps the stack trace). |
+| Clean up with `using` / `finally`; restore state | Streams in `using`; key buffers wiped in `finally`; temp file deleted on any failure → **no side effects after an exception** (ADR-07). |
+| Document every exception | `<exception cref="…">` on every public member (§1.4). |
+| Async: validate arguments before the async part; cancellation = `OperationCanceledException` | Guard clauses run synchronously; `CancellationToken.ThrowIfCancellationRequested()` in loops. |
+| Never put secrets in messages | Messages never contain passwords, keys or file contents. |
+
+**Layer 2 — Presentation (handles expected errors at the user action)**
+
+Each command (Browse, Encrypt, Decrypt) has one `try/catch` with **specific** catches, most specific first:
+
+| Exception | User sees (example) |
+|---|---|
+| `OperationCanceledException` | "Cancelled. No file was written." |
+| `AuthenticationFailedException` | "Wrong password, or the file was changed or damaged." |
+| `InvalidEncryptedFileException` | "This is not a SecureFile encrypted file, or it is damaged." |
+| `FileNotFoundException` / `DirectoryNotFoundException` | "The file or folder can't be found or opened." |
+| `UnauthorizedAccessException` | "Windows denied access. Choose another folder or check permissions." |
+| `PathTooLongException` | "The path is too long. Choose a shorter folder or name." |
+| `IOException` (incl. disk full, file in use) | "The file couldn't be read or written: {reason}." |
+
+The mapping lives in one small, unit-tested class (`ErrorMessageProvider`), so every message is consistent and
+testable. The ViewModel does **not** catch `Exception` — anything unexpected goes to Layer 3.
+
+**Layer 3 — WPF app (global safety nets, registered first thing in `App.OnStartup`)**
+
+| Event | Catches | What we do |
+|---|---|---|
+| `Application.DispatcherUnhandledException` | Unhandled exceptions on the **UI thread** | Log details; show a friendly dialog; `e.Handled = true` → the app keeps running. |
+| `AppDomain.CurrentDomain.UnhandledException` | Unhandled exceptions on **any other thread** | Log only — Microsoft: it *cannot* prevent the app from closing. |
+| `TaskScheduler.UnobservedTaskException` | Faulted tasks nobody awaited | Log and `SetObserved()`. (In .NET Core it no longer crashes the app, but it would hide a bug.) |
+
+**WinForms equivalent (for comparison in the presentation):** `Application.ThreadException` +
+`Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException)` (set before `Application.Run`)
+plays the role of WPF's `DispatcherUnhandledException`; `AppDomain.UnhandledException` is the same in both.
+
+**Logging:** a small local log file (`%LOCALAPPDATA%\SecureFile\logs`) with time, exception type, message and stack
+trace — **never** passwords, keys or file contents. No network (ADR-12).
+
+**Rules for our own code:** no `async void` except UI event handlers; no empty `catch { }`; no `throw ex;`
+(use `throw;`); no exception used for normal flow (e.g. "is this our file?" is a `TryRead…` check, not an exception).
+
 ---
 
 ## 5. Crypto design: the encrypted file format and the two flows
@@ -405,13 +501,13 @@ Why does Core not reference WPF? What does `TreatWarningsAsErrors` buy us?
 
 | Step | Goal | Done when | Status |
 |---|---|---|---|
-| 1.1 | `FileDetails` (name, size in bytes, extension, last modified) + `FileSizeFormatter` (`1.5 MB`). | Unit tests for 0 B, 1023 B, 1 KB, >4 GB, no extension, `.tar.gz`, `.bashrc`. | 🟨 done (31 tests, 100 % coverage) — self-check pending |
+| 1.1 | `FileDetails` (name, size in bytes, extension, last modified) + `FileSizeFormatter` (`1.5 MB`). | Unit tests for 0 B, 1023 B, 1 KB, >4 GB, no extension, `.tar.gz`, `.bashrc`. | 🟨 done — quality gate passed (G1–G15, mutation 100 %) — self-check pending |
 | 1.2 | `EncryptedFileFormat` constants + `EncryptedFileHeader` (write/read/validate). | Tests: round-trip, wrong magic, unknown version, iterations out of range, file too short. | ⬜ |
 | 1.3 | `KeyDerivation`: PBKDF2 → HKDF (§5.2), NFC normalization, key wiping. | Known-answer tests: RFC 7914 §11 (PBKDF2-HMAC-SHA256), RFC 5869 test case 1 (HKDF-SHA256). | ⬜ |
 | 1.4 | AES-CBC check against NIST: prove we call `Aes` correctly. | NIST SP 800-38A F.2.5/F.2.6 (CBC-AES256) vectors pass (with `PaddingMode.None` for the vector). | ⬜ |
 | 1.5 | `FileEncryptionService.EncryptAsync` (§5.3): streaming, HMAC, progress, cancel, temp + move. | Round-trip tests at 0, 1, 15, 16, 17 bytes, 1 MiB ± 1; same input → different output each time. | ⬜ |
 | 1.6 | `FileEncryptionService.DecryptAsync` (§5.4): verify-then-commit. | Wrong password and every tamper/truncation case fail **and leave no output file**. | ⬜ |
-| 1.7 | Error model: `SecureFileException` + specific types (`InvalidEncryptedFileException`, `AuthenticationFailedException`, …) mapped to user messages. | Every failure in §9 maps to one clear message. | ⬜ |
+| 1.7 | Error model (ADR-13 Layer 1): `SecureFileException` + `InvalidEncryptedFileException`, `AuthenticationFailedException` with the three standard constructors. | Every failure in §9 maps to one exception type; tests prove no partial output. | ⬜ |
 | 1.8 | `PasswordStrengthEvaluator` (simple rules: length + character variety) and `PasswordGenerator` (`RandomNumberGenerator`). | Tests for empty, short, long, Unicode passwords. | ⬜ |
 
 **Checkpoint 1:** What is an IV and why must it be random for CBC? Why a salt? Why 600,000 iterations,
@@ -428,6 +524,7 @@ Why `FixedTimeEquals` instead of `==`? Why HKDF instead of 64 bytes from PBKDF2?
 | 2.3 | Commands: Browse, Encrypt, Decrypt, Cancel, Generate password, Open folder; `CanExecute` rules. | Buttons enable/disable correctly in tests. | ⬜ |
 | 2.4 | Auto-detect: if the file starts with `SFEN`, suggest Decrypt; otherwise Encrypt. | Tests for both cases. | ⬜ |
 | 2.5 | ViewModel tests with fake services (no window needed). | Presentation coverage ≥ 85%. | ⬜ |
+| 2.6 | `ErrorMessageProvider` + per-command `try/catch` with specific catches (ADR-13 Layer 2). | Every exception in the ADR-13 table gives its message; unexpected exceptions are **not** caught here. | ⬜ |
 
 **Checkpoint 2:** What is MVVM and what lives in each part? What is data binding? What does
 `[ObservableProperty]` generate? Why can we test a ViewModel without opening a window?
@@ -436,7 +533,7 @@ Why `FixedTimeEquals` instead of `==`? Why HKDF instead of 64 bytes from PBKDF2?
 
 | Step | Goal | Done when | Status |
 |---|---|---|---|
-| 3.1 | `App.xaml` + pure-DI composition in `OnStartup` (ADR-09). | App starts and shows the main window. | ⬜ |
+| 3.1 | `App.xaml` + pure-DI composition in `OnStartup` (ADR-09) + **global exception safety nets and local log** (ADR-13 Layer 3). | App starts; a forced test exception shows the friendly dialog, is logged, and the app keeps running. | ⬜ |
 | 3.2 | Main window layout per §11 (drop zone, file card, password, output, actions, progress, status). | Matches the UX spec screenshot. | ⬜ |
 | 3.3 | Fluent theme, light/dark following Windows, consistent spacing and sizes. | Looks right at 100%, 150%, 200% scaling. | ⬜ |
 | 3.4 | Drag-and-drop, native Open/Save dialogs, keyboard shortcuts, `AutomationProperties.Name` on all controls. | Full flow possible with keyboard only. | ⬜ |
@@ -550,7 +647,7 @@ Targets are measured on one reference machine (recorded in the report: CPU, RAM,
 
 | Tool | Target |
 |---|---|
-| VS *Analyze → Calculate Code Metrics* | Maintainability Index ≥ 70 per class; cyclomatic complexity ≤ 10 per method; inheritance depth ≤ 3 |
+| CA1502/CA1505 analyzers (build-enforced) + VS *Analyze → Calculate Code Metrics* for the report | Maintainability Index ≥ 60 per type and method (Microsoft: 20–100 = good; first target of 70 proved too strict when applied to every small method — see LEARNING_LOG Step 1.1 gate); cyclomatic complexity ≤ 10 per method; inheritance depth ≤ 3 |
 | Architecture tests (NetArchTest) | Core has no UI references; Presentation has no WPF/Avalonia references |
 | Reuse demonstration | Core used by WPF, Avalonia, CLI and tests; `dotnet pack` builds a NuGet package |
 
@@ -889,3 +986,4 @@ whether the WPF Fluent `ThemeMode` API is still marked experimental in .NET 10, 
 | 2026-11-24 | Environment check | SDKs installed: 9.0.308, 11.0.100 (no 10.0 SDK). Runtime 10.0.15 present. Existing `EncryptionHandling` = empty WinForms template. Not a git repo. |
 | 2026-11-24 | Stage 0 | .NET 10 SDK 10.0.404 + GitHub CLI installed; solution, projects, shared build rules, packages, editorconfig, gitattributes, local tools, CI, docs created. Build: 0 warnings. Walkthrough in LEARNING_LOG.md. |
 | 2026-11-24 | Step 1.1 | FileDetails, IFileDetailsReader, FileDetailsReader, FileSizeFormatter + 31 tests (incl. property-based), 100 % coverage. Style rules refined: interface members, static readonly naming. |
+| 2026-11-24 | Step 1.1 revision | ADR-13 exception strategy; quality gate §1.7 with verify.ps1, Git hooks, metric limits (CA1502/CA1505), architecture tests; Stryker mutation score 100 %. |

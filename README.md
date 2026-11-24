@@ -27,8 +27,15 @@ optionally Visual Studio 2026.
 
 ```powershell
 dotnet tool restore
+git config core.hooksPath .githooks   # once per clone: enables the quality-gate hooks
 dotnet build SecureFile.slnx -c Release
 dotnet test --solution SecureFile.slnx -c Release
+```
+
+Before every push, the `pre-push` hook runs the full quality gate. Run it manually any time:
+
+```powershell
+pwsh -File scripts/verify.ps1
 ```
 
 ## Repository layout

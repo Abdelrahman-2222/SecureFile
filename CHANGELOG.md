@@ -11,6 +11,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - File details for the selected file: name, extension, size in bytes, full path and last change time (UTC)
   (`FileDetails`, `IFileDetailsReader`, `FileDetailsReader`).
 - `FileSizeFormatter`: human-readable sizes (`1.5 MB`) with binary units and culture-aware decimals.
+- Quality gate: `scripts/verify.ps1` (format, build, tests, Core coverage limits, vulnerable packages, secrets,
+  forbidden code patterns, AI-attribution check) and Git hooks (`commit-msg`, `pre-push`) in `.githooks/`.
+- Code-metric limits enforced by the build: cyclomatic complexity ≤ 10 (CA1502), Maintainability Index ≥ 60 (CA1505).
+- Architecture tests for the layer rule (Core and Presentation free of UI dependencies; Core classes sealed).
+- Exception-handling strategy ADR-13 (Core throws, ViewModel handles expected errors, global safety nets).
 - Solution `SecureFile.slnx` with projects `SecureFile.Core`, `SecureFile.Presentation`, `SecureFile.Wpf`
   and test projects for core, presentation, integration and architecture tests.
 - `SecureFile.CrossPlatform.slnf` solution filter for building on macOS and Linux.

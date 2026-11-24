@@ -21,3 +21,4 @@ Each one gets its own file (using [0000-template.md](0000-template.md)) when the
 | ADR-10 | xUnit v3 on Microsoft.Testing.Platform | Accepted | Stage 0 |
 | ADR-11 | Self-contained single-file `.exe` | Accepted | Stage 6 |
 | ADR-12 | No telemetry, no network calls | Accepted | All |
+| [ADR-13](0013-exception-handling.md) | Exception handling in three layers (Core throws, ViewModel handles expected, global safety nets) | Accepted | Steps 1.7, 2.6, 3.1 |

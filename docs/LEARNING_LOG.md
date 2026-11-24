@@ -486,3 +486,115 @@ still-empty test projects, each with a note to remove it when their first test a
 6. Why do the tests pass `CultureInfo.InvariantCulture`, while the app will pass the user's culture?
 7. What is the difference between `[Fact]` and `[Theory]`?
 8. What does the property-based test check, and why is that stronger than examples alone?
+
+### Step 1.1 — revision: exception handling and the quality gate (2026-11-24)
+
+You asked two things: *"are all possible errors handled so the app never crashes?"* and *"verify every requirement
+before any commit or push."* This revision answers both.
+
+#### Lesson — exceptions in .NET (from Microsoft Learn)
+
+- An **exception** is .NET's way of saying "this operation could not be completed". If nobody catches it, it travels
+  up the call chain; if it reaches the top, the app closes.
+- **Catch only what you can handle.** Microsoft's first rule: *if your code can't recover, don't catch* — let a
+  higher level (that can show a message or retry) handle it. Catching everything hides bugs.
+- **Throw early with clear types** (guard clauses), **document** what you throw, and **clean up** with `using`/`finally`
+  so a failure leaves no half-finished work.
+- **Exception families:** `FileNotFoundException`, `DirectoryNotFoundException` and `PathTooLongException` all *derive*
+  from `IOException`. One `catch (IOException)` therefore handles every file-system problem.
+- **Global safety nets (WPF):** `Application.DispatcherUnhandledException` (UI thread — can keep the app alive),
+  `AppDomain.CurrentDomain.UnhandledException` (other threads — can only log), `TaskScheduler.UnobservedTaskException`
+  (forgotten tasks). **WinForms** uses `Application.ThreadException` + `SetUnhandledExceptionMode` instead of the first one.
+- Our design (**ADR-13**, PROJECT_PLAN §4): **Core throws** precise exceptions → **ViewModel catches the expected ones**
+  per button and shows a specific message → **global safety nets** log and show a friendly message for anything
+  unexpected. So: never crash, never a stack trace on screen, never a silent failure.
+
+**What Step 1.1 can throw — checked by experiment, not only by reading docs:**
+
+| Input | Exception | Note |
+|---|---|---|
+| `null` | `ArgumentNullException` (ParamName `filePath`) | our guard |
+| `""`, `"   "` | `ArgumentException` (ParamName `filePath`) | our guard — needed because `"   "` is a valid name on Linux/macOS |
+| null character in path | `ArgumentException` | thrown by .NET |
+| missing file, folder, invalid characters, missing drive, unreachable server, access denied | `FileNotFoundException` | `FileInfo.Exists` reports all of these as "does not exist" |
+| path far beyond the OS limit | `PathTooLongException` (Windows) / `FileNotFoundException` (Linux/macOS) | both are `IOException` |
+| file deleted between the check and reading the size | `FileNotFoundException` / `IOException` | rare race; documented |
+
+The interface documentation (`IFileDetailsReader`) now lists all of these, and new tests cover them.
+Today nothing crashes the app because the app does not yet *call* Core; the ViewModel handling (step 2.6) and the
+global safety nets (step 3.1) are scheduled in the plan.
+
+#### Lesson — the quality gate
+
+A **quality gate** is a list of checks that must *all* pass before work moves forward. Ours (PROJECT_PLAN §1.7) has
+15 items (G1–G15) covering requirements, security, performance, modularity, code quality, documentation and Git.
+
+- **Automated:** `pwsh -File scripts/verify.ps1` runs format, build, tests, coverage limits, vulnerable packages,
+  secrets scan, forbidden code patterns (ADR-13 rules) and the AI-attribution check, then prints PASS/FAIL per check.
+- **Enforced by Git hooks** (`git config core.hooksPath .githooks`):
+  - `commit-msg` rejects AI attribution and messages that are not `type(scope): subject`;
+  - `pre-push` runs `verify.ps1` and cancels the push if anything fails.
+- **Code metrics in the build:** analyzers **CA1502** (cyclomatic complexity ≤ 10 per method) and **CA1505**
+  (Maintainability Index ≥ 60) read `CodeMetricsConfig.txt`.
+  - *Cyclomatic complexity* = number of independent paths through a method (each `if`, loop, `&&` adds one).
+  - *Maintainability Index* = 0–100 score from code size, complexity and vocabulary; Microsoft rates 20–100 as good.
+- **Mutation testing (Stryker.NET):** the tool changes the code on purpose (e.g. `>=` → `>`, `"TB"` → `""`, removes a line)
+  and re-runs the tests. If no test fails, that change "survived" → a gap in the tests.
+- **A gate must be able to fail:** every new check was proven by injecting a real violation (an over-complex method,
+  `catch (Exception) { }`, `new Random()`, an AI attribution line, a badly formatted commit message) and seeing it rejected.
+
+#### What the gate found in Step 1.1 — and the fixes
+
+| Finding | Fix |
+|---|---|
+| `latest-all` does **not** switch on CA1502/CA1505 (found because the first probe was not flagged) | Enabled them explicitly in `.editorconfig` |
+| `FileSizeFormatter.Format` Maintainability Index 61 (< first target 70) | Extracted `ScaleToLargestFittingUnit` and `RoundForDisplay` — each step now has a name |
+| A clear 10-line method still scored 66–69: 70 applied to *every method* is stricter than intended | Limit set to **60** (3× Microsoft's "good" line of 20; tangled code at 51 still fails). Recorded in the plan. |
+| A test's `[InlineData]` table counted as "unmaintainable" | CA1505 off for tests (data tables ≠ logic); CA1502 still on |
+| Mutation: removing our guard clause went unnoticed (FileInfo throws a similar error itself) | Tests now assert `ParamName == "filePath"` |
+| Mutation: emptying the exception message went unnoticed | Test asserts the message is not empty |
+| Mutation: changing `"TB"` went unnoticed (random sizes almost never land in TB) | Added exact 1 TB and 1 PB examples |
+
+**Walkthrough of the refactored `FileSizeFormatter`:**
+
+| Code | Meaning |
+|---|---|
+| `(double size, int unitIndex) = ScaleToLargestFittingUnit(sizeInBytes);` | Call the helper and **deconstruct** its two results into two variables in one line. |
+| `private static (double Size, int UnitIndex) ScaleToLargestFittingUnit(long sizeInBytes)` | Returns a **tuple**: two values at once, each with a name. `private` = only this class uses it. |
+| `int largestUnitIndex = UnitNames.Length - 1;` | Named value for "the index of EB", instead of an expression inside the loop condition. |
+| `while (unitIndex < largestUnitIndex && RoundForDisplay(size) >= BytesPerUnitStep)` | Same logic as before, now readable as a sentence. |
+| `private static double RoundForDisplay(double value)` | One job: round exactly like the `0.##` text format, so the check and the display always agree. |
+
+**New architecture tests** (`tests/SecureFile.Architecture.Tests/LayerDependencyTests.cs`):
+`Core_DoesNotDependOnPresentationOrAnyUserInterface`, `Presentation_DoesNotDependOnAnyUserInterfaceFramework`,
+`Core_ConcreteClasses_AreSealed`. They use NetArchTest to read the compiled code and check the rules; the alias
+`using ArchitectureTestResult = NetArchTest.Rules.TestResult;` avoids a name clash with xUnit's own `TestResult`.
+
+#### Quality gate — Step 1.1 results
+
+| # | Check | Result |
+|---|---|---|
+| G1 | Requirement R2 (name, size, extension) | ✅ implemented and tested |
+| G2 | Format | ✅ clean |
+| G3 | Build, all analyzers incl. CA53xx | ✅ 0 warnings |
+| G4 | Tests | ✅ 40 passed, 0 failed (normal, edge, invalid, property-based) |
+| G5 | Core coverage | ✅ 100 % lines, 100 % branches |
+| G6 | Vulnerable packages | ✅ none |
+| G7 | Secrets | ✅ none |
+| G8 | Forbidden patterns | ✅ clean (7 rules) |
+| G9 | Exceptions documented, no secrets in messages | ✅ all 5 exception types documented |
+| G10 | Architecture | ✅ 3 tests pass |
+| G11 | Metrics | ✅ complexity ≤ 10, Maintainability Index ≥ 60 (build-enforced) |
+| G12 | Mutation score | ✅ **100 %** (26 of 26 mutants killed; first run 88.5 % → gaps fixed) |
+| G13 | Performance | ✅ `Format` 0.36 µs/call, allocates only the result (47 B); `Read` p50 26.5 µs, p95 28.1 µs (i7-8750H, HDD) — far below one 16 ms frame |
+| G14 | Docs | ✅ XML docs (build-enforced), changelog, this log, plan |
+| G15 | Git | ✅ hooks active; Conventional Commits; no AI attribution |
+
+#### Self-check — revision (open book)
+
+1. Why should Core *not* catch `Exception`? Where are unexpected exceptions handled instead?
+2. Why does one `catch (IOException)` cover `FileNotFoundException` and `PathTooLongException`?
+3. Which WPF event can keep the app alive after an error, and which can only log?
+4. Why did we keep our own guard clause although `FileInfo` throws for empty paths too?
+5. What is mutation testing, and what did it reveal that 100 % coverage did not?
+6. Why is a gate check useless unless you have seen it fail once?
