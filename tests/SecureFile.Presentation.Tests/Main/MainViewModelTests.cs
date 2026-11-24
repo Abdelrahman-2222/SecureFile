@@ -14,7 +14,7 @@ public sealed class MainViewModelTests
     private static readonly string InputPath = Path.Combine(Path.GetTempPath(), "report.pdf");
 
     /// <summary>A password that Encrypt accepts: at least 8 characters, typed twice.</summary>
-    private const string ValidPassword = "secret-pass-1";
+    private const string ValidPassword = "secret pass one";
 
     private readonly FakeFileEncryptionService _encryption = new();
     private readonly FakeFileDialogService _dialogs = new();
