@@ -68,7 +68,8 @@ checked: nothing leaves your computer.** Every suggestion below serves one of th
 | Screen-reader announcements, high-contrast check, small screens and high scaling | Usable by everyone; needs a person with a screen reader | Should | M | B3 |
 | **Passphrase generator** ("blue river coffee lamp"), local word list, secure random, clipboard cleared after 30 s | Memorable and strong passwords | Should | S | B2 (24, 38) |
 | ✅ Success message reminds that the unencrypted original is still on disk (built in Stage 9.0) | People do not think the original is gone | Could | S | B2 (25) |
-| Larger list of common passwords, including Arabic | Better advice on weak passwords | Could | S | C3 |
+| Larger list of common passwords, including Arabic, and **refuse** a password found on it (like Too short), as NIST SP 800-63B recommends | Stops `Password1234`-style choices, which advice alone does not | Should | S | C3, C24 |
+| ❌ Decided against (2026-11-25): an "Encrypt anyway?" dialog for a Weak password. The warning is already beside the field before the user acts; a confirm dialog gets clicked through by habit and adds friction without stopping weak choices. Weak stays an amber caution with its own status text; the common-password refusal above is the real fix | Recorded so later stages do not reopen it | — | — | C24 |
 | "This looks like a key or password file" hint | Helps people notice what they protect | Could | S | — |
 | Right-click "Encrypt with SecureFile" in Explorer / Finder | Fits how people already work | Could | M | — |
 | Encrypt a whole folder or a batch | A common real need (also for the command line) | Could | M | C11 |

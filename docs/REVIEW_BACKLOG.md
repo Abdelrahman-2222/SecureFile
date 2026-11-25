@@ -97,6 +97,7 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 | C21 | Avalonia window has no automated UI test on a real (non-headless) desktop and no screen-reader check; the headless test covers bindings, clipboard guard and one encrypt/decrypt round trip | Stage 7; manual checklist in `docs/NEXT_STEP_PROMPT.md` |
 | C22 | Stryker (mutation testing) has never run on the CLI's pure logic (argument parser, password and path resolvers) | Recorded in Stage 8; Core has 100 %, Presentation is C18 |
 | C23 | Stage 9.0 review, low: `FileIdentity` collapses `..` inside a link target as text (a target like `sub/../x` where `sub` is a link can be missed); WPF drop highlight may flicker when the pointer crosses a child of the drop zone; no headless test of Enter-to-Confirm in Avalonia | Contrived or cosmetic; add the Avalonia key test in 9.1 |
+| C24 | A password on the common-password list (such as `Password1234`) is only rated Weak and can still be used; advice alone does not stop it. Decided 2026-11-25: no "Encrypt anyway?" dialog (clicked through by habit); instead refuse listed passwords like Too short, and grow the list (Arabic too, `docs/SUGGESTIONS.md`) | Small Core + ViewModel change with tests; Stage 9.x or a later release, not a merge blocker |
 
 ## D. How to burn this down
 
