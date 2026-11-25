@@ -570,6 +570,31 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public async Task SaveDialogOpen_LocksInputs_AndEncryptsWithThePasswordCheckedBefore()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        viewModel.Password = ValidPassword;
+        viewModel.ConfirmPassword = ValidPassword;
+        var save = new TaskCompletionSource<string?>();
+        _dialogs.PendingSave = save.Task;
+
+        Task running = viewModel.EncryptCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.IsChoosingOutput);
+        Assert.False(viewModel.CanEditInputs);
+        Assert.False(viewModel.BrowseCommand.CanExecute(null));
+        Assert.False(viewModel.OpenFileCommand.CanExecute(InputPath));
+        Assert.False(viewModel.DecryptCommand.CanExecute(null));
+        viewModel.Password = "x"; // a dialog that does not block the window (Linux portal) let the user type
+
+        save.SetResult(InputPath + ".enc");
+        await running;
+
+        Assert.False(viewModel.IsChoosingOutput);
+        Assert.Equal(ValidPassword, Assert.Single(_encryption.Calls).Password);
+    }
+
+    [Fact]
     public async Task OpenFolder_FileManagerFails_KeepsTheSuccessMessageAndAddsTheHint()
     {
         MainViewModel viewModel = await CreateWithFileAsync(InputPath);
@@ -577,8 +602,8 @@ public sealed class MainViewModelTests
         _folderOpener.Result = false;
         await viewModel.EncryptCommand.ExecuteAsync(null);
 
-        viewModel.OpenFolderCommand.Execute(null);
-        viewModel.OpenFolderCommand.Execute(null); // twice: the hint is not appended twice
+        await viewModel.OpenFolderCommand.ExecuteAsync(null);
+        await viewModel.OpenFolderCommand.ExecuteAsync(null); // twice: the hint is not appended twice
 
         Assert.True(viewModel.IsSucceeded);
         Assert.StartsWith("Encrypted copy saved as", viewModel.StatusMessage, StringComparison.Ordinal);

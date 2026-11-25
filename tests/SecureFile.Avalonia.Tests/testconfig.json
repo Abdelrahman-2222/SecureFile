@@ -1,0 +1,14 @@
+{
+  "codeCoverage": {
+    "Configuration": {
+      "CodeCoverage": {
+        "ModulePaths": {
+          "Include": [
+            ".*SecureFile\\.Core\\.dll$",
+            ".*SecureFile\\.Presentation\\.dll$"
+          ]
+        }
+      }
+    }
+  }
+}

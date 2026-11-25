@@ -16,6 +16,11 @@
   <ItemGroup>
     <!-- MVVM helpers from Microsoft (ADR-08): ObservableObject, RelayCommand, source generators. -->
     <PackageVersion Include="CommunityToolkit.Mvvm" Version="8.4.2" />
+    <!-- Cross-platform UI for the macOS and Linux windows (Stage 7, bonus). One version for all Avalonia packages. -->
+    <PackageVersion Include="Avalonia" Version="12.2.0" />
+    <PackageVersion Include="Avalonia.Desktop" Version="12.2.0" />
+    <PackageVersion Include="Avalonia.Themes.Fluent" Version="12.2.0" />
+    <PackageVersion Include="Avalonia.Fonts.Inter" Version="12.2.0" />
   </ItemGroup>
 
   <!-- Test packages. -->
@@ -31,6 +36,8 @@
     <!-- Drives the real WPF window through Windows UI Automation (Step 3.7, T-40). -->
     <PackageVersion Include="FlaUI.Core" Version="5.0.0" />
     <PackageVersion Include="FlaUI.UIA3" Version="5.0.0" />
+    <!-- Runs the Avalonia window without a screen, on every OS in CI (Stage 7: the window's end-to-end test). -->
+    <PackageVersion Include="Avalonia.Headless" Version="12.2.0" />
   </ItemGroup>
 
   <!-- Benchmark packages (Step 5.1). -->

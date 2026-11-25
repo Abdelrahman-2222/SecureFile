@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The cross-platform desktop window (Stage 7, bonus): macOS and Linux, and it also runs on Windows for development.
+    It is a thin shell like the WPF app: Avalonia -> Presentation (the same MainViewModel) -> Core. Plain net10.0, so
+    it builds on every operating system. The executable is called "SecureFile", like the Windows app.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>SecureFile</AssemblyName>
+    <RootNamespace>SecureFile.Avalonia</RootNamespace>
+    <ApplicationIcon>Assets\SecureFile.ico</ApplicationIcon>
+    <!-- Trimming and Native AOT analyzers on: Avalonia supports both (the WPF app cannot be trimmed), see Step 7.5. -->
+    <IsAotCompatible>true</IsAotCompatible>
+    <!-- Bindings are checked and compiled at build time (x:DataType), so a typo is a build error and trimming is safe. -->
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <AvaloniaResource Include="Assets\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="Avalonia.Desktop" />
+    <PackageReference Include="Avalonia.Themes.Fluent" />
+    <!-- A bundled font, so the window looks the same on a Linux system with few fonts installed. -->
+    <PackageReference Include="Avalonia.Fonts.Inter" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SecureFile.Presentation\SecureFile.Presentation.csproj" />
+    <ProjectReference Include="..\SecureFile.Core\SecureFile.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="SecureFile.Avalonia.Tests" />
+  </ItemGroup>
+
+</Project>

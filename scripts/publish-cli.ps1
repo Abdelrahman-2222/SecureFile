@@ -21,6 +21,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 Set-Location $repo
+. (Join-Path $PSScriptRoot 'lib/TarGz.ps1')
 
 $version = ([xml](Get-Content 'Directory.Build.props')).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
 $root = Join-Path $repo 'artifacts/cli'
@@ -47,12 +48,10 @@ foreach ($rid in $Runtimes) {
         Compress-Archive -Path (Join-Path $folder '*') -DestinationPath $archive -CompressionLevel Optimal
     }
     else {
-        # tar keeps the file name inside a folder and is what Linux and macOS users expect (Windows 10+ ships bsdtar).
+        # tar keeps the file name inside a folder and is what Linux and macOS users expect. Written by .NET's tar writer
+        # (scripts/lib/TarGz.ps1) so "securefile" is stored as executable: Windows' tar.exe stored 0644 (chmod needed).
         $archive = Join-Path $root "$name.tar.gz"
-        # On Windows use the system's own tar.exe: a GNU tar earlier on the PATH (Git Bash) reads "D:" as a remote host.
-        $tar = if ($IsWindows) { Join-Path $env:SystemRoot 'System32\tar.exe' } else { 'tar' }
-        & $tar -czf $archive -C $root $name
-        if ($LASTEXITCODE -ne 0) { throw "tar failed for $rid (exit code $LASTEXITCODE)." }
+        New-TarGz -ParentFolder $root -FolderName $name -Archive $archive -Executables @('securefile')
     }
 
     $hash = (Get-FileHash $archive -Algorithm SHA256).Hash.ToLowerInvariant()

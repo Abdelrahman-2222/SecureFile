@@ -86,7 +86,7 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 | C8 | macOS and Linux have no desktop window | Plan Steps 7.1 and 7.2 (Avalonia); releases for them are held back until then |
 | C9 | GitHub branch and tag protection is unavailable on a private free repository | The release branch can be deleted on the website; make the repository public or upgrade the plan (see `docs/RELEASING.md`) |
 | C10 | **DONE (Step 5.3):** Presentation coverage measured: 95.8 % lines, about 91 % branches (target >= 85 %) | See `docs/QUALITY_REPORT.md` |
-| C11 | CLI: `tar.gz` archives built on Windows may not carry the executable bit (README tells users `chmod +x`); no `--quiet`/`--json` mode; no folder or multi-file support | CLI polish |
+| C11 | CLI: ~~`tar.gz` archives built on Windows may not carry the executable bit~~ (**fixed in Stage 7**: `scripts/lib/TarGz.ps1` stores 0755); no `--quiet`/`--json` mode; no folder or multi-file support | CLI polish |
 | C12 | Original findings that stay as documented limits: no secure delete (SSDs cannot guarantee it); AES-CBC+HMAC format v1 only | See `docs/SUGGESTIONS.md` |
 | C14 | On Linux/macOS a directory symlink or case alias of the input can pass the same-file check and the rename replaces the input (Windows is safe) | Security review R2; needs a file-identity comparison (platform code) |
 | C15 | No deterministic test of `AtomicFileWriter.TryDeleteFile` retry; no Core test of the same-file branch of `ThrowIfOutputPathIsUnusable` | Security review R4 |
@@ -94,6 +94,9 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 | C17 | `--password-stdin` from Windows PowerShell 5.1 turns non-ASCII into `?`; the file is locked with a password nobody can retype | Security review R6: read stdin as UTF-8 bytes and document |
 | C18 | `MainViewModel` progress throttle is not testable at its 100 ms boundary (`Stopwatch` is not injectable); Stryker is not run on Presentation | Second review R4 |
 | C13 | Encrypt/decrypt do not overlap CPU work with the final disk flush: 100 MB takes about CPU time + disk time (1.4 s) instead of the larger of the two (about 0.9 s on the HDD) | Measured in Step 5.1; fix means a write-behind or periodic flush in the crash-safe path, so it needs its own design and tests |
+| C19 | **Half done (Stage 7 review):** a Save dialog that does not block the window (Linux portal) could let the user change the checked password or start a second operation. Fixed: inputs and actions are locked while the dialog is open (`IsChoosingOutput`) and the operation uses the password checked before it. Open: Avalonia's `ShowOverwritePrompt` may not be honoured by every Linux portal backend, so an existing file could be replaced without asking | Check on a real Linux desktop (checklist); if no prompt appears, ask in `AvaloniaFileDialogService` when the file exists |
+| C20 | Avalonia window gaps versus WPF: no Caps Lock warning (Avalonia has no API to read the Caps Lock state); Open folder opens the folder but cannot select the file (no `/select` equivalent in the launcher); the macOS app bundle has no icon (`.icns` not made) | Stage 7; documented in the window's code |
+| C21 | Avalonia window has no automated UI test on a real (non-headless) desktop and no screen-reader check; the headless test covers bindings, clipboard guard and one encrypt/decrypt round trip | Stage 7; manual checklist in `docs/NEXT_STEP_PROMPT.md` |
 
 ## D. How to burn this down
 

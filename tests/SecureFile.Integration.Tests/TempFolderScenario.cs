@@ -90,23 +90,23 @@ internal sealed class ScriptedDialogs : IFileDialogService
 
     public string? Save { get; set; }
 
-    public string? ShowOpenFileDialog()
+    public Task<string?> ShowOpenFileDialogAsync()
     {
-        return Open;
+        return Task.FromResult(Open);
     }
 
-    public string? ShowSaveFileDialog(string suggestedFilePath)
+    public Task<string?> ShowSaveFileDialogAsync(string suggestedFilePath)
     {
-        return Save;
+        return Task.FromResult(Save);
     }
 }
 
 /// <summary>A folder opener that does nothing and says it worked.</summary>
 internal sealed class NoFolderOpener : IFolderOpener
 {
-    public bool OpenContainingFolder(string filePath)
+    public Task<bool> OpenContainingFolderAsync(string filePath)
     {
-        return true;
+        return Task.FromResult(true);
     }
 }
 

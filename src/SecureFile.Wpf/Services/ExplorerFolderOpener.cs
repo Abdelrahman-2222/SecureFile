@@ -15,11 +15,20 @@ internal sealed class ExplorerFolderOpener : IFolderOpener
     /// <remarks>
     /// <see langword="true"/> means only that Explorer was started: <c>explorer.exe</c> exits with code 1 even when it
     /// succeeded, so its exit code is not used. The argument is built as one string because Explorer wants the exact
-    /// form <c>/select,"path"</c>, which <see cref="ProcessStartInfo.ArgumentList"/> would quote differently.
+    /// form <c>/select,"path"</c>, which <see cref="ProcessStartInfo.ArgumentList"/> would quote differently. Starting
+    /// Explorer does not wait for it, so the answer is a completed task.
     /// </remarks>
-    public bool OpenContainingFolder(string filePath)
+    public Task<bool> OpenContainingFolderAsync(string filePath)
     {
         ArgumentNullException.ThrowIfNull(filePath);
+        return Task.FromResult(StartExplorer(filePath));
+    }
+
+    /// <summary>Starts Explorer with the file selected.</summary>
+    /// <param name="filePath">The full path of the file.</param>
+    /// <returns><see langword="true"/> when Explorer was started.</returns>
+    private static bool StartExplorer(string filePath)
+    {
         try
         {
             using var process = Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{filePath}\"") { UseShellExecute = false });

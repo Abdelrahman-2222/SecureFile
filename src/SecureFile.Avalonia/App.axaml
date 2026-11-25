@@ -1,0 +1,34 @@
+<Application x:Class="SecureFile.Avalonia.App"
+             x:ClassModifier="internal"
+             xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             RequestedThemeVariant="Default">
+    <!-- RequestedThemeVariant="Default": light or dark following the operating system, like the WPF app. -->
+    <Application.Styles>
+        <FluentTheme />
+    </Application.Styles>
+
+    <!-- The same status colours as the WPF app (Windows Fluent palette), one set per theme so text stays readable. -->
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="CriticalBrush" Color="#C42B1C" />
+                    <SolidColorBrush x:Key="CautionBrush" Color="#9D5D00" />
+                    <SolidColorBrush x:Key="SuccessBrush" Color="#0F7B0F" />
+                    <SolidColorBrush x:Key="CriticalBackgroundBrush" Color="#FDE7E9" />
+                    <SolidColorBrush x:Key="CautionBackgroundBrush" Color="#FFF4CE" />
+                    <SolidColorBrush x:Key="SuccessBackgroundBrush" Color="#DFF6DD" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="CriticalBrush" Color="#FF99A4" />
+                    <SolidColorBrush x:Key="CautionBrush" Color="#FCE100" />
+                    <SolidColorBrush x:Key="SuccessBrush" Color="#6CCB5F" />
+                    <SolidColorBrush x:Key="CriticalBackgroundBrush" Color="#442726" />
+                    <SolidColorBrush x:Key="CautionBackgroundBrush" Color="#433519" />
+                    <SolidColorBrush x:Key="SuccessBackgroundBrush" Color="#393D1B" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

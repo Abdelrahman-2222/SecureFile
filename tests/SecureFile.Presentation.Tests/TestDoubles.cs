@@ -14,15 +14,18 @@ internal sealed class FakeFileDialogService : IFileDialogService
 
     public string? SuggestedSavePath { get; private set; }
 
-    public string? ShowOpenFileDialog()
+    public Task<string?> ShowOpenFileDialogAsync()
     {
-        return OpenResult;
+        return Task.FromResult(OpenResult);
     }
 
-    public string? ShowSaveFileDialog(string suggestedFilePath)
+    /// <summary>When set, the Save dialog stays "open" until this task completes (a non-modal dialog, as on Linux).</summary>
+    public Task<string?>? PendingSave { get; set; }
+
+    public Task<string?> ShowSaveFileDialogAsync(string suggestedFilePath)
     {
         SuggestedSavePath = suggestedFilePath;
-        return SaveResult;
+        return PendingSave ?? Task.FromResult(SaveResult);
     }
 }
 
@@ -68,10 +71,10 @@ internal sealed class FakeFolderOpener : IFolderOpener
 
     public string? OpenedPath { get; private set; }
 
-    public bool OpenContainingFolder(string filePath)
+    public Task<bool> OpenContainingFolderAsync(string filePath)
     {
         OpenedPath = filePath;
-        return Result;
+        return Task.FromResult(Result);
     }
 }
 

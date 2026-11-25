@@ -189,7 +189,17 @@ public sealed partial class MainViewModel : ObservableObject
     public partial string ProgressText { get; private set; } = string.Empty;
 
     /// <summary>Gets a value indicating whether the inputs (password, file choice) accept changes; they are locked while working.</summary>
-    public bool CanEditInputs => !IsBusy;
+    public bool CanEditInputs => !IsBusy && !IsChoosingOutput;
+
+    /// <summary>Gets a value indicating whether the Save dialog is open, so the inputs and actions are locked meanwhile.</summary>
+    /// <remarks>
+    /// Not every system's dialog blocks the window: the Linux desktop portal draws it in another process, so the user could
+    /// otherwise change the already-checked password, choose another file or start a second operation (ADR-16, C19).
+    /// </remarks>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanEditInputs))]
+    [NotifyCanExecuteChangedFor(nameof(BrowseCommand), nameof(OpenFileCommand), nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand))]
+    public partial bool IsChoosingOutput { get; private set; }
 
     /// <summary>Gets a value indicating whether the last operation succeeded (the window shows the result panel).</summary>
     public bool IsSucceeded => State == MainViewState.Succeeded;
@@ -230,7 +240,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <returns>A task that completes when the details are shown.</returns>
     private async Task BrowseCoreAsync()
     {
-        string? path = _fileDialogs.ShowOpenFileDialog();
+        string? path = await _fileDialogs.ShowOpenFileDialogAsync().ConfigureAwait(true);
         if (path is not null)
         {
             await LoadFileAsync(path).ConfigureAwait(true);
@@ -392,13 +402,15 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     /// <summary>Shows the last result in the file manager; if that fails, says how to find it.</summary>
+    /// <returns>A task that completes when the file manager was asked to open.</returns>
+    /// <remarks>"File manager", not "File Explorer": the same ViewModel runs on Windows, macOS (Finder) and Linux.</remarks>
     [RelayCommand(CanExecute = nameof(CanOpenFolder))]
-    private void OpenFolder()
+    private async Task OpenFolderAsync()
     {
-        if (!_folderOpener.OpenContainingFolder(_lastOutputPath!))
+        if (!await _folderOpener.OpenContainingFolderAsync(_lastOutputPath!).ConfigureAwait(true))
         {
             // Appended to the success message (not replacing it): the operation did succeed, only showing it failed.
-            StatusMessage = $"{_lastSuccessMessage} The folder couldn't be opened. Open it yourself in File Explorer.";
+            StatusMessage = $"{_lastSuccessMessage} The folder couldn't be opened. Open it yourself in your file manager.";
         }
     }
 
@@ -544,7 +556,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <returns>A task that completes when the operation has ended.</returns>
     /// <remarks>
     /// <c>overwriteExisting: true</c> is safe because the Save dialog has already asked the user before returning an
-    /// existing file (<see cref="IFileDialogService.ShowSaveFileDialog"/> contract). The input-equals-output check
+    /// existing file (<see cref="IFileDialogService.ShowSaveFileDialogAsync"/> contract). The input-equals-output check
     /// repeats the Core rule on purpose: Core enforces it with an <see cref="ArgumentException"/> (a programming
     /// error), while here the user gets a message and can choose again.
     /// </remarks>
@@ -555,14 +567,17 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
+        // The checked password is kept here: the operation must use exactly what was checked, whatever happens to the
+        // boxes while the Save dialog is open.
         string inputPath = SelectedFile!.FullPath;
-        string? outputPath = AskForOutputPath(encrypt, inputPath);
+        string password = Password;
+        string? outputPath = await AskForOutputPathAsync(encrypt, inputPath).ConfigureAwait(true);
         if (outputPath is null)
         {
             return;
         }
 
-        await ExecuteOperationAsync(encrypt, inputPath, outputPath).ConfigureAwait(true);
+        await ExecuteOperationAsync(encrypt, inputPath, outputPath, password).ConfigureAwait(true);
         ShowSuccess(encrypt, outputPath);
     }
 
@@ -588,14 +603,15 @@ public sealed partial class MainViewModel : ObservableObject
     /// <param name="encrypt"><see langword="true"/> to encrypt, <see langword="false"/> to decrypt.</param>
     /// <param name="inputPath">The chosen file.</param>
     /// <param name="outputPath">Where the result goes.</param>
+    /// <param name="password">The password that was checked before the Save dialog.</param>
     /// <returns>A task that completes when the operation has ended; throws <see cref="OperationCanceledException"/> after Cancel.</returns>
-    private async Task ExecuteOperationAsync(bool encrypt, string inputPath, string outputPath)
+    private async Task ExecuteOperationAsync(bool encrypt, string inputPath, string outputPath, string password)
     {
         using var cancellation = new CancellationTokenSource();
         BeginOperation(encrypt, cancellation);
         try
         {
-            await StartOperation(encrypt, inputPath, outputPath, cancellation.Token).ConfigureAwait(true);
+            await StartOperation(encrypt, inputPath, outputPath, password, cancellation.Token).ConfigureAwait(true);
         }
         finally
         {
@@ -714,23 +730,24 @@ public sealed partial class MainViewModel : ObservableObject
     /// <param name="encrypt"><see langword="true"/> to encrypt, <see langword="false"/> to decrypt.</param>
     /// <param name="inputPath">The chosen file.</param>
     /// <param name="outputPath">Where the result goes (the user confirmed replacing it if it exists).</param>
+    /// <param name="password">The checked password.</param>
     /// <param name="cancellationToken">Cancelled when the user chooses Cancel.</param>
     /// <returns>The running operation.</returns>
-    private Task StartOperation(bool encrypt, string inputPath, string outputPath, CancellationToken cancellationToken)
+    private Task StartOperation(bool encrypt, string inputPath, string outputPath, string password, CancellationToken cancellationToken)
     {
         var progress = new Progress<int>(OnProgress);
         return encrypt
-            ? _encryptionService.EncryptAsync(inputPath, outputPath, Password, overwriteExisting: true, progress, cancellationToken)
-            : _encryptionService.DecryptAsync(inputPath, outputPath, Password, overwriteExisting: true, progress, cancellationToken);
+            ? _encryptionService.EncryptAsync(inputPath, outputPath, password, overwriteExisting: true, progress, cancellationToken)
+            : _encryptionService.DecryptAsync(inputPath, outputPath, password, overwriteExisting: true, progress, cancellationToken);
     }
 
     /// <summary>Shows the Save dialog with a suggestion and refuses the input itself as the output.</summary>
     /// <param name="encrypt">Whether the operation is encryption (decides the suggested name).</param>
     /// <param name="inputPath">The chosen file.</param>
     /// <returns>The output path, or <see langword="null"/> when the user cancelled or chose the input.</returns>
-    private string? AskForOutputPath(bool encrypt, string inputPath)
+    private async Task<string?> AskForOutputPathAsync(bool encrypt, string inputPath)
     {
-        string? outputPath = _fileDialogs.ShowSaveFileDialog(encrypt ? SuggestEncryptedPath(inputPath) : SuggestDecryptedPath(inputPath));
+        string? outputPath = await ShowSaveDialogLockedAsync(encrypt ? SuggestEncryptedPath(inputPath) : SuggestDecryptedPath(inputPath)).ConfigureAwait(true);
         if (outputPath is not null && IsSameFile(inputPath, outputPath))
         {
             State = MainViewState.Failed;
@@ -747,6 +764,22 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         return outputPath;
+    }
+
+    /// <summary>Shows the Save dialog with the inputs and actions locked until it closes (<see cref="IsChoosingOutput"/>).</summary>
+    /// <param name="suggestedFilePath">The path to suggest.</param>
+    /// <returns>The chosen path, or <see langword="null"/> when the user cancelled.</returns>
+    private async Task<string?> ShowSaveDialogLockedAsync(string suggestedFilePath)
+    {
+        IsChoosingOutput = true;
+        try
+        {
+            return await _fileDialogs.ShowSaveFileDialogAsync(suggestedFilePath).ConfigureAwait(true);
+        }
+        finally
+        {
+            IsChoosingOutput = false;
+        }
     }
 
     /// <summary>Compares full paths ignoring case, like Core's own check (Windows and macOS ignore case).</summary>
@@ -773,7 +806,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <returns><see langword="true"/> when the user may choose a file.</returns>
     private bool CanBrowse()
     {
-        return !IsBusy;
+        return !IsBusy && !IsChoosingOutput;
     }
 
     /// <summary>Encrypt also needs a password of at least the minimum length that was typed the same twice.</summary>
@@ -798,7 +831,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <returns><see langword="true"/> when the user may start an operation.</returns>
     private bool CanRunFileOperation()
     {
-        return SelectedFile is not null && Password.Length > 0 && !IsBusy;
+        return SelectedFile is not null && Password.Length > 0 && !IsBusy && !IsChoosingOutput;
     }
 
     /// <summary>Suggests <c>report.pdf.enc</c> next to <c>report.pdf</c>.</summary>

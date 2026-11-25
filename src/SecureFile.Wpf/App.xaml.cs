@@ -2,6 +2,7 @@ using System.Windows;
 using System.Windows.Threading;
 using SecureFile.Core.Cryptography;
 using SecureFile.Core.Files;
+using SecureFile.Presentation.Errors;
 using SecureFile.Presentation.Main;
 using SecureFile.Wpf.Services;
 

@@ -21,7 +21,7 @@ it works completely on your computer and needs no internet. There is nothing to 
 ```bash
 tar -xzf securefile-cli-0.1.0-beta1-linux-x64.tar.gz
 cd securefile-cli-0.1.0-beta1-linux-x64
-chmod +x securefile            # one time: mark it as a program
+chmod +x securefile            # only if "Permission denied" (older archives were packed without the program flag)
 ./securefile --version
 ```
 
@@ -30,7 +30,7 @@ chmod +x securefile            # one time: mark it as a program
 ```bash
 tar -xzf securefile-cli-0.1.0-beta1-osx-arm64.tar.gz
 cd securefile-cli-0.1.0-beta1-osx-arm64
-chmod +x securefile
+chmod +x securefile            # only if "Permission denied"
 xattr -d com.apple.quarantine securefile   # one time: tell macOS you trust this download
 ./securefile --version
 ```
