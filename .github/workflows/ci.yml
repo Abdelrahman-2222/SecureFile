@@ -1,8 +1,11 @@
 # Continuous Integration: every push and pull request is built and tested automatically.
 # Job 1 (Windows) runs the FULL quality gate (scripts/verify.ps1) on the whole solution, including the WPF app.
 #   Git hooks on a developer machine can be skipped; this job cannot, so it is the real gate.
-# Job 2 (Ubuntu + macOS) builds and tests the cross-platform projects (Core runs on every OS - Phase 5).
-# Job 3 scans the full Git history for leaked secrets with gitleaks.
+# Job 2 (Ubuntu + macOS) builds and tests the cross-platform projects: Core, CLI and the Avalonia window, whose
+#   end-to-end test runs headless (no screen). Together with job 1 this is the Windows/Ubuntu/macOS matrix (Step 7.3).
+# Jobs 3 + 4 (cross-OS golden files): each system encrypts the same sample with the CLI, then every system decrypts all
+#   of them, so a file made on one OS is proven to open on the others.
+# Job 5 scans the full Git history for leaked secrets with gitleaks.
 #
 # Security: actions are pinned to an exact commit (SHA) instead of a movable tag, and the checkout does not keep
 # the GitHub token on disk while build tools run. Dependabot keeps the pinned SHAs up to date.
@@ -82,6 +85,72 @@ jobs:
 
       - name: Test (symbolic-link tests run here; Windows skips them without Developer Mode)
         run: dotnet test --solution SecureFile.CrossPlatform.slnf -c Release --no-build
+
+  golden-encrypt:
+    name: Golden file - encrypt on ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Same cost rule as above: macOS only for pull requests, main and manual runs.
+        os: ${{ fromJSON(github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feature/') && '["windows-latest", "ubuntu-latest"]' || '["windows-latest", "ubuntu-latest", "macos-latest"]') }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install the .NET SDK from global.json
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Build the command-line app
+        run: dotnet build src/SecureFile.Cli -c Release
+
+      - name: Encrypt the sample on this system
+        shell: pwsh
+        run: ./scripts/cross-os-golden.ps1 -Mode Encrypt -Directory golden -Label ${{ runner.os }}
+
+      - name: Upload the encrypted sample
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          name: golden-${{ runner.os }}
+          path: golden/*.enc
+          if-no-files-found: error
+          retention-days: 1
+
+  golden-decrypt:
+    name: Golden file - decrypt all on ${{ matrix.os }}
+    needs: golden-encrypt
+    strategy:
+      fail-fast: false
+      matrix:
+        os: ${{ fromJSON(github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feature/') && '["windows-latest", "ubuntu-latest"]' || '["windows-latest", "ubuntu-latest", "macos-latest"]') }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Check out the code
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Install the .NET SDK from global.json
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Build the command-line app
+        run: dotnet build src/SecureFile.Cli -c Release
+
+      - name: Download the samples encrypted on every system
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: golden-*
+          path: golden
+
+      - name: Decrypt every sample and compare with the original
+        shell: pwsh
+        run: ./scripts/cross-os-golden.ps1 -Mode Decrypt -Directory golden
 
   secrets-scan:
     name: Secrets scan (gitleaks, full history)
