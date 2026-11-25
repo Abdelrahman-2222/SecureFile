@@ -803,6 +803,31 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public async Task OpenDialogOpen_LocksTheInputsAndActionsUntilItCloses()
+    {
+        // Review VM-1: a non-blocking Open dialog (Linux portal) let the user start an operation and then swap the file.
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        viewModel.Password = ValidPassword;
+        viewModel.ConfirmPassword = ValidPassword;
+        var open = new TaskCompletionSource<string?>();
+        _dialogs.PendingOpen = open.Task;
+
+        Task browsing = viewModel.BrowseCommand.ExecuteAsync(null);
+
+        Assert.True(viewModel.IsFileDialogOpen);
+        Assert.False(viewModel.CanEditInputs);
+        Assert.False(viewModel.EncryptCommand.CanExecute(null));
+        Assert.False(viewModel.RunPrimaryCommand.CanExecute(null));
+        Assert.False(viewModel.OpenFilesCommand.CanExecute(null));
+
+        open.SetResult(null);
+        await browsing;
+
+        Assert.False(viewModel.IsFileDialogOpen);
+        Assert.True(viewModel.EncryptCommand.CanExecute(null));
+    }
+
+    [Fact]
     public async Task SaveDialogOpen_LocksInputs_AndEncryptsWithThePasswordCheckedBefore()
     {
         MainViewModel viewModel = await CreateWithFileAsync(InputPath);
@@ -813,7 +838,7 @@ public sealed class MainViewModelTests
 
         Task running = viewModel.EncryptCommand.ExecuteAsync(null);
 
-        Assert.True(viewModel.IsChoosingOutput);
+        Assert.True(viewModel.IsFileDialogOpen);
         Assert.False(viewModel.CanEditInputs);
         Assert.False(viewModel.BrowseCommand.CanExecute(null));
         Assert.False(viewModel.OpenFileCommand.CanExecute(InputPath));
@@ -824,7 +849,7 @@ public sealed class MainViewModelTests
         save.SetResult(InputPath + ".enc");
         await running;
 
-        Assert.False(viewModel.IsChoosingOutput);
+        Assert.False(viewModel.IsFileDialogOpen);
         Assert.Equal(ValidPassword, Assert.Single(_encryption.Calls).Password);
     }
 

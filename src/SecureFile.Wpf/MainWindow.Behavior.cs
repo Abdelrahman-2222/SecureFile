@@ -124,9 +124,9 @@ internal sealed partial class MainWindow
     /// After the Save dialog closed without starting an operation (the user cancelled it), puts the focus back in the
     /// password box: the button that opened it was disabled while it was open and lost the focus (review item 7).
     /// </summary>
-    private void OnChoosingOutputChanged()
+    private void OnFileDialogOpenChanged()
     {
-        if (!_viewModel.IsChoosingOutput)
+        if (!_viewModel.IsFileDialogOpen)
         {
             Dispatcher.BeginInvoke(DispatcherPriority.Input, () =>
             {

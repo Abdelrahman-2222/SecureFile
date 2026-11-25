@@ -208,9 +208,9 @@ internal sealed partial class MainWindow : Window
         {
             OnStateChanged();
         }
-        else if (e.PropertyName == nameof(MainViewModel.IsChoosingOutput))
+        else if (e.PropertyName == nameof(MainViewModel.IsFileDialogOpen))
         {
-            OnChoosingOutputChanged();
+            OnFileDialogOpenChanged();
         }
         else if (e.PropertyName == nameof(MainViewModel.SelectedFile))
         {

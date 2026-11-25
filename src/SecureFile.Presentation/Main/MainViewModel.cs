@@ -203,17 +203,19 @@ public sealed partial class MainViewModel : ObservableObject
     public partial string ProgressText { get; private set; } = string.Empty;
 
     /// <summary>Gets a value indicating whether the inputs (password, file choice) accept changes; they are locked while working.</summary>
-    public bool CanEditInputs => !IsBusy && !IsChoosingOutput;
+    public bool CanEditInputs => !IsBusy && !IsFileDialogOpen;
 
-    /// <summary>Gets a value indicating whether the Save dialog is open, so the inputs and actions are locked meanwhile.</summary>
+    /// <summary>Gets a value indicating whether the Open or Save dialog is open, so the inputs and actions are locked meanwhile.</summary>
     /// <remarks>
     /// Not every system's dialog blocks the window: the Linux desktop portal draws it in another process, so the user could
-    /// otherwise change the already-checked password, choose another file or start a second operation (ADR-16, C19).
+    /// otherwise change the already-checked password, choose another file or start a second operation (ADR-16, C19). The
+    /// Open dialog is locked too: a file picked there while an operation ran swapped the file mid-operation and re-enabled
+    /// every command (review VM-1).
     /// </remarks>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanEditInputs))]
     [NotifyCanExecuteChangedFor(nameof(BrowseCommand), nameof(OpenFileCommand), nameof(OpenFilesCommand), nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand))]
-    public partial bool IsChoosingOutput { get; private set; }
+    public partial bool IsFileDialogOpen { get; private set; }
 
     /// <summary>Gets a value indicating whether the last operation succeeded (the window shows the result panel).</summary>
     public bool IsSucceeded => State == MainViewState.Succeeded;
@@ -254,7 +256,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <returns>A task that completes when the details are shown.</returns>
     private async Task BrowseCoreAsync()
     {
-        string? path = await _fileDialogs.ShowOpenFileDialogAsync().ConfigureAwait(true);
+        string? path = await ShowDialogLockedAsync(_fileDialogs.ShowOpenFileDialogAsync).ConfigureAwait(true);
         if (path is not null)
         {
             await LoadFileAsync(path).ConfigureAwait(true);
@@ -793,19 +795,27 @@ public sealed partial class MainViewModel : ObservableObject
         return outputPath;
     }
 
-    /// <summary>Shows the Save dialog with the inputs and actions locked until it closes (<see cref="IsChoosingOutput"/>).</summary>
+    /// <summary>Shows the Save dialog with the inputs and actions locked until it closes (<see cref="IsFileDialogOpen"/>).</summary>
     /// <param name="suggestedFilePath">The path to suggest.</param>
     /// <returns>The chosen path, or <see langword="null"/> when the user cancelled.</returns>
-    private async Task<string?> ShowSaveDialogLockedAsync(string suggestedFilePath)
+    private Task<string?> ShowSaveDialogLockedAsync(string suggestedFilePath)
     {
-        IsChoosingOutput = true;
+        return ShowDialogLockedAsync(() => _fileDialogs.ShowSaveFileDialogAsync(suggestedFilePath));
+    }
+
+    /// <summary>Shows a file dialog with the inputs and actions locked until it closes (<see cref="IsFileDialogOpen"/>).</summary>
+    /// <param name="showDialog">Opens the Open or Save dialog.</param>
+    /// <returns>The chosen path, or <see langword="null"/> when the user cancelled.</returns>
+    private async Task<string?> ShowDialogLockedAsync(Func<Task<string?>> showDialog)
+    {
+        IsFileDialogOpen = true;
         try
         {
-            return await _fileDialogs.ShowSaveFileDialogAsync(suggestedFilePath).ConfigureAwait(true);
+            return await showDialog().ConfigureAwait(true);
         }
         finally
         {
-            IsChoosingOutput = false;
+            IsFileDialogOpen = false;
         }
     }
 
@@ -859,7 +869,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <returns><see langword="true"/> when the user may choose a file.</returns>
     private bool CanBrowse()
     {
-        return !IsBusy && !IsChoosingOutput;
+        return !IsBusy && !IsFileDialogOpen;
     }
 
     /// <summary>Encrypt also needs a password of at least the minimum length that was typed the same twice.</summary>
@@ -884,7 +894,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <returns><see langword="true"/> when the user may start an operation.</returns>
     private bool CanRunFileOperation()
     {
-        return SelectedFile is not null && Password.Length > 0 && !IsBusy && !IsChoosingOutput;
+        return SelectedFile is not null && Password.Length > 0 && !IsBusy && !IsFileDialogOpen;
     }
 
     /// <summary>Suggests <c>report.pdf.enc</c> next to <c>report.pdf</c>.</summary>
