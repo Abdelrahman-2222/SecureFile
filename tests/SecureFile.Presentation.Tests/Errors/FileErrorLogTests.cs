@@ -61,6 +61,68 @@ public sealed class FileErrorLogTests : IDisposable
         Assert.DoesNotContain("TaxReturn2025", text, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void Write_LogFolderMissing_CreatesItAndWrites()
+    {
+        var log = new FileErrorLog(Path.Combine(_folder.FullName, "logs", "deeper", "test.log"));
+
+        log.WriteExpected(new InvalidOperationException("x"));
+
+        Assert.True(File.Exists(log.LogFilePath));
+    }
+
+    [Fact]
+    public void Write_LogOverOneMegabyte_MovesItToDotOneAndStartsANewFile()
+    {
+        var log = new FileErrorLog(Path.Combine(_folder.FullName, "test.log"));
+        File.WriteAllText(log.LogFilePath, new string('o', 1_000_001));
+
+        log.WriteExpected(new InvalidOperationException("fresh"));
+
+        Assert.Equal(1_000_001, new FileInfo(log.LogFilePath + ".1").Length);
+        string text = File.ReadAllText(log.LogFilePath);
+        Assert.Contains("fresh", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("ooo", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Write_LogOfExactlyOneMegabyte_IsNotRotatedYet()
+    {
+        var log = new FileErrorLog(Path.Combine(_folder.FullName, "test.log"));
+        File.WriteAllText(log.LogFilePath, new string('o', 1_000_000));
+
+        log.WriteExpected(new InvalidOperationException("appended"));
+
+        Assert.False(File.Exists(log.LogFilePath + ".1"));
+        Assert.StartsWith("ooo", File.ReadAllText(log.LogFilePath), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Format_TwoExceptions_GivesTheOuterThenTheInnerAfterAnArrow()
+    {
+        var chain = new InvalidOperationException("outer", new ArgumentException("inner"));
+
+        Assert.Equal(
+            $"System.InvalidOperationException: outer{Environment.NewLine} ---> System.ArgumentException: inner",
+            LogEntryFormatter.Format(chain, includeStackTrace: false));
+    }
+
+    [Fact]
+    public void Format_DeepChain_WritesAtMostFiveInnerExceptions()
+    {
+        Exception chain = new InvalidOperationException("level 8");
+        for (int level = 7; level >= 1; level--)
+        {
+            chain = new InvalidOperationException($"level {level}", chain);
+        }
+
+        string text = LogEntryFormatter.Format(chain, includeStackTrace: false);
+
+        Assert.Equal(5, text.Split(" ---> ").Length - 1);
+        Assert.Contains("level 6", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("level 7", text, StringComparison.Ordinal);
+    }
+
     /// <summary>Throws and catches <paramref name="exception"/>, so it carries a real stack trace like a logged one.</summary>
     private static Exception Thrown(Exception exception)
     {

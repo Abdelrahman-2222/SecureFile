@@ -36,6 +36,21 @@ public sealed class ProgressTextFormatterTests
     }
 
     [Fact]
+    public void Format_ExactlySixtySecondsLeft_SwitchesToMinutes()
+    {
+        // Half done after 60 s: 60 s left, the first value written in minutes (the boundary, found by Stryker).
+        string text = ProgressTextFormatter.Format(50, TenMegabytes, TimeSpan.FromSeconds(60), CultureInfo.InvariantCulture);
+
+        Assert.EndsWith("about 1 min 0 s left", text, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Format_NullFormatProvider_ThrowsArgumentNullException()
+    {
+        Assert.Throws<ArgumentNullException>("formatProvider", () => ProgressTextFormatter.Format(50, TenMegabytes, TimeSpan.FromSeconds(2), null!));
+    }
+
+    [Fact]
     public void Format_LongRemainingTime_UsesMinutes()
     {
         string text = ProgressTextFormatter.Format(10, TenMegabytes, TimeSpan.FromSeconds(13), CultureInfo.InvariantCulture);
