@@ -1,64 +1,79 @@
-# Next step: copy-paste prompt for a new chat (Stage 9: final deliverables)
+# Next step: copy-paste prompt for a new chat (Stage 9.0: backlog burn-down before the final review)
 
-Last finished (2026-11-25): Stage 8 (stakeholder suggestions), plan row 8.1, on branch `feature/stage-8-suggestions` (PR
-against `main`). `docs/SUGGESTIONS.md` now lists what is built (amber where only CI has run it) and 36 new suggestions
-with priority, effort and backlog reference. Stage 9 is meant to run **after everything is tested and confirmed**, so the
-user checks below should come first; 9.1 will mark any that are still open.
+Last finished (2026-11-25): Stage 8 (stakeholder suggestions), plan row 8.1, PR #7 (`feature/stage-8-suggestions` into
+`main`). After it, every open item in `docs/REVIEW_REPORT_2026-11-24.md` and `docs/REVIEW_BACKLOG.md` was checked against
+the code and triaged into "fix now" (step 9.0, below), "if time" and "later". The rest of Stage 9 (9.1 full review of
+all PRs, code and logic; 9.2 `docs/FINAL_GUIDE.md`; 9.3 presentation with the v2 / future-releases roadmap; 9.4 the
+user's demo video) follows in a later chat.
 
 ## Things only the user can do (still open)
 
-- [ ] **Stage 7 real systems (plan 7.4):** macOS 14+ (`pwsh scripts/publish-desktop.ps1 -Runtimes osx-arm64`, follow
-  `docs/DESKTOP_README.md`) and a Linux desktop (`linux-x64`; or WSL with `wsl --install -d Ubuntu`). Check: the window
-  opens, Browse, drag and drop, encrypt with password + confirm, Save over an existing file asks once (backlog C19), Open
-  folder, F1/About, close while encrypting asks first, decrypt, a file encrypted on Windows decrypts there. Then mark 7.4
-  and decide whether macOS/Linux go into a release (`docs/RELEASING.md`).
-- [ ] **Stage 6:** Windows Sandbox run (`docs/SANDBOX_TEST.md`; also a Definition of Done item), ADR-15 decision,
-  screenshots (`docs/SCREENSHOTS_NEEDED.md`), any GitHub release (branch `release/v0.1.0-beta2` has one docs commit,
-  e71adc1, that is not on `main`).
+- [ ] Merge PR #7 before starting 9.0.
+- [ ] **Antivirus (C4):** add a Kaspersky exclusion for `%TEMP%\SecureFile*` (do not disable it). Stage 8's push failed
+  3 times in a row on `...LeavesNothing`-style Core decryption tests because of its upper-case
+  `.~OUTPUT.BIN.*.SECUREFILE-TMP.tmp` copies.
+- [ ] **Stage 7 real systems (plan 7.4):** macOS 14+ and a Linux desktop, checklist in `docs/DESKTOP_README.md` and backlog
+  C19/C21; then decide whether macOS/Linux go into a release (`docs/RELEASING.md`).
+- [ ] **Stage 6:** Windows Sandbox run (`docs/SANDBOX_TEST.md`), ADR-15 decision, screenshots
+  (`docs/SCREENSHOTS_NEEDED.md`), any GitHub release (`release/v0.1.0-beta2` has docs commit e71adc1 not on `main`).
 - [ ] **Stage 5** (`docs/QUALITY_REPORT.md`, "Things only the user can do"): cold start, VS profiler, SonarQube, class
   coupling, decision C1 (compression 134 -> 65 MB), optional Native AOT size.
-- [ ] **Usability:** a person runs `docs/TESTPLAN.md` and the friends session in `docs/USABILITY.md` (backlog C6).
-- [ ] 9.4 demo video (2 minutes) can only be recorded by the user.
+- [ ] **Usability (C6):** a person runs `docs/TESTPLAN.md` and the friends session in `docs/USABILITY.md`.
+- [ ] Decisions: C7 (code signing costs money), C9 (public repository for CodeQL and branch protection).
 
 Paste this into a new chat:
 
 ~~~
 Follow CLAUDE.md (read it first). Project: SecureFile, AES-256-CBC + HMAC file encryption, .NET 10, WPF app (Windows),
-Avalonia app (macOS/Linux, bonus), command line; layers Wpf/Avalonia/Cli -> Presentation -> Core. Task: Stage 9 "Final
-deliverables" (plan rows 9.1-9.3; 9.4 is the user's video) in this one chat, then open the pull request. Do not read
-docs/PROJECT_PLAN.md or docs/LEARNING_LOG.md in full: grep the rows or sections you need (Stage 9 rows, Definition of Done,
-§14 and §15). Terse chat updates.
+Avalonia app (macOS/Linux, bonus), command line; layers Wpf/Avalonia/Cli -> Presentation -> Core. Task: Stage 9.0 "Backlog
+burn-down" (plan row 9.0) in this one chat, then open the pull request. Do not read docs/PROJECT_PLAN.md,
+docs/LEARNING_LOG.md or docs/REVIEW_REPORT_2026-11-24.md in full: grep the rows or item numbers you need (numbers like #9
+are review-report items, B/C ids are in docs/REVIEW_BACKLOG.md). Terse chat updates.
 
-STEP 0: git status, git fetch --prune. If the Stage 8 PR (feature/stage-8-suggestions) is merged, branch
-feature/stage-9-deliverables from main; otherwise from feature/stage-8-suggestions and target that branch (check it still
-exists on origin first). Build and run all tests first. Ask the user which "Things only the user can do" in
-docs/NEXT_STEP_PROMPT.md are now done, and record the answers.
+STEP 0: git status, git fetch --prune. If PR #7 (feature/stage-8-suggestions) is merged, branch
+feature/stage-9-burndown from main; otherwise from feature/stage-8-suggestions and target that branch (check it still
+exists on origin first). Build and run all tests first.
 
-KNOWN ENVIRONMENT: Windows 11, Kaspersky kills programs that write many large files (about 1 full test run in 4 fails with a
-"...LeavesNothing" test: capture the name, re-run); never disable the antivirus. Scripts need `powershell -ExecutionPolicy Bypass
--File ...` or pwsh, run from PowerShell, not Git Bash. No Mac, no Linux PC, WSL has no distribution, no ARM machine, no C++
-build tools (so no Native AOT).
+KNOWN ENVIRONMENT: Windows 11, Kaspersky makes backup copies of temp files (about 1 full test run in 4, sometimes several
+in a row, fails a "...LeavesNothing" test with an upper-case `.~OUTPUT.*.SECUREFILE-TMP.tmp`: capture the name, re-run);
+never disable the antivirus and never weaken those tests. Scripts need `powershell -ExecutionPolicy Bypass -File ...` or
+pwsh, run from PowerShell, not Git Bash; capture full output to artifacts/*.log so failing test names are not cut off.
+No Mac, no Linux PC, WSL has no distribution, no ARM machine, no C++ build tools. CI runs Windows, Ubuntu and macOS.
 
-9.1 Final review against the Definition of Done (plan, under Stage 9) and the traceability matrix (§15): every R1-R6 and
-    D1-D7 has a passing test (name it), 0 warnings, 0 vulnerable packages, §8 targets met or the gap explained (use
-    docs/QUALITY_REPORT.md §5.5). Tick only what is proven; anything waiting on the user stays open and amber.
-9.2 docs/FINAL_GUIDE.md (§14.1): the detailed explanation guide, so the user can explain and defend every file and line:
-    the why and the alternatives refused, linking the ADRs, THREAT_MODEL, QUALITY_REPORT and SUGGESTIONS instead of copying them.
-9.3 Team Lead presentation (§14.2), built around the six grading criteria, with a Q&A preparation section; use
-    docs/SUGGESTIONS.md §5 as the story. Ask the user which format (pptx file or a slides artifact) before building it.
-    No screenshots are invented: leave clearly marked placeholders for the ones in docs/SCREENSHOTS_NEEDED.md.
+FIX NOW (one commit per item or tight group, each with a test where it makes sense; order = risk first):
+ 1 C14  same-file check on Linux/macOS: a directory symlink or case alias of the input can pass and the rename replaces the
+        input. Compare file identity (resolve links; case-insensitive volumes), add tests that run on the Ubuntu/macOS CI.
+ 2 C16  Windows: owner-only ACL on the temp file and result (the Unix side already sets UnixCreateMode owner-only).
+ 3 #29  error log: no full paths and no stack trace for expected failures (wrong password, tampered file); keep crashes.
+ 4 #24  WPF visible password box: UndoLimit=0; "Show password" resets for the next file.
+ 5 C17  docs/CLI_README.md: Windows PowerShell 5.1 pipes non-ASCII as `?`; recommend pwsh or
+        `$OutputEncoding = [Text.UTF8Encoding]::new()`.
+ 6 #9   WPF mnemonics `_Password` / `Co_nfirm` must target the visible box when "Show password" is on.
+ 7 #17/#31  drop zone text "Drop a file here or Browse…", drag-over highlight, first-run text not repeated three times
+        (WPF and Avalonia).
+ 8 #12 (rest)  a dropped folder says it is a folder; several dropped files say only one is used; no copy cursor while busy.
+ 9 #16/#33  file card: tooltip with full name, folder, last-modified date, exact size.
+10 #15  error dialogs name the log file (`FileErrorLog.LogFilePath`) and have the main window as owner.
+11 #11/#30, #7  Enter in the first password box moves to Confirm; Cancel focused while working; focus after a cancel.
+12 #25 (rest)  success message names the folder ("Your original file was not changed" is already there: update the report).
+13 C15  deterministic test of AtomicFileWriter.TryDeleteFile retry + Core test of the same-file branch.
+14 C18  inject TimeProvider into MainViewModel's progress throttle; add the 100 ms boundary, second-operation, late-report tests.
+15 B5   architecture rule: SecureFile.Cli references no UI or network assemblies.
+16 B6   PROJECT_PLAN §11.1 and FileErrorLog.LogFilePath remarks match the app; review-report statuses updated (#25 is stale).
+IF TIME: #18 (count text elements, not UTF-16 units, for the 8 minimum and 1,024 limit), #19, #21, #22, #28, #34 free-disk-space
+check, B3 code part (live-region announcements, automation names). LATER (do not do; keep in docs/SUGGESTIONS.md): #6/#34 format
+v2, Argon2id, #2 startup sweep, #35, #36-#38, C13, C19-C21, C2, C6, C1/C7/C9 decisions.
 
-CARRY-OVER (keep listed, do the cheap ones if time allows):
-- Backlog: C13, C14, C15, C16 (second half), C17 (document PowerShell 5.1 piping in docs/CLI_README.md: cheap), C18, C19,
-  C20, B1 WPF items, B3/B4, C2/C6. docs/SUGGESTIONS.md maps the user-visible ones to a stakeholder line (C15 is a test
-  gap only, so it is not there).
-- Stryker on the CLI's pure logic (C22) and on Presentation (C18) was never run.
-- One unexplained flaky test failure from the antivirus: hunt it in final hardening (capture the test name).
+For every item: update its line in docs/REVIEW_BACKLOG.md and the review report status, and the matching row in
+docs/SUGGESTIONS.md (built / not built). Avalonia shares the ViewModel: check each Presentation change there too.
 
-RULES: no limit or target is loosened to pass; warnings are errors; XML docs on public and private members; edit with Edit/Write
-(no Python or heredoc rewriting of source); Conventional Commits, first line <= 72 characters, NO AI attribution lines; never commit
-secrets, big binaries or artifacts/; ask before any outward-facing action. The pre-push hook runs scripts/verify.ps1 on `git push`:
-do not run it by hand per commit. Wrap-up: append ONE short "Stage 9" section to docs/LEARNING_LOG.md (append only, do not read it),
-CHANGELOG lines, plan rows marked honestly (amber for anything waiting on the user), replace this file with the final hand-off
-(what is left for the user only), one reviewer agent on the whole diff, then the PR and the ccd_pr tools.
+RULES: no limit or target is loosened to pass; warnings are errors; XML docs on public and private members; complexity <= 10,
+maintainability >= 60; ConfigureAwait(true) in Presentation, (false) in Core; ADR-13 exception rules; edit with Edit/Write (no
+Python or heredoc rewriting of source); `dotnet format SecureFile.slnx whitespace` after creating files; Conventional Commits, first
+line <= 72 characters, NO AI attribution lines; never commit secrets, big binaries or artifacts/; ask before any outward-facing
+action. The pre-push hook runs scripts/verify.ps1 on `git push`: do not run it by hand per commit. Wrap-up: append ONE short
+"Stage 9.0" section to docs/LEARNING_LOG.md (append only, do not read it), CHANGELOG lines, plan row 9.0 marked honestly (amber for
+anything waiting on the user), replace this file with the hand-off for 9.1-9.3 (full review of all PRs, code and logic against the
+Definition of Done and §15, Stryker on Presentation and CLI, FINAL_GUIDE.md, presentation with v2 / future-releases roadmap), one
+reviewer agent on the whole diff, then the PR and the ccd_pr tools.
 ~~~
