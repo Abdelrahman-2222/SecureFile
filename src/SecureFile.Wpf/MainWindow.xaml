@@ -45,8 +45,8 @@
                 </StackPanel>
             </Border>
 
-            <!-- 2. File card -->
-            <Border BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,16,0,0">
+            <!-- 2. File card; the tooltip has the full name, folder, date and exact size (review items 16 and 33). -->
+            <Border ToolTip="{Binding FileCardToolTip}" BorderBrush="{DynamicResource CardStrokeColorDefaultBrush}" Background="{DynamicResource CardBackgroundFillColorDefaultBrush}" BorderThickness="1" CornerRadius="8" Padding="16" Margin="0,16,0,0">
                 <TextBlock x:Name="FileSummaryText" AutomationProperties.AutomationId="FileSummary"
                            Text="{Binding FileSummary}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
             </Border>

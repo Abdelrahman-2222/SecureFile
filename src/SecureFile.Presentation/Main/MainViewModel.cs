@@ -101,7 +101,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Gets the details of the chosen file, or <see langword="null"/> when no file is chosen.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(FileSummary), nameof(PasswordHint), nameof(IsEncryptOffered), nameof(IsDecryptOffered), nameof(IsEncrypting), nameof(IsDecrypting))]
+    [NotifyPropertyChangedFor(nameof(FileSummary), nameof(FileCardToolTip), nameof(PasswordHint), nameof(IsEncryptOffered), nameof(IsDecryptOffered), nameof(IsEncrypting), nameof(IsDecrypting))]
     [NotifyCanExecuteChangedFor(nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand))]
     public partial FileDetails? SelectedFile { get; private set; }
 

@@ -28,7 +28,7 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 - **9** **DONE (Stage 9.0):** the `_Password` and `Co_nfirm` labels now target the visible boxes while "Show password" is on (WPF; Avalonia has one box per field). The F clash was fixed earlier.
 - **12 (rest)** **DONE (Stage 9.0):** a dropped folder says "This is a folder" (PathIsFolderException); several dropped files use the first and say so (OpenFilesCommand); no copy cursor while busy. Open: only the dashed zone is a drop target.
 - **17 / 31** **DONE (Stage 9.0):** the drop zone reads "Drop a file here or Browse…", gets an accent border while a file is dragged over it, and the first-run status line adds information instead of repeating the drop zone (WPF and Avalonia).
-- **16 / 33** File card: a long name hides extension and size; add a tooltip, the folder, the date and the exact size (plan §11.1 promised them).
+- **16 / 33** **DONE (Stage 9.0):** the file card has a tooltip with the full name, folder, last-modified time and exact size (`FileCardToolTip`, WPF and Avalonia). Open: the card line itself still cuts a long name (and a mixed-direction name may reorder).
 - **8 / 11 / 30** Show-password toggle moves focus off the checkbox; Enter in the first box should move to Confirm; newline-paste difference between box types.
 - **7** Cancel is not focused while working; focus after a cancel; check that Esc still cancels when the focused box has just been disabled.
 - **15** Error dialogs do not say where the log file is (`FileErrorLog.LogFilePath` exists) and have no owner window.

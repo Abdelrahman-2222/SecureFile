@@ -447,6 +447,32 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public void DescribeFile_GivesNameFolderDateAndExactSize()
+    {
+        string folder = Path.Combine(Path.GetTempPath(), "Taxes");
+        var modified = new DateTime(2026, 11, 25, 8, 30, 0, DateTimeKind.Utc);
+        var file = new FileDetails(Path.Combine(folder, "a very long name that the card cuts.pdf"), "a very long name that the card cuts.pdf", ".pdf", 1_234_567, modified);
+
+        string text = MainViewModel.DescribeFile(file, CultureInfo.InvariantCulture);
+
+        string expectedDate = modified.ToLocalTime().ToString("g", CultureInfo.InvariantCulture);
+        Assert.Equal(
+            $"a very long name that the card cuts.pdf\nFolder: {folder}\nModified: {expectedDate}\nSize: 1,234,567 bytes (1.18 MB)",
+            text);
+    }
+
+    [Fact]
+    public async Task FileCardToolTip_OnlyWhileAFileIsChosen()
+    {
+        MainViewModel viewModel = CreateViewModel();
+        Assert.Null(viewModel.FileCardToolTip);
+
+        await viewModel.OpenFileCommand.ExecuteAsync(InputPath);
+
+        Assert.StartsWith(Path.GetFileName(InputPath), viewModel.FileCardToolTip, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task OpenFiles_DroppedFolder_SaysItIsAFolderAndLogsItAsExpected()
     {
         MainViewModel viewModel = CreateViewModel();

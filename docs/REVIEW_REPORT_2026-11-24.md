@@ -34,7 +34,7 @@ list to burn down and links back here for the detail.
 | 13 | Progress area shows stale text (verified) | After an operation (or a cancel at 45 %) the next Browse shows the old "45 % · 12.3 MB/s · about 5 s left" | VM:254-261, 328-335 | **FIXED** (`ClearProgress`). No test shows a non-empty value being cleared (the fake never reports progress) |
 | 14 | A failed "Open folder" message appeared inside the green success banner and replaced the "saved as…" text (verified) | `OpenFolder()` overwrote `StatusMessage` while State stayed Succeeded | VM:279-285 | **FIXED** |
 | 15 | Error dialogs never say where the log file is (verified) | `FileErrorLog.LogFilePath` exists "so the friendly dialog can tell the user where it is" but is never used; the message boxes have no owner window | FileErrorLog.cs:43; App.xaml.cs:69, 79 | **OPEN** |
-| 16 | The file card truncates away the important part (verified) | `FileSummary` is one string "name (.ext) · size" with ellipsis, so a long name cuts the extension and size; no tooltip (plan §11.1(2) promised exact bytes), no last-modified date, no folder (two same-named files look identical); an Arabic or mixed-direction name reorders the "(.ext) · size" part (suspected) | MW.xaml:50-51 | **OPEN** |
+| 16 | The file card truncates away the important part (verified) | `FileSummary` is one string "name (.ext) · size" with ellipsis, so a long name cuts the extension and size; no tooltip (plan §11.1(2) promised exact bytes), no last-modified date, no folder (two same-named files look identical); an Arabic or mixed-direction name reorders the "(.ext) · size" part (suspected) | MW.xaml:50-51 | **PARTLY (Stage 9.0)**: tooltip with full name, folder, date and exact bytes (WPF and Avalonia). Open: the one-line card still truncates; mixed-direction names |
 
 ## Minor
 
@@ -61,7 +61,7 @@ list to burn down and links back here for the detail.
 | 30 | Initial focus on Browse; Enter in the first password box moves to Confirm | **PARTLY** (initial focus done; Enter-to-Confirm open) |
 | 31 | Drag-over highlight and the text "Drop a file here or Browse…" | **FIXED (Stage 9.0)** |
 | 32 | A tooltip or inline hint for every disabled button, and an always-visible reason line | **PARTLY** (live guidance line; tooltips only on hover) |
-| 33 | Folder path and last-modified date on the file card, with a tooltip for exact bytes (plan §11.1) | OPEN |
+| 33 | Folder path and last-modified date on the file card, with a tooltip for exact bytes (plan §11.1) | **FIXED (Stage 9.0)**: in the card's tooltip |
 | 34 | Warn or pre-check free disk space before a large Decrypt or Encrypt | OPEN (see 6) |
 | 35 | Cancel a file read on a stalled network drive: Cancel is visible but disabled and Esc does nothing during "Reading the file details…" (VM:264-275) | OPEN |
 | 36 | A single-instance check or a warning when the same output is open in another instance (temp names are unique, so UX only) | OPEN |
