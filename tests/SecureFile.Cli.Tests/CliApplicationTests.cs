@@ -136,6 +136,28 @@ public sealed class CliApplicationTests : IDisposable
     }
 
     [Fact]
+    public async Task Encrypt_OutputIsTheInputThroughAFolderLink_IsRefusedWithAPlainMessage()
+    {
+        // Review CLI-1: a text comparison let this through and the engine's ArgumentException crashed the program.
+        string original = Write("a.txt", "x");
+        string alias = Path.Combine(_folder, "alias");
+        try
+        {
+            Directory.CreateSymbolicLink(alias, _folder);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Assert.Skip($"Symbolic links cannot be created here: {exception.Message}");
+        }
+
+        RunResult result = await RunAsync(["encrypt", original, "-o", Path.Combine(alias, "a.txt"), "--force", "--password-stdin"], stdin: Phrase + "\n");
+
+        Assert.Equal(ExitCodes.Failure, result.Code);
+        Assert.Contains("can't replace the file you chose", result.Err, StringComparison.Ordinal);
+        Assert.Equal("x", await File.ReadAllTextAsync(original, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task Encrypt_OutputIsAFolderOrInvalidName_IsReportedWithoutACrash()
     {
         string original = Write("a.txt", "x");

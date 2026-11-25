@@ -153,7 +153,7 @@ internal sealed class CliApplication
             return $"The file \"{input}\" can't be found (or it is a folder).";
         }
 
-        if (OutputPathResolver.IsSameFile(input, output))
+        if (IsSameFileOrLoop(input, output))
         {
             return "The result can't replace the file you chose. Give a different name with --output.";
         }
@@ -169,6 +169,26 @@ internal sealed class CliApplication
         return File.Exists(output) && !options.Force
             ? $"\"{output}\" already exists. Use --force to replace it, or --output to choose another name."
             : null;
+    }
+
+    /// <summary>Tells whether the output would replace the input; a link loop in either path counts as "yes".</summary>
+    /// <param name="input">The chosen file.</param>
+    /// <param name="output">Where the result would go.</param>
+    /// <returns><see langword="true"/> when the result must be refused.</returns>
+    /// <remarks>
+    /// A loop means the identity cannot be decided; refusing is the safe answer, and choosing another
+    /// <c>--output</c> is the fix either way.
+    /// </remarks>
+    private static bool IsSameFileOrLoop(string input, string output)
+    {
+        try
+        {
+            return OutputPathResolver.IsSameFile(input, output);
+        }
+        catch (IOException)
+        {
+            return true;
+        }
     }
 
     /// <summary>Runs the engine with a progress line and turns the expected failures into plain messages.</summary>

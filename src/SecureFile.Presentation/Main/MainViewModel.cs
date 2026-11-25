@@ -809,13 +809,18 @@ public sealed partial class MainViewModel : ObservableObject
         }
     }
 
-    /// <summary>Compares full paths ignoring case, like Core's own check (Windows and macOS ignore case).</summary>
-    /// <param name="first">One path.</param>
-    /// <param name="second">The other path.</param>
+    /// <summary>Tells whether writing <paramref name="output"/> would replace <paramref name="input"/>.</summary>
+    /// <param name="input">The chosen file.</param>
+    /// <param name="output">The path from the Save dialog.</param>
     /// <returns><see langword="true"/> when both name the same file.</returns>
-    private static bool IsSameFile(string first, string second)
+    /// <remarks>
+    /// Uses Core's own check (links, case and Unicode aliases): a plain text comparison let a folder link through, and
+    /// Core's <see cref="ArgumentException"/> then reached the safety net as an "unexpected" error (review VM-2). A link
+    /// loop throws <see cref="IOException"/>, which the guarded command turns into a plain message.
+    /// </remarks>
+    private static bool IsSameFile(string input, string output)
     {
-        return string.Equals(Path.GetFullPath(first), Path.GetFullPath(second), StringComparison.OrdinalIgnoreCase);
+        return FileIdentity.AreSameFile(Path.GetFullPath(input), Path.GetFullPath(output));
     }
 
     /// <summary>

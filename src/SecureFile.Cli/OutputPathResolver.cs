@@ -1,4 +1,5 @@
 using SecureFile.Core.Cryptography;
+using SecureFile.Core.Files;
 
 namespace SecureFile.Cli;
 
@@ -24,13 +25,18 @@ internal static class OutputPathResolver
         return command == CliCommand.Encrypt ? inputPath + EncryptedFileFormat.FileExtension : DecryptedName(inputPath);
     }
 
-    /// <summary>Tells whether two paths name the same file (case is ignored, like Windows and macOS do).</summary>
-    /// <param name="first">One path.</param>
-    /// <param name="second">The other path.</param>
+    /// <summary>Tells whether writing <paramref name="output"/> would replace <paramref name="input"/>.</summary>
+    /// <param name="input">The chosen file.</param>
+    /// <param name="output">Where the result would go.</param>
     /// <returns><see langword="true"/> when both lead to the same file.</returns>
-    public static bool IsSameFile(string first, string second)
+    /// <remarks>
+    /// Uses the engine's own check (links, case and Unicode aliases), so a path the engine would refuse is refused
+    /// here first with a plain message instead of an unhandled <see cref="ArgumentException"/> (review CLI-1).
+    /// </remarks>
+    /// <exception cref="IOException">A path holds a link loop.</exception>
+    public static bool IsSameFile(string input, string output)
     {
-        return string.Equals(Path.GetFullPath(first), Path.GetFullPath(second), StringComparison.OrdinalIgnoreCase);
+        return FileIdentity.AreSameFile(Path.GetFullPath(input), Path.GetFullPath(output));
     }
 
     /// <summary>Removes <c>.enc</c> from the name; a name without it gets <c>.decrypted</c>, so the suggestion never equals the input.</summary>

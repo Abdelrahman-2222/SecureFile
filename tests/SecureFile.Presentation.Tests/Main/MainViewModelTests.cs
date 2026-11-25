@@ -373,6 +373,45 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public async Task Encrypt_OutputIsTheInputThroughAFolderLink_FailsWithAMessageAndDoesNotCallCore()
+    {
+        // Review VM-2: a text comparison let the alias through, and Core's ArgumentException reached the safety net.
+        string folder = Directory.CreateTempSubdirectory("SecureFileVm_").FullName;
+        string alias = folder + "-alias";
+        try
+        {
+            try
+            {
+                Directory.CreateSymbolicLink(alias, folder);
+            }
+            catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+            {
+                Assert.Skip($"Symbolic links cannot be created here: {exception.Message}");
+            }
+
+            string input = Path.Combine(folder, "report.pdf");
+            await File.WriteAllTextAsync(input, "x", TestContext.Current.CancellationToken);
+            MainViewModel viewModel = await CreateWithFileAsync(input);
+            _dialogs.SaveResult = Path.Combine(alias, "report.pdf");
+
+            await viewModel.EncryptCommand.ExecuteAsync(null);
+
+            Assert.Empty(_encryption.Calls);
+            Assert.Equal(MainViewState.Failed, viewModel.State);
+            Assert.StartsWith("Choose a different name", viewModel.StatusMessage, StringComparison.Ordinal);
+        }
+        finally
+        {
+            if (Directory.Exists(alias))
+            {
+                Directory.Delete(alias);
+            }
+
+            Directory.Delete(folder, recursive: true);
+        }
+    }
+
+    [Fact]
     public void Constructor_NullService_ThrowsArgumentNullException()
     {
         Assert.Throws<ArgumentNullException>("encryptionService", () => new MainViewModel(null!, _detailsReader, _dialogs, _errorLog, _folderOpener));
