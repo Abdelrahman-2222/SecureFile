@@ -20,13 +20,14 @@ completely on your computer and needs no internet.
 
 | Your computer | In this beta |
 |---|---|
-| **Windows 10 or 11, 64-bit** | **Ready.** Follow "How to run it" below. |
+| **Windows 10 or 11, 64-bit** (almost every PC) | **Ready.** Use the `win-x64` zip and follow "How to run it" below. |
+| **Windows 11 on an ARM PC** (Surface Pro X, Copilot+ PC; Settings → System → About says "ARM-based processor") | **Built but never run.** Use the `win-arm64` zip. It was made on another kind of PC and has not been tried on real ARM hardware, so please tell me if it starts. (The `win-x64` zip also runs on ARM PCs, a little slower.) |
 | **macOS** and **Linux** | **Not in this release.** A desktop version for both is planned as the next step (a window, like the Windows one). Tell me your system and I will send you the first build when it exists. Your opinion on the idea still helps. |
 
 ## How to run it
 
 1. Unzip the folder anywhere (for example your Desktop).
-2. Double-click **SecureFile.exe**. There is nothing to install. Windows 10 or 11, 64-bit.
+2. Double-click **SecureFile.exe**. There is nothing to install. Windows 10 or 11, 64-bit (x64 or ARM).
 
 ## Try it in one minute
 

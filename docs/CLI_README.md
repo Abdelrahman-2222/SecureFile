@@ -38,7 +38,7 @@ xattr -d com.apple.quarantine securefile   # one time: tell macOS you trust this
 If macOS still says it "cannot be opened because the developer cannot be verified", open **System Settings → Privacy &
 Security** and choose **Open Anyway** next to the message, then run it again.
 
-**Windows** (`win-x64`): unzip, open PowerShell in the folder, run `.\securefile.exe --version`. If SmartScreen says
+**Windows** (`win-x64`; `win-arm64` for ARM PCs such as Surface Pro X, built but not yet run on real ARM hardware): unzip, open PowerShell in the folder, run `.\securefile.exe --version`. If SmartScreen says
 "Windows protected your PC", choose **More info → Run anyway**.
 
 **Check the download** (any system): compare the archive's SHA-256 with the line in `SHA256SUMS.txt`:

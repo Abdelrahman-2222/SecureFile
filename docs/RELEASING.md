@@ -16,13 +16,14 @@ release branch (fast-forward only) and a new tag (`v0.1.1`).
 From a clone checked out at the release branch:
 
 ```powershell
-pwsh scripts/publish-beta.ps1                  # Windows app (window), win-x64   -> artifacts/beta
-pwsh scripts/publish-cli.ps1                   # command line for win-x64, linux-x64, linux-arm64, osx-arm64, osx-x64 -> artifacts/cli
+pwsh scripts/publish-beta.ps1                  # Windows app (window), win-x64 and win-arm64 -> artifacts/beta
+pwsh scripts/publish-cli.ps1                   # command line for win-x64, win-arm64, linux-x64, linux-arm64, osx-arm64, osx-x64 -> artifacts/cli
 ```
 
 | System | Window | Command line |
 |---|---|---|
 | Windows 10/11 x64 | `SecureFile-<v>-<label>-win-x64.zip` | `securefile-<v>-<label>-win-x64.zip` |
+| Windows 11 ARM64 | `SecureFile-<v>-<label>-win-arm64.zip` (**built, never run**) | `securefile-<v>-<label>-win-arm64.zip` (**built, never run**) |
 | Linux x64 and arm64 | not built yet (Avalonia, plan Step 7.1) | built, **held back from releases** until the window exists (Steps 7.1 and 7.2) |
 | macOS Apple silicon and Intel | not built yet (Avalonia, plan Step 7.1) | built, **held back from releases** until the window exists (Steps 7.1 and 7.2) |
 

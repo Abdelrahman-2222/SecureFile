@@ -11,11 +11,11 @@
 .PARAMETER Label
   The pre-release label in the file names (default: beta1). The version number comes from Directory.Build.props.
 .PARAMETER Runtimes
-  The .NET runtime identifiers to build (default: win-x64, linux-x64, linux-arm64, osx-arm64, osx-x64).
+  The .NET runtime identifiers to build (default: win-x64, win-arm64, linux-x64, linux-arm64, osx-arm64, osx-x64).
 #>
 param(
     [string]$Label = 'beta1',
-    [string[]]$Runtimes = @('win-x64', 'linux-x64', 'linux-arm64', 'osx-arm64', 'osx-x64')
+    [string[]]$Runtimes = @('win-x64', 'win-arm64', 'linux-x64', 'linux-arm64', 'osx-arm64', 'osx-x64')
 )
 
 $ErrorActionPreference = 'Stop'
