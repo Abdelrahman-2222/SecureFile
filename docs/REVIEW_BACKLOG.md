@@ -119,3 +119,37 @@ mutants are disabled). Answered or recorded:
 | R2 | Low | Cancelling Save reset the state even after a success | Fixed: only a `Failed` state is reset (after a success the file is cleared, so the case cannot be reached from the screen) |
 | R4 | Low | The throttle test covers the first report, skipped reports and the 100 % bypass, not the 100 ms boundary, a second operation or a late report; `Stopwatch` is not injectable and Stryker runs only on Core | **Fixed (Stage 9.0, C18):** `TimeProvider` injected, the three tests added. Open: Stryker on Presentation (plan 9.2) |
 | R5 | Info | The bar can lag a few percent during a long final flush | Accepted (cosmetic; 100 % is always shown) |
+
+## F. Final review (Stage 9.1, six read-only reviewers, one per area, every finding checked against the code)
+
+Areas: Core crypto and files, Presentation ViewModel, WPF + Avalonia windows, CLI, tests and CI/scripts, documents.
+No High findings; the crypto design (tag over header and ciphertext, constant-time compare, verify before the padding is
+touched, HKDF key split, bounded iteration count, wiped key buffers) was confirmed sound. Each fix below is one commit.
+
+| # | Sev | Finding | Decision |
+|---|---|---|---|
+| CORE-1 | Medium | `/dev/zero` (Linux/macOS) reports length 0 and never ends: encryption ran until the disk was full | **Fixed:** reading more bytes than the length at the start throws `IOException`; tests with a device-like stream and with `/dev/zero` (Unix only). **Open:** opening a FIFO blocks in `open()` (also in `FileDetailsReader`); rare, needs a file-type probe |
+| CORE-2 | Low | `P@ssw0rd2024`, `W3lc0me2024!` rated Strong: the look-alike reading also turned the suffix into letters | **Fixed:** a third reading drops trailing digits and symbols first; tests |
+| CORE-3 | Nit | `Thread.Sleep` in the delete retry can block the caller for ~0.4 s when an already-cancelled token meets a locked temp file | Accepted (rare combination; documented here) |
+| VM-1 | Medium | Browse did not lock the window while the Open dialog was open (a non-blocking Linux portal let a file be swapped mid-operation) | **Fixed:** `IsChoosingOutput` became `IsFileDialogOpen` and covers both dialogs; test |
+| VM-2 | Low/Med | Same-file check by text only: a folder link or Unicode alias reached the safety net as "unexpected" | **Fixed** with CLI-1: `FileIdentity` is public and both front ends call it; tests |
+| VM-3 | Nit | `OpenFilesCommand` missing from the change-notification lists | **Fixed** |
+| VM-4 | Nit | Disk-full HResult comment named the wrong constant | **Fixed** |
+| UI-1 | Medium | WPF: if the operation ended while the "close?" question was open, Yes left the window open and it closed later by itself | **Fixed:** checks again after the answer, like Avalonia |
+| UI-2 | Medium | WPF status changes were not announced (LiveSetting without `LiveRegionChanged`) | **Fixed:** the window raises the event. **Open:** check with Narrator/NVDA (B3) and the same check for Avalonia |
+| UI-3 | Low | WPF: the collapsed plain-text box holds the password even while "Show password" is off | **Open:** write the visible boxes only while shown; needs a manual run of TESTPLAN A-rows (WPF has no unit tests), so not changed blind |
+| UI-4 | Nit | WPF `MaxHeight` taken from the primary screen only | Accepted (documented; a second, shorter monitor can still clip) |
+| UI-5 | Nit | Avalonia test name said "Weak" for a Too short password | **Fixed** (renamed) |
+| CLI-1 | Med/High | Output = input through a link: Core's `ArgumentException` crashed the CLI with a stack trace | **Fixed** (see VM-2); a link loop is refused with the same message |
+| CLI-2 | Medium | Every Ctrl+C was swallowed, so a wait on a silent pipe could not be stopped | **Fixed:** the second Ctrl+C ends the process |
+| CLI-3 | Medium | `--password-stdin` at a terminal echoed the password | **Fixed:** refused with a plain message; test |
+| CLI-4 | Low | The error was glued to the progress line ("… 100 %Error: …") | **Fixed:** the line ends first; test |
+| CLI-5..7 | Low/Nit | `-o --force` wrote a file named `--force`; a second `-o` won silently; no `--`; `encrypt --help` was an error | **Fixed**; tests |
+| CI-1 | Medium | The WPF FlaUI tests were skipped in every gate (env var never set) | **Fixed:** a CI step runs them with `SECUREFILE_UI_TESTS=1` (4/4 pass locally). The local pre-push gate still skips them (needs a free desktop) |
+| CI-2 | Low/Med | gitleaks comment claimed a full-history scan on every run | **Fixed** (wording). Open idea: a weekly scheduled full scan |
+| CI-3 | Low | A delete-retry test raced a timer against the retry budget (a likely source of the rare unexplained failure) | **Fixed:** the lock is released inside the injected pause |
+| CI-4 | Low | The Core coverage gate merged every test project's coverage | **Fixed:** measured with Core.Tests alone (97.9 % / 95.8 %) |
+| CI-5 | Low | The pre-push gate checked the working tree, not the pushed commit | **Fixed:** a dirty tree refuses the push |
+| CI-6 | Low | No job timeouts (6 h default) | **Fixed:** 30 minutes per job |
+| CI-7 | Nit | A failed format check did not say which file | **Fixed** |
+| DOC-1..7 | Med/Low | TESTPLAN A15 said red for Weak; A19-A22 on one line; ADR-06 named CryptoStream; ADR files promise; beta2 ARM zip; Enter key; README "every change" | **Fixed**, one commit per document |
