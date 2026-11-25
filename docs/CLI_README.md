@@ -88,6 +88,17 @@ users on the machine in the list of running programs. Use the hidden prompt, or 
 read -rs PW; printf '%s\n' "$PW" | ./securefile encrypt notes.txt --password-stdin; unset PW
 ```
 
+**Windows PowerShell 5.1 and non-English passwords:** the program reads the piped password as UTF-8, but the old Windows
+PowerShell 5.1 (the blue window built into Windows) may turn letters such as `é`, `ü` or Arabic into `?` *before* they reach
+the program. The file would then be locked with a password nobody can type again. Use PowerShell 7 (`pwsh`), which pipes
+UTF-8, or first run this line in the same window:
+
+```powershell
+$OutputEncoding = [Text.UTF8Encoding]::new()
+```
+
+The hidden prompt (no `--password-stdin`) is not affected.
+
 **Ctrl+C** cancels safely: no half-written file is left behind.
 
 **Exit codes:** `0` done · `1` failed in an expected way (wrong password, damaged or unsupported file, no permission, file in

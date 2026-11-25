@@ -71,7 +71,7 @@ tag, fresh CSPRNG salt/IV, strict UTF-8 + NFC, no password in arguments or logs)
 | R3 | Low | CLI crashed with a raw `ArgumentException` for `--output <folder>` or an invalid name | **Fixed:** `CheckPaths` refuses both with a plain message (test `Encrypt_OutputIsAFolderOrInvalidName_IsReportedWithoutACrash`) |
 | R4 | Low | Temp-file name written wrongly; no deterministic test of the delete retry | Name **fixed**; retry test recorded as backlog C15 |
 | R5 | Low | Windows temp file/result inherit folder ACL (hidden is not protection) | **Fixed (Stage 9.0):** a decrypted temp file is created with an owner-only, non-inheriting ACL in the create call, and the rename keeps it (C16) |
-| R6 | Low | PowerShell 5.1 pipes non-ASCII text as `?` into `--password-stdin`, so the file is locked with a password nobody can retype | **Recorded:** backlog C17 (read stdin as UTF-8 bytes; document in CLI README) |
+| R6 | Low | PowerShell 5.1 pipes non-ASCII text as `?` into `--password-stdin`, so the file is locked with a password nobody can retype | **Fixed (Stage 7 + 9.0):** stdin is read as UTF-8 bytes; `docs/CLI_README.md` warns about PowerShell 5.1 and gives the `pwsh` / `$OutputEncoding` fix (C17) |
 | R7 | Info | The error log writes `exception.ToString()` (paths, user names, no secrets), no per-entry cap | Accepted (documented in the class) |
 | R8 | Info | Replay/rollback (swapping in another valid `.enc` made with the same password) is not modelled | **Added** as out of scope: the tag does not bind a file identity |
 | - | Info | Row 20 said `asInvoker` but the manifest does not state it | Wording fixed; adding the explicit level is backlog C16 |
