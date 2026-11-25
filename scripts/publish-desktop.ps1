@@ -65,6 +65,8 @@ foreach ($rid in $Runtimes) {
         -p:PublishSingleFile=true -p:PublishTrimmed=true `
         -p:DebugType=none -p:DebugSymbols=false -p:PublishDocumentationFiles=false -o $publish
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed for $rid (exit code $LASTEXITCODE)." }
+    # SkiaSharp's Windows packages copy about 100 MB of native debug symbols; they are not part of the program.
+    Get-ChildItem $publish -Filter '*.pdb' | Remove-Item
 
     New-Item -ItemType Directory -Path $folder | Out-Null
     if ($rid.StartsWith('osx')) {

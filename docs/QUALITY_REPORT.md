@@ -107,7 +107,36 @@ Verdict: **flat at about 25-28 MB** (target < 150 MB). The 1 GiB curve equals th
 C1 finding: compression halves the download-sized file on disk (134 to 65 MB) at the price of about 200 ms more startup.
 The release defaults were **not** changed; the decision is the user's (size versus 0.2 s of start).
 Note: `publish-cli.ps1` fails to create the archives when started from Git Bash (Git's `tar` cannot read `D:` paths); it
-works from PowerShell.
+works from PowerShell. (Since Stage 7 it writes the .tar.gz with .NET's tar writer instead, so this no longer applies.)
+
+## 7.5 Size: WPF (cannot be trimmed) versus Avalonia (trimmed)
+
+Measured 2026-11-25 on the reference machine, same commit, `dotnet publish -c Release --self-contained -p:PublishSingleFile=true`,
+no debug symbols. All zips made the same way (`Compress-Archive -CompressionLevel Optimal`), so they compare with each other;
+the WPF zip from `publish-beta.ps1` in 5.2 (56.2 MB) used the same command on an older build.
+
+| Build (win-x64 unless named) | Program files | Main executable | Zip / tar.gz |
+|---|---|---|---|
+| **WPF**, untrimmed (trimming is not supported for WPF) | 133.6 MB (1 file) | 133.6 MB | 58.1 MB |
+| Avalonia, untrimmed | 99.3 MB (4 files) | 81.3 MB | 43.4 MB |
+| **Avalonia, trimmed** (`PublishTrimmed=true`) | **38.3 MB** (4 files) | 20.4 MB | **16.4 MB** |
+| Avalonia trimmed, linux-x64 / linux-arm64 (`publish-desktop.ps1`) | 36.4 / 35.3 MB | 23.1 / 22.5 MB | 15.0 / 14.6 MB |
+| Avalonia trimmed, osx-x64 / osx-arm64 (`SecureFile.app`) | 40.2 / 39.4 MB | 20.9 / 20.2 MB | 17.2 / 16.8 MB |
+| Avalonia, **Native AOT** | not measured | | |
+
+Findings:
+
+- **Trimming is the big lever:** it removes about 61 MB (99 to 38 MB) from Avalonia; the trimmed window is 29 % of the
+  WPF app on disk and 28 % of its download. The four Avalonia files are the program plus three native libraries kept next
+  to it (Skia for drawing, HarfBuzz for text, ANGLE `av_libglesv2.dll` for OpenGL on Windows).
+- **No trim warnings:** the Avalonia project has the trimming/AOT analyzers on (`IsAotCompatible`) and uses compiled
+  bindings (`x:DataType`), and warnings are errors, so a publish that trims unsafely fails instead of shipping.
+- **Native AOT was not measured:** it needs the platform's native linker (Visual Studio C++ build tools on Windows,
+  clang on Linux, Xcode on macOS), none of which is installed here, and it cannot be cross-compiled to another OS. It
+  is listed under "Things only the user can do".
+- SkiaSharp's Windows packages copy about 100 MB of native debug symbols (`*.pdb`) into a publish; they are excluded
+  above and deleted by `publish-desktop.ps1`.
+- The Windows release stays WPF (the required track). The Avalonia numbers for win-x64 are for this comparison only.
 
 ## 5.3 Code metrics, coverage, mutation
 
@@ -188,7 +217,7 @@ before the rename. That is now written down as "verify-then-commit"; an extra HM
 | 6 | Peak memory 1 MB / 100 MB / 1 GiB (5.2) | flat, < 150 MB | 25 / 28 / 28 MB | Met |
 | 7 | Progress updates (5.2) | <= 10 per second | was about 70 per second; throttled to 10 per second | Met after fix |
 | 8 | UI thread blocked (5.2) | never > 50 ms | by code review: work off the UI thread; profiler run pending | **Open** (user checklist, VS profiler) |
-| 9 | Published size (5.2) | reported per architecture | WPF win-x64 134 MB (65 MB compressed); CLI 12.6-14.5 MB exe, 5.3-5.9 MB archives; win-arm64 in Stage 6 | Reported |
+| 9 | Published size (5.2, 7.5) | reported per architecture | WPF win-x64 134 MB (65 MB compressed); CLI 12.6-14.5 MB exe, 5.3-5.9 MB archives; Avalonia trimmed 35-40 MB (archives 15-17 MB), WPF vs Avalonia in 7.5; Native AOT not measured | Reported |
 | 10 | Complexity / maintainability (5.3) | <= 10 / >= 60 | worst 7 / lowest 60 (Core) | Met |
 | 11 | Coverage Core (5.3) | >= 90 % lines, >= 85 % branches | 98.7 % / 98.6 % | Met |
 | 12 | Coverage Presentation (5.3) | >= 85 % | 95.8 % lines, about 91 % branches | Met |
@@ -219,3 +248,7 @@ before the rename. That is now written down as "verify-then-commit"; an extra HM
 - [ ] **Microsoft Threat Modeling Tool (optional):** the STRIDE table is in `docs/THREAT_MODEL.md`; redraw it in the tool if the course needs the .tm7 file.
 - [ ] **Screenshots to supply:** profiler timeline (`docs/quality/screenshots/profiler-cpu.png`), SonarQube result, Task Manager during a 1 GiB encryption. They are not invented here.
 - [ ] **Decision C1:** accept `EnableCompressionInSingleFile` (65 MB, about 0.2 s slower start) or keep 134 MB uncompressed.
+- [ ] **Native AOT size (7.5, optional):** install the Visual Studio "Desktop development with C++" workload, then
+  `dotnet publish src/SecureFile.Avalonia -c Release -r win-x64 -p:PublishAot=true -o artifacts/size/avalonia-aot` and
+  add the folder size (without `*.pdb`) to the 7.5 table. Not needed for any release.
+- [ ] **macOS and Linux windows on real systems (7.4):** the checklist is in `docs/NEXT_STEP_PROMPT.md`.
