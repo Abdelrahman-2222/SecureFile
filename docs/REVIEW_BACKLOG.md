@@ -96,6 +96,7 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 | C20 | Avalonia window gaps versus WPF: no Caps Lock warning (Avalonia has no API to read the Caps Lock state); Open folder opens the folder but cannot select the file (no `/select` equivalent in the launcher); the macOS app bundle has no icon (`.icns` not made) | Stage 7; documented in the window's code |
 | C21 | Avalonia window has no automated UI test on a real (non-headless) desktop and no screen-reader check; the headless test covers bindings, clipboard guard and one encrypt/decrypt round trip | Stage 7; manual checklist in `docs/NEXT_STEP_PROMPT.md` |
 | C22 | Stryker (mutation testing) has never run on the CLI's pure logic (argument parser, password and path resolvers) | Recorded in Stage 8; Core has 100 %, Presentation is C18 |
+| C23 | Stage 9.0 review, low: `FileIdentity` collapses `..` inside a link target as text (a target like `sub/../x` where `sub` is a link can be missed); WPF drop highlight may flicker when the pointer crosses a child of the drop zone; no headless test of Enter-to-Confirm in Avalonia | Contrived or cosmetic; add the Avalonia key test in 9.1 |
 
 ## D. How to burn this down
 
