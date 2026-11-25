@@ -1,6 +1,7 @@
 using System.Globalization;
 using SecureFile.Core.Cryptography;
 using SecureFile.Core.Files;
+using SecureFile.Core.Passwords;
 using SecureFile.Presentation.Main;
 
 namespace SecureFile.Presentation.Tests.Main;
@@ -466,6 +467,19 @@ public sealed class MainViewModelTests
         string root = Path.GetPathRoot(Path.GetTempPath())!;
 
         Assert.EndsWith($"in the folder \"{root}\".", MainViewModel.SuccessMessage(encrypt: false, "a.enc", Path.Combine(root, "a")), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Guidance_WeakButMatchingPassword_SaysItIsWeakAndThatEncryptIsStillAllowed()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+
+        viewModel.Password = "Password1234";
+        viewModel.ConfirmPassword = "Password1234";
+
+        Assert.Equal(PasswordStrength.Weak, viewModel.Strength);
+        Assert.True(viewModel.EncryptCommand.CanExecute(null)); // advice only: the minimum length is the one rule
+        Assert.StartsWith("The password is weak. You can still choose Encrypt file", viewModel.StatusMessage, StringComparison.Ordinal);
     }
 
     [Fact]

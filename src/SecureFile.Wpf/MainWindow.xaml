@@ -80,7 +80,7 @@
                                     <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding Strength}" Value="Weak">
-                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding Strength}" Value="Fair">
                                     <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
@@ -104,7 +104,7 @@
                                     <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding Strength}" Value="Weak">
-                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCriticalBrush}" />
+                                    <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />
                                 </DataTrigger>
                                 <DataTrigger Binding="{Binding Strength}" Value="Fair">
                                     <Setter Property="Foreground" Value="{DynamicResource SystemFillColorCautionBrush}" />

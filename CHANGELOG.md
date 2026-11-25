@@ -32,6 +32,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
   used, no copy cursor while busy (#12); Enter in the first password box moves to Confirm, Cancel has the focus while
   working, and the focus returns after a cancel (#11, #30, #7); the safety-net dialogs name the log file and have the
   main window as owner (#15); the success message names the folder and says the unencrypted original is still there (#25).
+- Stage 9.0 (user feedback): a weak password is shown in amber, not red (red now means only "blocks", too short), and the
+  status line says "The password is weak. You can still choose Encrypt file…" instead of a plain "Ready".
 
 ### Changed
 

@@ -155,12 +155,13 @@ internal sealed partial class MainWindow : Window
         }
     }
 
-    /// <summary>Red for too short and weak, amber for fair, green for strong (the WPF window's DataTriggers).</summary>
+    /// <summary>Red for too short (blocks), amber for weak and fair (advice), green for strong (the WPF window's DataTriggers).</summary>
     private void ApplyStrengthColour()
     {
         PasswordStrength strength = _viewModel.Strength;
-        bool critical = strength is PasswordStrength.TooShort or PasswordStrength.Weak;
-        bool caution = strength == PasswordStrength.Fair;
+        // Red only for what blocks (too short); a weak password is allowed, so it is a caution like Fair.
+        bool critical = strength == PasswordStrength.TooShort;
+        bool caution = strength is PasswordStrength.Weak or PasswordStrength.Fair;
         bool success = strength == PasswordStrength.Strong;
         foreach (StyledElement element in new StyledElement[] { StrengthBar, StrengthLabel })
         {

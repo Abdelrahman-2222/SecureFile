@@ -357,7 +357,20 @@ public sealed partial class MainViewModel : ObservableObject
             return "Type the password again to confirm it.";
         }
 
-        return PasswordsMatch ? "Ready. Choose Encrypt file." : "The two passwords are not the same yet.";
+        return PasswordsMatch ? ReadyToEncryptGuidance() : "The two passwords are not the same yet.";
+    }
+
+    /// <summary>The "go" line, which admits a weak password instead of a plain "Ready".</summary>
+    /// <returns>The sentence to show.</returns>
+    /// <remarks>
+    /// A weak password is allowed on purpose (only the minimum length is a rule; the meter is advice), but a red warning
+    /// next to a plain "Ready" looked contradictory. The line now says both: it is weak, and encrypting is still possible.
+    /// </remarks>
+    private string ReadyToEncryptGuidance()
+    {
+        return Strength == PasswordStrength.Weak
+            ? "The password is weak. You can still choose Encrypt file, but a few unrelated words would be safer."
+            : "Ready. Choose Encrypt file.";
     }
 
     /// <summary>Keeps the guidance line in step with the typed password.</summary>
