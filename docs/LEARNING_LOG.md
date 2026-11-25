@@ -1891,3 +1891,25 @@ Why these choices:
 
 Waiting for the user: run the Sandbox test, decide ADR-15, supply screenshots (`docs/SCREENSHOTS_NEEDED.md`), nothing published.
 Gotcha: `powershell -File script.ps1 -Runtimes a,b` passes `a,b` as ONE string; use one runtime, or call it from inside PowerShell.
+
+## Stage 7: Avalonia windows for macOS and Linux (2026-11-25)
+
+- **Why the dialog interfaces became async (ADR-16):** Avalonia's `StorageProvider` and `Launcher` only return tasks (on
+  Linux another process, the desktop portal, draws the dialog). Blocking on them freezes the UI thread they need; a nested
+  message loop invites re-entrancy bugs. WPF just returns `Task.FromResult`, so its behaviour did not change.
+- **One ViewModel, two windows:** the Avalonia window binds the same `MainViewModel`; only three small services differ. In
+  Avalonia the password box is a normal `TextBox` with `PasswordChar`/`RevealPassword`, so the password is a plain two-way
+  binding (WPF needed code-behind because `PasswordBox.Password` is not bindable).
+- **A test found a real gap:** Avalonia blocks Copy in a hidden password box but allows it once the text is revealed; the
+  window's `CopyingToClipboard`/`CuttingToClipboard` handlers are what keep it off the clipboard, and the headless test proves it.
+- **Headless UI tests:** `Avalonia.Headless.XUnit` is built for xUnit v3 3.x and fails discovery under 4.x
+  (`MissingMethodException`); `HeadlessUnitTestSession` from `Avalonia.Headless` is framework-neutral and works.
+- **Cross-OS golden files:** each OS encrypts the same computed 3 MB sample with the CLI in CI, every OS decrypts all of
+  them. Nothing large is committed; the password goes through stdin and is non-ASCII on purpose.
+- **Windows `tar.exe` stores 0644,** so programs packed on Windows need `chmod +x`. `System.Formats.Tar` lets the script set
+  0755 itself. The SDK adds an ad-hoc code signature to `osx-arm64` even on Windows (Apple silicon requires one).
+- **Size:** WPF 133.6 MB vs Avalonia trimmed 38.3 MB on win-x64; SkiaSharp also copies about 100 MB of native `.pdb` files
+  on Windows, which the script deletes. Native AOT needs the platform's native linker, so it was not measured.
+
+Waiting for the user: try the macOS and Linux archives on real systems (no Mac, no WSL distribution here), Native AOT size.
+Gotcha: inside `namespace SecureFile.Avalonia`, `Avalonia.Media.X` resolves to `SecureFile.Avalonia.Media`; use `global::`.

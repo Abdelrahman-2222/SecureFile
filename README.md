@@ -7,7 +7,7 @@ Under the hood it uses **AES-256-CBC** with an **HMAC-SHA256** check (a wrong pa
 derived from your password with PBKDF2 (600,000 rounds), and big files are processed in a stream. It is written in C# on
 .NET 10; the Windows app uses WPF, and there is a command-line version for Windows, Linux and macOS.
 
-> **Status:** pre-release (`0.1.0-beta`). Windows app and command line work; desktop windows for macOS and Linux are planned.
+> **Status:** pre-release (`0.1.0-beta`). Windows app and command line work; desktop windows for macOS and Linux are built and tested automatically but not yet released (they have not been tried on a real Mac or Linux desktop).
 > Please test on copies of your files. Details: [CHANGELOG.md](CHANGELOG.md), [docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md).
 
 ## Download
@@ -64,7 +64,8 @@ it is. Do not switch the antivirus off.
   backup). Delete them by hand.
 - Malware on your computer (for example a keylogger) can see the password as you type it. See [SECURITY.md](SECURITY.md) and
   [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the full list.
-- Windows app: Windows 10/11 only. macOS and Linux have the command line today; windows for them are planned.
+- Windows app: Windows 10/11 only. macOS and Linux windows exist (Avalonia, `scripts/publish-desktop.ps1`) but are not
+  released until tried on real systems; see [docs/DESKTOP_README.md](docs/DESKTOP_README.md).
 - Not audited by an independent security firm. Use it for learning and everyday privacy, not as your only protection for
   something whose leak would be a disaster.
 

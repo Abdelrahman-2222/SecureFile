@@ -8,6 +8,18 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Stage 7 (macOS and Linux window, bonus): `src/SecureFile.Avalonia` reuses `MainViewModel` with native Open/Save dialogs
+  (`StorageProvider`), the system launcher for "Open folder", and a password box that blocks Copy/Cut even while shown.
+  Headless end-to-end tests (`tests/SecureFile.Avalonia.Tests`) run the real window on Windows, Ubuntu and macOS.
+- Step 7.3: CI encrypts a 3 MB sample with the CLI on Windows, Ubuntu and macOS, and every system decrypts all of them
+  (`scripts/cross-os-golden.ps1`). Ubuntu and macOS also build and test the Avalonia window.
+- Step 7.4: `scripts/publish-desktop.ps1` builds trimmed `SecureFile-<v>-<label>-<rid>.tar.gz` for linux-x64, linux-arm64,
+  osx-arm64 and osx-x64 (macOS as `SecureFile.app`) with `docs/DESKTOP_README.md`. **Not run on a real Mac or Linux
+  desktop yet**; macOS and Linux releases stay held back (`docs/RELEASING.md`).
+- Step 7.5: size comparison in `docs/QUALITY_REPORT.md`: WPF win-x64 133.6 MB versus Avalonia trimmed 38.3 MB (zips 58.1
+  versus 16.4 MB). Native AOT not measured (no native linker installed).
+- ADR-16: the dialog and folder-opener interfaces are asynchronous.
+
 - `.gitguardian.yaml`: GitGuardian flagged the made-up passwords in `PasswordPatternsTests.cs` as "Generic Password"; that one
   test file is now ignored by path (all detectors stay on). The old incidents are dismissed on the GitGuardian dashboard as "test credential".
 - Stage 6 (publishing), step 6.1: `scripts/publish-beta.ps1` and `scripts/publish-cli.ps1` also build `win-arm64`
@@ -107,6 +119,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Stage 7: `IFileDialogService` and `IFolderOpener` return tasks (ADR-16); `FileErrorLog` moved from the WPF project to
+  Presentation so both windows share it. The "folder couldn't be opened" hint now says "file manager".
+- Stage 7: `.tar.gz` archives (CLI and desktop) are written with .NET's tar writer, so the program keeps its executable flag.
 - Progress on screen is updated at most 10 times per second (it was about 70 per second for a 100 MB file); the time
   left is shown as "2 h 5 min" from one hour on.
 - Cancelling the Save dialog clears an old error message; a bad drop or Browse keeps the previous good file.

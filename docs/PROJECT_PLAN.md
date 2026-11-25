@@ -769,11 +769,11 @@ What does a mutation score tell us that coverage does not?
 
 | Step | Goal | Done when | Status |
 |---|---|---|---|
-| 7.1 | Avalonia app reusing the same `MainViewModel`. | Same features as WPF. | ⬜ |
-| 7.2 | Avalonia service implementations (StorageProvider dialogs, launcher, clipboard). | Works on Windows. | ⬜ |
-| 7.3 | CI matrix on Windows, Ubuntu, macOS; cross-OS "golden file" tests (files encrypted on one OS decrypt on all). | All green. | ⬜ |
-| 7.4 | Publish `osx-arm64`, `osx-x64`, `linux-x64`, `linux-arm64`; test Linux in WSL2/WSLg; macOS on a Mac or VM. | Runs on each. | 🟡 CLI archives for linux-x64, linux-arm64, osx-arm64, osx-x64 are built by `scripts/publish-cli.ps1` but NOT released: macOS and Linux releases wait for the Avalonia window (7.1, 7.2); decision 2026-11-24 |
-| 7.5 | Size comparison: WPF (no trimming) vs Avalonia trimmed/AOT. | Numbers in the report. | ⬜ |
+| 7.1 | Avalonia app reusing the same `MainViewModel`. | Same features as WPF. | ✅ 2026-11-25: `src/SecureFile.Avalonia`, run on Windows (window rendered, native dialog opened); headless end-to-end tests. Two documented gaps (backlog C20): no Caps Lock warning, Open folder cannot select the file |
+| 7.2 | Avalonia service implementations (StorageProvider dialogs, launcher, clipboard). | Works on Windows. | ✅ 2026-11-25: dialogs and launcher behind the (now async, ADR-16) Presentation interfaces; clipboard = Copy/Cut blocked in the password boxes (tested). Linux portal modality open (C19) |
+| 7.3 | CI matrix on Windows, Ubuntu, macOS; cross-OS "golden file" tests (files encrypted on one OS decrypt on all). | All green. | 🟡 jobs written and the script run locally on Windows; green only once the PR's CI run passes on all three systems |
+| 7.4 | Publish `osx-arm64`, `osx-x64`, `linux-x64`, `linux-arm64`; test Linux in WSL2/WSLg; macOS on a Mac or VM. | Runs on each. | 🟡 `scripts/publish-desktop.ps1` builds all four (archives 15-17 MB, program stored as executable, osx-arm64 ad-hoc signed by the SDK). **Not run on any of them:** no WSL distribution installed, no Mac; releases stay held back (`docs/RELEASING.md`). Waiting for the user |
+| 7.5 | Size comparison: WPF (no trimming) vs Avalonia trimmed/AOT. | Numbers in the report. | 🟡 WPF 133.6 MB vs Avalonia trimmed 38.3 MB in `docs/QUALITY_REPORT.md` §7.5; Native AOT not measured (needs the C++ build tools; user checklist) |
 | 7.6 | Optional `SecureFile.Cli`. | `securefile encrypt <in> <out>` works. | ✅ built early (2026-11-24): `src/SecureFile.Cli` + 39 tests; Windows binary run by hand; Linux and macOS binaries built but only the Ubuntu/macOS CI test run exercises them |
 
 ### Stage 8 — Stakeholder suggestions (Phase 6) · ~2 hours
