@@ -780,7 +780,7 @@ What does a mutation score tell us that coverage does not?
 
 | Step | Goal | Status |
 |---|---|---|
-| 8.1 | Write `SUGGESTIONS.md` (§13): what, why, benefit, priority, effort — marking which are already built. | 🟡 first full draft written early (docs/SUGGESTIONS.md, 2026-11-24): algorithm decision, AI guardrails, roadmap tables; refresh at Stage 8 |
+| 8.1 | Write `SUGGESTIONS.md` (§13): what, why, benefit, priority, effort — marking which are already built. | ✅ refreshed in Stage 8 (2026-11-25): built list checked against the repo (🟡 where only CI has run it), 36 new suggestions with priority, effort and backlog reference; the slides themselves are Step 9.3 |
 
 ### Stage 9 — Final deliverables · ~½ day (only after everything is tested and confirmed)
 

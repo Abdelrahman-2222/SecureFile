@@ -19,6 +19,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Step 7.5: size comparison in `docs/QUALITY_REPORT.md`: WPF win-x64 133.6 MB versus Avalonia trimmed 38.3 MB (zips 58.1
   versus 16.4 MB). Native AOT not measured (no native linker installed).
 - ADR-16: the dialog and folder-opener interfaces are asynchronous.
+- Stage 8: `docs/SUGGESTIONS.md` refreshed for stakeholders: what is built (marked amber where only CI has run it) and 36
+  new suggestions with priority, effort and their backlog item. Backlog C8 and C17 updated to what Stage 7 already did;
+  C22 (no mutation testing on the CLI) added.
 
 ### Fixed
 
