@@ -1090,9 +1090,12 @@ public sealed class MainViewModelTests
     {
         MainViewModel viewModel = CreateViewModel();
 
-        viewModel.Password = "Password1234";
+        string commonWord = "Password1234";
+        string mixedCharacters = "Hjkmnp7!x";
+
+        viewModel.Password = commonWord;
         string weak = viewModel.StrengthText;
-        viewModel.Password = "Hjkmnp7!x";
+        viewModel.Password = mixedCharacters;
         string fair = viewModel.StrengthText;
 
         Assert.Equal("Weak: avoid repeats, sequences and common words. A few unrelated words are safer.", weak);
