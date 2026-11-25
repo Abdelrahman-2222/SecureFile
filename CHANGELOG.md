@@ -8,6 +8,26 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- Stage 8: `docs/SUGGESTIONS.md` refreshed for stakeholders: what is built (marked amber where only CI has run it) and 36
+  new suggestions with priority, effort and their backlog item. Backlog C8 and C17 updated to what Stage 7 already did;
+  C22 (no mutation testing on the CLI) added.
+- Stage 9.0 hand-off: every open review and backlog item triaged against the code (plan row 9.0, `docs/NEXT_STEP_PROMPT.md`).
+
+### Changed
+
+- Documents brought in line with the published `v0.1.0-beta2` (README, RELEASING, CLI_README, BETA_README, SUGGESTIONS,
+  plan row 7.4, backlog C8): the macOS and Linux windows were released as a **preview** for testers. The `0.1.0-beta2`
+  section below, written on the release branch, is now on `main` too.
+
+## [0.1.0-beta2] - 2026-11-25
+
+Released for Windows (app and command line, x64), with the macOS and Linux windows attached as a **preview for testers**
+(they pass the automated tests on macOS and Ubuntu but had not been run on a real Mac or Linux desktop). Not attached:
+win-arm64 and the macOS/Linux command lines (built, never run). This section also covers `0.1.0-beta1` (2026-11-24,
+Windows app only), which was cut before the changelog had release sections.
+
+### Added
+
 - Stage 7 (macOS and Linux window, bonus): `src/SecureFile.Avalonia` reuses `MainViewModel` with native Open/Save dialogs
   (`StorageProvider`), the system launcher for "Open folder", and a password box that blocks Copy/Cut even while shown.
   Headless end-to-end tests (`tests/SecureFile.Avalonia.Tests`) run the real window on Windows, Ubuntu and macOS.
@@ -19,9 +39,6 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Step 7.5: size comparison in `docs/QUALITY_REPORT.md`: WPF win-x64 133.6 MB versus Avalonia trimmed 38.3 MB (zips 58.1
   versus 16.4 MB). Native AOT not measured (no native linker installed).
 - ADR-16: the dialog and folder-opener interfaces are asynchronous.
-- Stage 8: `docs/SUGGESTIONS.md` refreshed for stakeholders: what is built (marked amber where only CI has run it) and 36
-  new suggestions with priority, effort and their backlog item. Backlog C8 and C17 updated to what Stage 7 already did;
-  C22 (no mutation testing on the CLI) added.
 
 ### Fixed
 

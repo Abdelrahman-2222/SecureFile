@@ -25,14 +25,15 @@ pwsh scripts/publish-desktop.ps1               # Avalonia window for linux-x64, 
 |---|---|---|
 | Windows 10/11 x64 | `SecureFile-<v>-<label>-win-x64.zip` | `securefile-cli-<v>-<label>-win-x64.zip` |
 | Windows 11 ARM64 | `SecureFile-<v>-<label>-win-arm64.zip` (**built, never run**) | `securefile-cli-<v>-<label>-win-arm64.zip` (**built, never run**) |
-| Linux x64 and arm64 | `SecureFile-<v>-<label>-linux-x64.tar.gz` / `-linux-arm64.tar.gz`: built, **held back from releases** until tried on a real Linux desktop | built, **held back** with the window |
-| macOS Apple silicon and Intel | `SecureFile-<v>-<label>-osx-arm64.tar.gz` / `-osx-x64.tar.gz` (a `SecureFile.app`): built, **held back from releases** until tried on a real Mac | built, **held back** with the window |
+| Linux x64 and arm64 | `SecureFile-<v>-<label>-linux-x64.tar.gz` / `-linux-arm64.tar.gz`: **preview for testers** since `v0.1.0-beta2` | built, **held back** (never run on Linux) |
+| macOS Apple silicon and Intel | `SecureFile-<v>-<label>-osx-arm64.tar.gz` / `-osx-x64.tar.gz` (a `SecureFile.app`): **preview for testers** since `v0.1.0-beta2` | built, **held back** (never run on macOS) |
 
-**Why macOS and Linux are still held back (decision of 2026-11-24, kept in Stage 7):** the windows now exist (plan Steps
-7.1, 7.2) and pass automated tests on Ubuntu and macOS in CI (headless window test, cross-OS golden files), but nobody has
-yet started them on a real Mac or Linux desktop: there is no Mac here, no Linux PC, and WSL has no distribution installed.
-Native dialogs, Gatekeeper, the app bundle and fonts can only be judged on a real system. Release them only after the
-checks in `docs/NEXT_STEP_PROMPT.md` ("Things only the user can do") were done on at least one Mac and one Linux desktop.
+**Why macOS and Linux are only a preview (decision at the `v0.1.0-beta2` release, 2026-11-25; until then they were held
+back):** the windows exist (plan Steps 7.1, 7.2) and pass automated tests on Ubuntu and macOS in CI (headless window test,
+cross-OS golden files), but nobody has yet started them on a real Mac or Linux desktop: there is no Mac here, no Linux PC,
+and WSL has no distribution installed. Native dialogs, Gatekeeper, the app bundle and fonts can only be judged on a real
+system, so beta2 attaches them labelled **PREVIEW** with a tester checklist in the release notes. Drop the label only
+after the checks in `docs/DESKTOP_README.md` (plan 7.4) were done on at least one Mac and one Linux desktop.
 The osx-arm64 program carries an ad-hoc code signature added by the .NET SDK (checked in the file), which Apple silicon
 requires; it is **not** signed with an Apple Developer ID nor notarized (ADR-15 covers only Windows so far).
 
@@ -59,8 +60,8 @@ x64 and 52.0 MB arm64; CLI zips 5.3 to 5.9 MB each.
    and put the hashes in the release notes.
 4. **Ask the owner before anything outward-facing**: pushing the branch or tag, creating the GitHub Release, uploading the
    zips, sending links to testers. The scripts never upload anything. `artifacts/` is git-ignored; never commit a zip.
-5. Attach to the release only what is ready (today: the Windows zips; macOS and Linux windows and command lines stay held
-   back until tried on real systems, see above).
+5. Attach to the release only what is ready (today: the Windows zips, plus the macOS and Linux windows clearly labelled
+   as a preview; win-arm64 and the macOS/Linux command lines stay held back until run on real systems, see above).
 
 ## Checklist before cutting a release branch
 
@@ -101,3 +102,4 @@ deleting the branch on the website. What exists instead:
 | Release | Contents | Notes |
 |---|---|---|
 | `v0.1.0-beta1` (branch `release/v0.1.0-beta1`) | **Windows app only** (`SecureFile-0.1.0-beta1-win-x64.zip` and its SHA-256) | Decision of 2026-11-24: nothing for macOS and Linux is released until the desktop windows exist (plan Steps 7.1 and 7.2). The command-line archives were built and tried (Windows) but are not attached. Only documents changed between the tag and the release branch head (the macOS/Linux wording), no program code; the zip was built from commit `4e9c693`, so the exe embeds that commit id (`ProductVersion 0.1.0+4e9c693…`) and its hash differs from a build at the tag. GitHub treats asset names as case-insensitive, so `SecureFile-...` and `securefile-...` zips cannot share a release: name command-line zips `securefile-cli-...`. |
+| `v0.1.0-beta2` (branch `release/v0.1.0-beta2`) | **Windows:** `SecureFile-0.1.0-beta2-win-x64.zip` (app) and `securefile-cli-0.1.0-beta2-win-x64.zip` (command line), each with a `.sha256`. **Preview:** `SecureFile-0.1.0-beta2-osx-arm64/osx-x64/linux-x64/linux-arm64.tar.gz` with `SHA256SUMS-macos-linux.txt` | Built from the tagged commit. Both Windows programs started before upload (app window opened; CLI encrypt/decrypt round trip). The macOS/Linux windows are attached as a **preview for testers** (release notes carry a checklist); win-arm64 and the macOS/Linux command lines are built but held back. Not done before this pre-release: the full `docs/TESTPLAN.md` run and the Windows Sandbox test (stated in the release notes). |
