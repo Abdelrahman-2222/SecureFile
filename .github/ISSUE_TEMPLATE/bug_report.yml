@@ -1,0 +1,56 @@
+name: Bug report
+description: Something does not work as described.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you! **Security problem?** Do not report it here; see SECURITY.md.
+        Never paste a password or a file you care about.
+  - type: dropdown
+    id: frontend
+    attributes:
+      label: Which part?
+      options:
+        - Windows app (WPF)
+        - macOS window (preview)
+        - Linux window (preview)
+        - Command line
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: SecureFile version
+      description: Help → About (F1), or `securefile --version`.
+      placeholder: 0.1.0-beta3
+    validations:
+      required: true
+  - type: input
+    id: system
+    attributes:
+      label: System
+      placeholder: Windows 11 23H2 / macOS 15 on M2 / Ubuntu 24.04 GNOME
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Choose a 2 GB file
+        2. Type a password, click Encrypt file
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect, and what happened?
+    validations:
+      required: true
+  - type: textarea
+    id: extra
+    attributes:
+      label: Screenshot or log (optional)
+      description: The log holds no file names and no passwords. Windows `%LOCALAPPDATA%\SecureFile\logs`, macOS `~/Library/Application Support/SecureFile/logs`, Linux `~/.local/share/SecureFile/logs`.

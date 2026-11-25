@@ -1,0 +1,24 @@
+name: Feature request
+description: An idea that would make SecureFile more useful.
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: Please check docs/SUGGESTIONS.md first; the idea may already be on the roadmap.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would it solve?
+      placeholder: When I ..., I have to ...
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like to happen?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered (optional)

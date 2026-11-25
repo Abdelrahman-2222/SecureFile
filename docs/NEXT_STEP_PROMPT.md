@@ -1,30 +1,38 @@
-# Next step: copy-paste prompts for new chats (Stage 9.0b production gaps, then 9.4 demo video and the release)
+# Next step: copy-paste prompts for new chats (Stage 9.0b production gaps, then 9.4 demo video and the next release)
 
-Last finished (2026-11-25): Stage 9.1-9.3, plan rows 9.1-9.3, branch `feature/stage-9-final`. 9.1: six reviewer agents
-(Core, ViewModel, windows, CLI, CI/tests, docs) found 34 items, none High; 31 fixed with one commit each, 3 (CORE-3, UI-3, UI-4)
-recorded in `docs/REVIEW_BACKLOG.md` §F. Stryker: Presentation 83.06 % -> 100 %, CLI pure logic 82.86 % -> 100 %
-(`docs/QUALITY_REPORT.md` §9.1). 9.2: `docs/FINAL_GUIDE.md`. 9.3: `docs/SecureFile_TeamLead.pptx` (17 slides, Q&A in
-the speaker notes, v2 roadmap). 711 tests, 0 failing on Windows (9 skipped: UI opt-in, large files, Linux/macOS only).
+Last finished (2026-11-25):
+- Stage 9.1-9.3 merged as PR #11 (`3cfb5b2`). CI on main green: the WPF FlaUI step (5/5) and the Linux/macOS-only
+  tests (device file, folder links) on Ubuntu and macOS. 9.1: 34 findings, none High, 31 fixed, 3 recorded
+  (`docs/REVIEW_BACKLOG.md` §F); Stryker 100 % in Core, Presentation and the CLI logic. 9.2 `docs/FINAL_GUIDE.md`,
+  9.3 `docs/SecureFile_TeamLead.pptx`. A late user report (WPF password caret, USR-1 in §F2) was fixed with a FlaUI test;
+  712 tests.
+- Release `v0.1.0-beta3` (plan row 9.5): tag and branch `release/v0.1.0-beta3` at `3cfb5b2`, GitHub pre-release with
+  the Windows app, the macOS/Linux windows and command lines (preview), `SHA256SUMS.txt` and one READ-ME-FIRST per
+  system; the same three folders in `artifacts/SecureFile-beta3-for-testers/` for the Google Drive link.
+- Repository prepared for the public: MIT `LICENSE`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, issue templates,
+  `SECURITY.md` with a private report route, a README for users, developers and reviewers.
 
 ## Things only the user can do (still open)
 
-- [ ] Merge the Stage 9.1-9.3 PR (`feature/stage-9-final`) after CI is green on Windows, Ubuntu and macOS. Check in that
-  CI run: the new WPF FlaUI step passes, and the Linux/macOS-only tests ran (device file `/dev/zero`, folder links).
+- [ ] Switch the repository to public (Settings → General → Danger Zone → Change visibility), then in Settings →
+  Security turn on **Private vulnerability reporting**, and add a branch ruleset for `main` and a tag ruleset for `v*`
+  (backlog C9). After that, CodeQL can be enabled for free.
+- [ ] Share the Google Drive link with testers; collect answers per system (macOS/Linux: C19/C21).
 - [ ] Narrator check (UI-2): with Narrator on, a status change (wrong password, success) is read out once.
 - [ ] Rehearse the deck once with the speaker notes; add the three demo screenshots (`docs/SCREENSHOTS_NEEDED.md`).
 - [ ] Run the new TESTPLAN rows by hand on the WPF app: B8-B10, E2-E6, H2 (and A19-A22 split in Stage 9.1).
-- [ ] **Antivirus (C4):** add a Kaspersky exclusion for `%TEMP%\SecureFile*` (do not disable it).
-- [ ] **Stage 7 real systems (plan 7.4):** collect tester answers for the macOS/Linux preview (C19/C21).
+- [x] **Antivirus (C4):** Kaspersky exclusion for `%TEMP%\SecureFile*\` added 2026-11-25 (the gate then passed first time).
 - [ ] **Stage 5** (`docs/QUALITY_REPORT.md`): cold start, VS profiler, SonarQube, class coupling, decision C1.
 - [ ] **Usability (C6):** a person runs `docs/TESTPLAN.md` and the friends session in `docs/USABILITY.md`.
-- [ ] Decisions: C7 (code signing, with ADR-15 in Prompt A), C9 (public repository for CodeQL and branch protection).
+- [ ] Decision C7 (code signing, with ADR-15 in Prompt A). C9 is the visibility switch in the first item.
 
-**Releases are kept (user decision, 2026-11-25):** `v0.1.0-beta1` (first friends build) and `v0.1.0-beta2` stay published
-on GitHub, with their tags and zips, as the record of progress. Every later build is a new release next to them; never
-delete, edit or reuse an earlier tag or release, and never overwrite an earlier zip in `artifacts/beta`.
+**Releases are kept (user decision, 2026-11-25):** `v0.1.0-beta1`, `v0.1.0-beta2` and `v0.1.0-beta3` stay published
+on GitHub, with their tags, branches and zips, as the record of progress. Every later build is a new release next to
+them; never delete, edit or reuse an earlier tag or release, and never overwrite an earlier build in `artifacts/`
+(the publish scripts empty `artifacts/desktop` and `artifacts/cli`: move their contents to `artifacts/archive/` first).
 
-Order: **Prompt A (Stage 9.0b)** after this PR is merged, then **Prompt C (9.4 and the release)**, because the release
-must contain C24.
+Order: **Prompt A (Stage 9.0b)** first, then **Prompt C (9.4 and the next release)**, because that release must
+contain C24.
 
 ### Prompt A: Stage 9.0b (C24 common passwords, ADR-15 decision, clean-machine and manual test kit)
 
@@ -36,8 +44,7 @@ Avalonia app (macOS/Linux, bonus), command line; layers Wpf/Avalonia/Cli -> Pres
 row 9.0b) in this chat, then open the pull request. Do not read docs/PROJECT_PLAN.md or docs/LEARNING_LOG.md in full: grep
 the rows or sections you need. Terse chat updates.
 
-STEP 0: git status, git fetch --prune. Check that the Stage 9.1-9.3 PR (feature/stage-9-final) is merged; branch
-feature/stage-9-production-gaps from main. Build and run all tests first. Also update docs/FINAL_GUIDE.md and the
+STEP 0: git status, git fetch --prune, git switch main, git pull; branch feature/stage-9-production-gaps from main. Build and run all tests first. Also update docs/FINAL_GUIDE.md and the
 presentation's password slide for C24 (they were written before it).
 
 COMMITS: one per item, Conventional Commits, first line <= 72 characters, NO AI attribution lines.
@@ -84,14 +91,14 @@ manual results are missing), in this file remove Prompt A and keep Prompt C (9.4
 ccd_pr tools.
 ~~~
 
-### Prompt C: Stage 9.4 (demo video) and the final tester release
+### Prompt C: Stage 9.4 (demo video) and the next tester release
 
 Paste this into a new chat after Prompt A's PR is merged:
 
 ~~~
 Follow CLAUDE.md (read it first). Project: SecureFile, AES-256-CBC + HMAC file encryption, .NET 10, WPF app (Windows),
 Avalonia app (macOS/Linux, bonus), command line. Task: plan row 9.4 (2-minute demo video as a backup for the live demo)
-and the final tester release, then the pull request. Do not read docs/PROJECT_PLAN.md or docs/LEARNING_LOG.md in full:
+and the next tester release, then the pull request. Do not read docs/PROJECT_PLAN.md or docs/LEARNING_LOG.md in full:
 grep what you need (§14.2 demo flow, row 9.4, release row). Terse chat updates.
 
 STEP 0: git status, git fetch --prune. Check that the Stage 9.0b PR is merged; branch feature/stage-9-release from main.
@@ -103,13 +110,13 @@ file -> right password -> files compare equal -> large file + Cancel: nothing le
 script under scripts/ (no binaries committed). Tell the user how to record it (Windows: Win+Alt+R with Xbox Game Bar,
 or Clipchamp) and where to keep the video (NOT in the repository; attach it to the release or a shared drive). Mark
 row 9.4 done only when the user says the video exists.
-C2. FINAL TESTER RELEASE (user request): three per-OS packages named SecureFile-beta2-for-testers-<Windows|Linux|macOS>,
-each with notes only for that system (what to install, the SmartScreen/Gatekeeper warning, how to verify SHA-256, what
-to test, how to report). Use scripts/publish-*.ps1 with a NEW label (ask the user: e.g. beta3 or rc1); the version comes
-from Directory.Build.props. Update docs/RELEASING.md "Release history" and CHANGELOG (move [Unreleased] into the new
-version). KEEP every earlier release: v0.1.0-beta1 and v0.1.0-beta2 stay published with their tags and zips; the new
-build is a new tag and a new GitHub pre-release next to them. Never delete, edit or reuse an earlier tag, release or zip.
-Ask the user before creating the tag or the GitHub release (outward-facing) and show them the notes first.
+C2. NEXT TESTER RELEASE (with C24): repeat what v0.1.0-beta3 did (docs/RELEASING.md "Release history"): move
+artifacts/desktop and artifacts/cli to artifacts/archive/ first, run scripts/publish-*.ps1 with a NEW label (ask the
+user: beta4 or rc1), build three per-OS folders SecureFile-<label>-for-testers/SecureFile-<label>-<Windows|Linux|macOS>
+with a READ-ME-FIRST.txt and SHA256SUMS.txt each, smoke-test the Windows app and CLI, then tag, release branch and a
+GitHub pre-release next to the earlier ones. Update RELEASING and CHANGELOG (move [Unreleased] into the new version).
+KEEP every earlier release: never delete, edit or reuse an earlier tag, release, branch or zip. Ask the user before
+the tag and the release (outward-facing) and show them the notes first.
 
 KNOWN ENVIRONMENT: Windows 11, Kaspersky makes backup copies of temp files (about 1 full test run in 4 fails a
 "...LeavesNothing" test with an upper-case `.~OUTPUT.*.SECUREFILE-TMP.tmp`: capture the name, re-run); never disable the

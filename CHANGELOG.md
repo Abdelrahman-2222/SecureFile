@@ -8,6 +8,23 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- The repository is prepared for the public: MIT `LICENSE`, `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, issue templates,
+  a private vulnerability-report route in `SECURITY.md`, and a README for users, developers and reviewers.
+- Package metadata in `Directory.Build.props` (MIT licence expression, repository URL).
+
+### Changed
+
+- Every document brought in line with the `v0.1.0-beta3` release and the merged Stage 9.1-9.3 work (README, RELEASING,
+  BETA_README, FINAL_GUIDE, plan rows, hand-off).
+
+## [0.1.0-beta3] - 2026-11-25
+
+Built from `main` at the Stage 9.1-9.3 merge (`3cfb5b2`); tag `v0.1.0-beta3`, branch `release/v0.1.0-beta3`. The
+GitHub pre-release attaches the Windows app, the macOS and Linux windows (preview) and the command line for all
+three systems, one `READ-ME-FIRST-<system>.txt` per system and `SHA256SUMS.txt`. beta1 and beta2 stay published.
+
+### Added
+
 - Stage 8: `docs/SUGGESTIONS.md` refreshed for stakeholders: what is built (marked amber where only CI has run it) and 36
   new suggestions with priority, effort and their backlog item. Backlog C8 and C17 updated to what Stage 7 already did;
   C22 (no mutation testing on the CLI) added.

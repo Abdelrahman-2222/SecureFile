@@ -1988,3 +1988,25 @@ loosened); a slides artifact instead of .pptx (the user chose .pptx).
 
 **Still open / waiting on the user.** Narrator check of the live region, the CI run of the Linux/macOS-only tests and the
 new FlaUI step, UI-3 manual row, rehearsal and demo screenshots; 9.0b, 9.4 and the release are in NEXT_STEP_PROMPT.
+
+## Release v0.1.0-beta3 and public-repository preparation (2026-11-25)
+
+**What was done.** A late user report (WPF hidden password: after leaving the box and clicking back, typing went to the
+start) was traced to `SetBoxes` re-writing an unchanged `PasswordBox.Password`, which resets the caret; the boxes are now
+written only when the text differs, guarded by a FlaUI test that failed first ("dsaolleh"). Main (`3cfb5b2`) was tagged
+`v0.1.0-beta3` with a release branch and published as a GitHub pre-release with one READ-ME-FIRST per system and
+`SHA256SUMS.txt`; the same files sit in three per-OS tester folders. The repository got an MIT licence, CONTRIBUTING,
+a Code of Conduct, issue templates, a private security route and a README written for users, developers and reviewers.
+
+**Why.**
+- *Earlier releases are kept*: beta1, beta2 and beta3 side by side show the progress; a tag is never moved or reused.
+- *Build outputs moved to `artifacts/archive/` before publishing*: the publish scripts empty their folder, and the beta2
+  builds must survive.
+- *macOS/Linux stay "preview"*: CI tests them, but no person has run them there; the label is honest, not modest.
+- *History scanned before going public*: making a repository public publishes every old commit, not only the last one.
+
+**Alternatives not taken.** Re-using the beta2 tag (breaks anyone who checked a hash); a GPL licence (MIT is simpler for
+reviewers and employers to reuse); signing the builds now (decision ADR-15, still open).
+
+**Still open / waiting on the user.** Switching the repository to public, private vulnerability reporting and rulesets,
+sharing the tester link; the items in NEXT_STEP_PROMPT.

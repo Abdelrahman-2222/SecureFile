@@ -14,6 +14,11 @@
     <Copyright>Copyright © 2026 Abdelrahman H. Atta</Copyright>
     <Version>0.1.0</Version>
     <NeutralLanguage>en</NeutralLanguage>
+    <!-- Open source under the MIT License (LICENSE at the repository root). -->
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <RepositoryUrl>https://github.com/Abdelrahman-2222/SecureFile</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/Abdelrahman-2222/SecureFile</PackageProjectUrl>
   </PropertyGroup>
 
   <!-- C# language settings. -->

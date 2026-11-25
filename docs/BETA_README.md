@@ -66,7 +66,7 @@ The person who sent you the zip also sent a long code (SHA-256). To check that y
 folder with the zip and run:
 
 ```powershell
-Get-FileHash .\SecureFile-0.1.0-beta2-win-x64.zip -Algorithm SHA256
+Get-FileHash .\SecureFile-0.1.0-beta3-win-x64.zip -Algorithm SHA256
 ```
 
 The `Hash` line must match the code you were given. If it does not, do not run it and tell me.
