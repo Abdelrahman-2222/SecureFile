@@ -1179,6 +1179,214 @@ public sealed class MainViewModelTests
         Assert.Equal(MainViewState.NoFile, viewModel.State);
     }
 
+    [Fact]
+    public async Task OpenFile_WithAnEmptyPath_DoesNothing()
+    {
+        MainViewModel viewModel = CreateViewModel();
+
+        await viewModel.OpenFileCommand.ExecuteAsync(string.Empty);
+
+        Assert.Null(viewModel.SelectedFile);
+        Assert.Equal(MainViewState.NoFile, viewModel.State);
+    }
+
+    [Fact]
+    public async Task Browse_WhileReading_SaysItIsReadingTheFileDetails()
+    {
+        MainViewModel viewModel = CreateViewModel();
+        var messages = new List<string>();
+        viewModel.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(MainViewModel.StatusMessage))
+            {
+                messages.Add(viewModel.StatusMessage);
+            }
+        };
+        _dialogs.OpenResult = InputPath;
+
+        await viewModel.BrowseCommand.ExecuteAsync(null);
+
+        Assert.Contains("Reading the file details…", messages);
+    }
+
+    [Fact]
+    public async Task Browse_AfterASuccess_ClearsTheOldProgress()
+    {
+        (MainViewModel viewModel, TaskCompletionSource release, Task running) = await StartEncryptionAsync();
+        viewModel.OnProgress(100);
+        release.SetResult();
+        await running;
+        Assert.Equal(100, viewModel.ProgressPercentage);
+
+        _dialogs.OpenResult = InputPath;
+        await viewModel.BrowseCommand.ExecuteAsync(null);
+
+        Assert.Equal(0, viewModel.ProgressPercentage);
+        Assert.Equal(string.Empty, viewModel.ProgressText);
+    }
+
+    [Fact]
+    public async Task Browse_ReadIsCancelledBeforeAnyFileWasChosen_StaysAtNoFile()
+    {
+        MainViewModel viewModel = CreateViewModel();
+        _detailsReader.ExceptionToThrow = new OperationCanceledException();
+        _dialogs.OpenResult = InputPath;
+
+        await viewModel.BrowseCommand.ExecuteAsync(null);
+
+        Assert.Equal(MainViewState.NoFile, viewModel.State);
+    }
+
+    [Fact]
+    public async Task NewPassword_OfExactlyTheMinimumLength_IsNotCalledTooShortAndEnablesEncrypt()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        string exact = new('k', PasswordStrengthEvaluator.MinimumLength);
+        viewModel.ConfirmPassword = string.Empty;
+
+        viewModel.Password = exact;
+        string guidance = viewModel.StatusMessage;
+        viewModel.ConfirmPassword = exact;
+
+        Assert.Equal("Type the password again to confirm it.", guidance);
+        Assert.True(viewModel.EncryptCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task Enter_OnAnEncryptedFile_NeedsNoConfirmation()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath + ".enc");
+        viewModel.ConfirmPassword = string.Empty;
+
+        Assert.True(viewModel.RunPrimaryCommand.CanExecute(null));
+    }
+
+    [Fact]
+    public async Task TypingAfterASuccess_KeepsTheSuccessMessage()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        _dialogs.SaveResult = InputPath + ".enc";
+        await viewModel.EncryptCommand.ExecuteAsync(null);
+        string success = viewModel.StatusMessage;
+
+        viewModel.Password = "abc";
+
+        Assert.Equal(MainViewState.Succeeded, viewModel.State);
+        Assert.Equal(success, viewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task TypingWhileAnOperationRuns_KeepsTheWorkingState()
+    {
+        (MainViewModel viewModel, TaskCompletionSource release, Task running) = await StartEncryptionAsync();
+
+        viewModel.Password = "abc";
+
+        Assert.Equal(MainViewState.Working, viewModel.State);
+        Assert.Equal("Encrypting…", viewModel.StatusMessage);
+        release.SetResult();
+        await running;
+    }
+
+    [Fact]
+    public async Task ResetAfterUnexpectedError_WhileAnOperationRuns_LeavesItRunning()
+    {
+        (MainViewModel viewModel, TaskCompletionSource release, Task running) = await StartEncryptionAsync();
+
+        viewModel.ResetAfterUnexpectedError();
+
+        Assert.Equal(MainViewState.Working, viewModel.State);
+        release.SetResult();
+        await running;
+    }
+
+    [Fact]
+    public async Task UnexpectedFailure_AfterProgress_ClearsTheProgressAndReturnsToFileSelected()
+    {
+        (MainViewModel viewModel, TaskCompletionSource release, Task running) = await StartEncryptionAsync();
+        viewModel.OnProgress(40);
+        _encryption.ExceptionToThrow = new InvalidOperationException("unexpected");
+
+        release.SetResult();
+        await Assert.ThrowsAsync<InvalidOperationException>(() => running);
+
+        Assert.Equal(MainViewState.FileSelected, viewModel.State);
+        Assert.Equal(0, viewModel.ProgressPercentage);
+    }
+
+    [Fact]
+    public async Task Cancel_AfterProgress_ClearsTheProgress()
+    {
+        (MainViewModel viewModel, _, Task running) = await StartEncryptionAsync();
+        viewModel.OnProgress(40);
+
+        viewModel.CancelCommand.Execute(null);
+        await running;
+
+        Assert.Equal(MainViewState.FileSelected, viewModel.State);
+        Assert.Equal(0, viewModel.ProgressPercentage);
+    }
+
+    [Fact]
+    public async Task Encrypt_NotSupportedPath_FailsWithAMessage()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        _dialogs.SaveResult = InputPath + ".enc";
+        _encryption.ExceptionToThrow = new NotSupportedException("The given path's format is not supported.");
+
+        await viewModel.EncryptCommand.ExecuteAsync(null);
+
+        Assert.Equal(MainViewState.Failed, viewModel.State);
+        Assert.False(string.IsNullOrWhiteSpace(viewModel.StatusMessage));
+    }
+
+    [Fact]
+    public async Task Operation_StartAndEnd_TellTheCancelButtonToRecheck()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        int notifications = 0;
+        viewModel.CancelCommand.CanExecuteChanged += (_, _) => notifications++;
+        _dialogs.SaveResult = InputPath + ".enc";
+        var release = new TaskCompletionSource();
+        _encryption.WaitFor = release.Task;
+
+        Task running = viewModel.EncryptCommand.ExecuteAsync(null);
+        int atStart = notifications;
+        release.SetResult();
+        await running;
+
+        Assert.Equal(1, atStart);
+        Assert.Equal(2, notifications);
+    }
+
+    [Fact]
+    public async Task Progress_ShowsTheSpeedFromTheChosenFilesSize()
+    {
+        _detailsReader.SizeInBytes = 100_000_000;
+        (MainViewModel viewModel, TaskCompletionSource release, Task running) = await StartEncryptionAsync();
+        _clock.Advance(TimeSpan.FromSeconds(1));
+
+        viewModel.OnProgress(50);
+
+        string expected = ProgressTextFormatter.Format(50, 100_000_000, TimeSpan.FromSeconds(1), CultureInfo.CurrentCulture);
+        Assert.NotEqual(ProgressTextFormatter.Format(50, 0, TimeSpan.FromSeconds(1), CultureInfo.CurrentCulture), expected);
+        Assert.Equal(expected, viewModel.ProgressText);
+        release.SetResult();
+        await running;
+    }
+
+    [Fact]
+    public async Task Decrypt_AlwaysAsksCoreToReplaceTheChosenOutput()
+    {
+        // The Save dialog already asked "replace?", so Core is told it may overwrite (the same as for Encrypt).
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath + ".enc");
+        _dialogs.SaveResult = InputPath;
+
+        await viewModel.DecryptCommand.ExecuteAsync(null);
+
+        Assert.True(Assert.Single(_encryption.Calls).Overwrite);
+    }
+
     private MainViewModel CreateViewModel()
     {
         return new MainViewModel(_encryption, _detailsReader, _dialogs, _errorLog, _folderOpener, _clock);

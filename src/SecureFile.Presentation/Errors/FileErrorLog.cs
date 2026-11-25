@@ -77,21 +77,25 @@ public sealed class FileErrorLog : IErrorLog
                 File.AppendAllText(_logFilePath, entry);
             }
         }
+        // Stryker disable once Block : the block holds only the trace line below; removing it leaves the same silent result
         catch (IOException logFailure)
         {
             // Stryker disable once Statement,String : a trace line for a debugger; a failed log write must stay silent for the user, nothing to observe
             Trace.TraceWarning($"The error log could not be written: {logFailure.GetType().Name}");
         }
+        // Stryker disable once Block : the block holds only the trace line below; removing it leaves the same silent result
         catch (UnauthorizedAccessException logFailure)
         {
             // Stryker disable once Statement,String : a trace line for a debugger; a failed log write must stay silent for the user, nothing to observe
             Trace.TraceWarning($"The error log could not be written: {logFailure.GetType().Name}");
         }
+        // Stryker disable once Block : the block holds only the trace line below; removing it leaves the same silent result
         catch (NotSupportedException logFailure)
         {
             // Stryker disable once Statement,String : a trace line for a debugger; a failed log write must stay silent for the user, nothing to observe
             Trace.TraceWarning($"The error log could not be written: {logFailure.GetType().Name}");
         }
+        // Stryker disable once Block : the block holds only the trace line below; removing it leaves the same silent result
         catch (ArgumentException logFailure)
         {
             // Stryker disable once Statement,String : a trace line for a debugger; a failed log write must stay silent for the user, nothing to observe

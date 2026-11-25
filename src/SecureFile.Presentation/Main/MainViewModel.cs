@@ -669,6 +669,8 @@ public sealed partial class MainViewModel : ObservableObject
     private void EndOperation()
     {
         _operationCts = null;
+
+        // Stryker disable once Statement : equivalent; every caller changes State right after, which notifies IsProgressIndeterminate again
         OnPropertyChanged(nameof(IsProgressIndeterminate));
         CancelCommand.NotifyCanExecuteChanged();
     }
@@ -786,6 +788,8 @@ public sealed partial class MainViewModel : ObservableObject
             return null;
         }
 
+        // Stryker disable once Logical : outside Failed, showing the guidance again is harmless either way; the requirement is
+        // that an old red message goes (B1 item 20), tested by Encrypt_SaveDialogCancelledAfterAFailure_ClearsTheOldErrorMessage
         if (outputPath is null && State == MainViewState.Failed)
         {
             // Cancelling the Save dialog is the user's choice, not an error: an old red message from an earlier try must go
