@@ -96,7 +96,7 @@ public sealed class MainViewModelTests
         Assert.Equal(output, _dialogs.SuggestedSavePath);
         Assert.Equal([("Encrypt", InputPath, output, ValidPassword, true)], _encryption.Calls);
         Assert.Equal(MainViewState.Succeeded, viewModel.State);
-        Assert.Equal("Encrypted copy saved as \"report.pdf.enc\". Your original file was not changed.", viewModel.StatusMessage);
+        Assert.Equal(MainViewModel.SuccessMessage(encrypt: true, "report.pdf", output), viewModel.StatusMessage);
     }
 
     [Fact]
@@ -288,7 +288,7 @@ public sealed class MainViewModelTests
 
         Assert.Equal(Path.Combine(Path.GetTempPath(), expectedName), _dialogs.SuggestedSavePath);
         Assert.Equal("Decrypt", Assert.Single(_encryption.Calls).Operation);
-        Assert.Equal("Decrypted file saved as \"out.pdf\".", viewModel.StatusMessage);
+        Assert.Equal(MainViewModel.SuccessMessage(encrypt: false, inputName, Path.Combine(Path.GetTempPath(), "out.pdf")), viewModel.StatusMessage);
     }
 
     [Fact]
@@ -444,6 +444,27 @@ public sealed class MainViewModelTests
         Assert.Equal(InputPath, viewModel.SelectedFile?.FullPath); // the good file stays, with the message about the bad drop
         Assert.Contains("\"gone.bin\"", viewModel.StatusMessage, StringComparison.Ordinal); // and the message names the bad one
         Assert.Equal(ValidPassword, viewModel.Password);
+    }
+
+    [Fact]
+    public void SuccessMessage_NamesTheFolderAndSaysTheUnencryptedOriginalIsStillThere()
+    {
+        string output = Path.Combine(Path.GetTempPath(), "Taxes", "report.pdf.enc");
+
+        Assert.Equal(
+            "Encrypted copy saved as \"report.pdf.enc\" in the folder \"Taxes\". The unencrypted original \"report.pdf\" is still there: delete it yourself if only the encrypted copy should remain.",
+            MainViewModel.SuccessMessage(encrypt: true, "report.pdf", output));
+        Assert.Equal(
+            "Decrypted file saved as \"report.pdf.enc\" in the folder \"Taxes\".",
+            MainViewModel.SuccessMessage(encrypt: false, "report.pdf.enc", output));
+    }
+
+    [Fact]
+    public void SuccessMessage_FileAtTheTopOfADrive_NamesTheDrive()
+    {
+        string root = Path.GetPathRoot(Path.GetTempPath())!;
+
+        Assert.EndsWith($"in the folder \"{root}\".", MainViewModel.SuccessMessage(encrypt: false, "a.enc", Path.Combine(root, "a")), StringComparison.Ordinal);
     }
 
     [Fact]

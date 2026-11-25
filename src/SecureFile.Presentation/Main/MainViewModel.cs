@@ -584,20 +584,21 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         await ExecuteOperationAsync(encrypt, inputPath, outputPath, password).ConfigureAwait(true);
-        ShowSuccess(encrypt, outputPath);
+        ShowSuccess(encrypt, inputPath, outputPath);
     }
 
     /// <summary>Shows the result and forgets the file and the passwords.</summary>
     /// <param name="encrypt">Whether the finished operation was encryption.</param>
+    /// <param name="inputPath">The file that was read (named in the reminder after encryption).</param>
     /// <param name="outputPath">The file that was written.</param>
     /// <remarks>
     /// The job is done, so the window shows the real new state (nothing chosen) and the passwords do not stay in memory
     /// or on screen longer than needed. On failure they are kept on purpose: the user fixes the password and tries again.
     /// </remarks>
-    private void ShowSuccess(bool encrypt, string outputPath)
+    private void ShowSuccess(bool encrypt, string inputPath, string outputPath)
     {
         _lastOutputPath = outputPath;
-        _lastSuccessMessage = SuccessMessage(encrypt, Path.GetFileName(outputPath));
+        _lastSuccessMessage = SuccessMessage(encrypt, Path.GetFileName(inputPath), outputPath);
         State = MainViewState.Succeeded;
         StatusMessage = _lastSuccessMessage;
         SelectedFile = null;
@@ -797,15 +798,36 @@ public sealed partial class MainViewModel : ObservableObject
         return string.Equals(Path.GetFullPath(first), Path.GetFullPath(second), StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>The success message; after encryption it says the original is unchanged (PROJECT_PLAN §11.1).</summary>
+    /// <summary>
+    /// The success message: the result's name and folder, and after encryption a reminder that the unencrypted original
+    /// is still on the disk (review item 25).
+    /// </summary>
     /// <param name="encrypt">Whether the operation was encryption.</param>
-    /// <param name="outputName">The result's file name (never the full path).</param>
+    /// <param name="inputName">The original file's name.</param>
+    /// <param name="outputPath">The file that was written.</param>
     /// <returns>The message to show.</returns>
-    private static string SuccessMessage(bool encrypt, string outputName)
+    /// <remarks>
+    /// "Your original file was not changed" was true but read by some as "it is safe now"; the new text says plainly
+    /// that the readable original is still there. Only the folder's name is shown, not its full path, so the banner
+    /// stays short; Open folder shows the rest.
+    /// </remarks>
+    internal static string SuccessMessage(bool encrypt, string inputName, string outputPath)
     {
+        string outputName = Path.GetFileName(outputPath);
+        string folder = FolderName(outputPath);
         return encrypt
-            ? $"Encrypted copy saved as \"{outputName}\". Your original file was not changed."
-            : $"Decrypted file saved as \"{outputName}\".";
+            ? $"Encrypted copy saved as \"{outputName}\" in the folder \"{folder}\". The unencrypted original \"{inputName}\" is still there: delete it yourself if only the encrypted copy should remain."
+            : $"Decrypted file saved as \"{outputName}\" in the folder \"{folder}\".";
+    }
+
+    /// <summary>The name of the folder that holds <paramref name="filePath"/>, or the drive (such as <c>C:\</c>) at the top.</summary>
+    /// <param name="filePath">A full file path.</param>
+    /// <returns>The folder's own name.</returns>
+    private static string FolderName(string filePath)
+    {
+        string folder = Path.GetDirectoryName(filePath) ?? filePath;
+        string name = Path.GetFileName(folder);
+        return name.Length > 0 ? name : folder;
     }
 
     /// <summary>Browse is available whenever no operation is running.</summary>

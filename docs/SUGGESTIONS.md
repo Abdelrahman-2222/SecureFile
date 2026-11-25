@@ -67,7 +67,7 @@ checked: nothing leaves your computer.** Every suggestion below serves one of th
 | ✅ Error dialogs say where the log file is (built in Stage 9.0) | Faster help when something goes wrong | Should | S | B1 (15) |
 | Screen-reader announcements, high-contrast check, small screens and high scaling | Usable by everyone; needs a person with a screen reader | Should | M | B3 |
 | **Passphrase generator** ("blue river coffee lamp"), local word list, secure random, clipboard cleared after 30 s | Memorable and strong passwords | Should | S | B2 (24, 38) |
-| Success message reminds that the unencrypted original is still on disk | People do not think the original is gone | Could | S | B2 (25) |
+| ✅ Success message reminds that the unencrypted original is still on disk (built in Stage 9.0) | People do not think the original is gone | Could | S | B2 (25) |
 | Larger list of common passwords, including Arabic | Better advice on weak passwords | Could | S | C3 |
 | "This looks like a key or password file" hint | Helps people notice what they protect | Could | S | — |
 | Right-click "Encrypt with SecureFile" in Explorer / Finder | Fits how people already work | Could | M | — |
