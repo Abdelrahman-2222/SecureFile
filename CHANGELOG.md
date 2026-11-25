@@ -6,6 +6,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.1.0-beta2] - 2026-11-25
+
+Released for Windows only (app and command line, x64). The macOS and Linux builds exist but are held back until they
+have been tried on real systems (`docs/RELEASING.md`). This section also covers `0.1.0-beta1` (2026-11-24, Windows app
+only), which was cut before the changelog had release sections.
+
 ### Added
 
 - Stage 7 (macOS and Linux window, bonus): `src/SecureFile.Avalonia` reuses `MainViewModel` with native Open/Save dialogs
