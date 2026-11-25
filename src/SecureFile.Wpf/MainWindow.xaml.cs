@@ -172,6 +172,12 @@ internal sealed partial class MainWindow : Window
         {
             OnStateChanged();
         }
+        else if (e.PropertyName == nameof(MainViewModel.SelectedFile))
+        {
+            // A new file (or none, after a success) starts hidden again, so the next password is never typed in plain
+            // text by accident (review item 24). A failure keeps the file, so the choice stays for the retry.
+            ShowPasswordCheck.IsChecked = false;
+        }
     }
 
     /// <summary>Tells whether any of the four boxes shows something other than the ViewModel's password or confirmation.</summary>

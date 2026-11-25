@@ -41,7 +41,7 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
   `.lnk` differs between Browse and drop; the Open dialog has no filter; the read-only-target message does not name the file.
 - **21** File facts (size, encrypted or not) are read once when the file is chosen.
 - **22 (rest)** Progress text: estimate includes key derivation, "0.0 MB/s", mixed culture formats, whole-percent steps.
-- **24** Show password stays ticked for the next file; the visible box keeps an undo stack (`UndoLimit=0`); no clipboard clearing.
+- **24** **DONE (Stage 9.0):** Show password is unticked for each new file, and the visible boxes keep no undo history (WPF `UndoLimit=0`, Avalonia `IsUndoEnabled=False`). Open: no clipboard clearing (with 38).
 - **25** Success text does not say the unencrypted original is still on disk, or the folder.
 - **28** USABILITY.md says "lock/unlock"; "Wrong password," is blunt; one vague message covers a deleted file, a folder and a broken link.
 - **29** **DONE (Stage 9.0):** the log replaces every path by `<path>` and writes no stack trace for an expected failure (`LogEntryFormatter`, `IErrorLog.WriteExpected`); crashes keep theirs. Open: it still rotates once (`.1`).

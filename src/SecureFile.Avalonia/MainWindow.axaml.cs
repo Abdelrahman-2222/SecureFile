@@ -123,6 +123,7 @@ internal sealed partial class MainWindow : Window
                 break;
             case nameof(MainViewModel.SelectedFile):
                 ApplyButtonTooltips();
+                ShowPasswordCheck.IsChecked = false; // a new file starts hidden again (review item 24)
                 break;
             case nameof(MainViewModel.State):
                 OnStateChanged();

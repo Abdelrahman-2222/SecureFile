@@ -33,6 +33,8 @@
             <Setter Property="FontSize" Value="14" />
             <Setter Property="MaxLength" Value="1024" />
             <Setter Property="PasswordChar" Value="•" />
+            <!-- No undo history: it would keep earlier password text in memory (review item 24). -->
+            <Setter Property="IsUndoEnabled" Value="False" />
         </Style>
         <!-- Status colours: the words carry the meaning too, colour is only an extra cue. -->
         <Style Selector="TextBlock.critical">
