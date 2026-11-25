@@ -104,7 +104,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Gets the current state; it decides which commands can run (see <see cref="MainViewState"/>).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsBusy), nameof(CanEditInputs), nameof(IsSucceeded), nameof(IsFailed), nameof(IsProgressIndeterminate))]
-    [NotifyCanExecuteChangedFor(nameof(BrowseCommand), nameof(OpenFileCommand), nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand), nameof(OpenFolderCommand))]
+    [NotifyCanExecuteChangedFor(nameof(BrowseCommand), nameof(OpenFileCommand), nameof(OpenFilesCommand), nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand), nameof(OpenFolderCommand))]
     public partial MainViewState State { get; private set; } = MainViewState.NoFile;
 
     /// <summary>Gets the details of the chosen file, or <see langword="null"/> when no file is chosen.</summary>
@@ -212,7 +212,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// </remarks>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanEditInputs))]
-    [NotifyCanExecuteChangedFor(nameof(BrowseCommand), nameof(OpenFileCommand), nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand))]
+    [NotifyCanExecuteChangedFor(nameof(BrowseCommand), nameof(OpenFileCommand), nameof(OpenFilesCommand), nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand))]
     public partial bool IsChoosingOutput { get; private set; }
 
     /// <summary>Gets a value indicating whether the last operation succeeded (the window shows the result panel).</summary>
