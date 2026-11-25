@@ -57,6 +57,7 @@ dotnet tool restore | Out-Null
 # 1. Format -----------------------------------------------------------------
 $format = Invoke-Native 'Format' { dotnet format SecureFile.slnx --verify-no-changes }
 Add-Result 'Format' ($format.ExitCode -eq 0) $(if ($format.ExitCode -eq 0) { 'no changes needed' } else { 'run: dotnet format SecureFile.slnx' })
+if ($format.ExitCode -ne 0) { Write-Host $format.Output } # which file is wrong (review CI-7)
 
 # 2. Build ------------------------------------------------------------------
 # TreatWarningsAsErrors (Directory.Build.props) turns every warning into an error, so the exit code alone is the
@@ -78,8 +79,15 @@ if ($test.ExitCode -ne 0) { Write-Host $test.Output }
 
 # 4. Coverage of SecureFile.Core ---------------------------------------------
 # Fail-closed: a missing report or a value that cannot be read is a FAIL, never a silent pass.
+# Measured with Core's own tests only: merged with the integration, CLI and window tests, code that only an end-to-end
+# test touches would count as covered (review CI-4). The full run above still feeds the uploaded report.
+$coreResultsFolder = Join-Path $artifactsFolder 'CoreTestResults'
+$coreTest = Invoke-Native 'Coverage run (Core tests only)' {
+    dotnet test --project tests/SecureFile.Core.Tests -c Release --no-build --coverage --coverage-output-format cobertura --results-directory $coreResultsFolder
+}
+if ($coreTest.ExitCode -ne 0) { Write-Host $coreTest.Output }
 $coverageFolder = Join-Path $artifactsFolder 'Coverage'
-dotnet reportgenerator "-reports:$testResultsFolder/*.cobertura.xml" "-targetdir:$coverageFolder" `
+dotnet reportgenerator "-reports:$coreResultsFolder/*.cobertura.xml" "-targetdir:$coverageFolder" `
     '-reporttypes:TextSummary;Html' '-assemblyfilters:+SecureFile.Core' | Out-Null
 $summaryPath = Join-Path $coverageFolder 'Summary.txt'
 $summary = if (Test-Path $summaryPath) { Get-Content $summaryPath -Raw } else { '' }
