@@ -1,52 +1,49 @@
-# Next step: copy-paste prompt for a new chat (Phase 6, Stage 6: Publishing)
+# Next step: copy-paste prompt for a new chat (Phase 5, Stage 7: Avalonia windows for macOS and Linux)
 
-Last finished (2026-11-24): Stage 5 (Quality), plan rows 5.1-5.6, on branch `feature/stage-5-quality` (PR open; base is
-`feature/stage-4-testing` until the Stage 4 PR merges, then retarget to `main`). Numbers and verdicts are in
-`docs/QUALITY_REPORT.md`; threats in `docs/THREAT_MODEL.md`; open items in `docs/REVIEW_BACKLOG.md`.
+Last finished (2026-11-25): Stage 6 (Publishing), plan rows 6.1-6.5, on branch `feature/stage-6-publishing` (PR open; base is
+`feature/stage-5-quality` because Stage 4 and 5 are not in `main` yet; retarget when they merge). Stage 6 is amber, not green:
+the Windows Sandbox run, the ADR-15 decision (installer/signing), the README screenshots and any real release are **waiting for
+the user**; `win-arm64` is built but never run. See `docs/SANDBOX_TEST.md`, `docs/adr/0015-installer-and-code-signing.md`,
+`docs/SCREENSHOTS_NEEDED.md`, `docs/RELEASING.md`.
 
 Paste this into a new chat:
 
 ~~~
-Follow CLAUDE.md (read it first). Project: SecureFile, AES-256-CBC + HMAC file encryption, .NET 10, WPF app + a command-line
-version; layers Wpf/Cli -> Presentation -> Core. Task: do Stage 6 "Publishing" (plan rows 6.x) in this one chat, one commit per
-step, then open the pull request. Do not read docs/PROJECT_PLAN.md or docs/LEARNING_LOG.md in full: grep the rows you need.
-Terse chat updates.
+Follow CLAUDE.md (read it first). Project: SecureFile, AES-256-CBC + HMAC file encryption, .NET 10, WPF app + command line;
+layers Wpf/Cli -> Presentation -> Core. Task: do Stage 7 "Avalonia windows for macOS and Linux" (plan rows 7.1-7.5) in this one
+chat, one commit per step, then open the pull request. Do not read docs/PROJECT_PLAN.md or docs/LEARNING_LOG.md in full: grep the
+rows you need. Terse chat updates.
 
-STEP 0: git status, git fetch. If the Stage 5 PR is merged into main, switch to main, pull, create feature/stage-6-publishing;
-otherwise branch from feature/stage-5-quality and open the PR against it. Build and run all tests first.
+STEP 0: git status, git fetch. Find which of the Stage 4/5/6 PRs are merged into main; branch feature/stage-7-avalonia from main if
+Stage 6 is merged, otherwise from feature/stage-6-publishing (PR against it). Build and run all tests first.
 
-KNOWN ENVIRONMENT: Kaspersky kills programs that write many large files and makes backup copies of temp files (about 1 full test
-run in 4 fails with a "...LeavesNothing" test: capture the name, re-run). Never disable the antivirus; ask the user to exclude a
-folder. Scripts need `powershell -ExecutionPolicy Bypass -File ...` (policy blocks unsigned scripts); run publish-cli.ps1 from
-PowerShell, not Git Bash (Git's tar cannot read D: paths).
+KNOWN ENVIRONMENT: Windows 11, Kaspersky kills programs that write many large files (about 1 full test run in 4 fails with a
+"...LeavesNothing" test: capture the name, re-run); never disable the antivirus. Scripts need `powershell -ExecutionPolicy Bypass
+-File ...`, run from PowerShell, not Git Bash. No Mac and no Linux machine; WSL2/WSLg may exist (check). No ARM machine.
 
-6.1 win-arm64: add the win-arm64 build of the WPF app and the CLI to the publish scripts; the build is possible here, running it is
-    not (no ARM machine): say so in the docs. Record sizes.
-6.2 Windows Sandbox test: write scripts/sandbox-test.wsb (mapped read-only folder with the published exe, no network) and a click
-    list; running it is a USER task if Windows Sandbox is not enabled (needs Windows 11 Pro feature + reboot): put the exact steps in
-    the checklist and continue.
-6.3 Installer and signing decision: write an ADR comparing (a) zip + SHA-256 only, (b) MSIX, (c) Inno Setup/WiX installer, (d)
-    code-signing options (Azure Trusted Signing, OV/EV certificate, self-signed for tests). Recommend one; do not buy or upload anything.
-    The decision is the user's: record it as "proposed".
-6.4 README: user-facing README (what it is, download, verify the SHA-256, SmartScreen note, limits, forgotten password = lost),
-    screenshots listed for the user to supply (not invented).
-6.5 Release candidate: scripts/publish-beta.ps1 and publish-cli.ps1 produce the archives; docs/RELEASING.md updated; do NOT publish a
-    GitHub release or upload anything without asking.
+7.1 Avalonia app (src/SecureFile.Avalonia) reusing MainViewModel; same features as the WPF window (Browse, drop, password +
+    confirm, strength bar, Encrypt/Decrypt, progress, cancel, status line, About).
+7.2 Avalonia service implementations (StorageProvider dialogs, launcher, clipboard) behind the existing Presentation interfaces.
+7.3 CI matrix Windows/Ubuntu/macOS and a cross-OS "golden file" test (a file encrypted on one OS decrypts on all).
+7.4 Publish osx-arm64, osx-x64, linux-x64, linux-arm64 windows (scripts, archive names securefile-... vs SecureFile-...: keep
+    names distinct); test Linux in WSLg if present; macOS cannot be tested here: say so, add it to the user's checklist.
+7.5 Size comparison WPF (untrimmed) vs Avalonia (trimmed/AOT): numbers in docs/QUALITY_REPORT.md.
+Keep RELEASING.md "held back" wording true: macOS/Linux releases stay held until windows exist AND were tried on real systems.
 
-CARRY-OVER (from Stage 5; keep listed, do the cheap ones if time allows):
-- QUALITY_REPORT "Things only the user can do": cold start after reboot, VS profiler run, SonarQube for IDE, class coupling, screenshots,
-  decision C1 (EnableCompressionInSingleFile: 134 -> 65 MB, +0.2 s start).
-- Backlog C13 (encrypt/decrypt do not overlap CPU with the disk flush), C14 (symlink alias of the input on Linux/macOS), C15
-  (deterministic test of TryDeleteFile retry), C16 (explicit asInvoker in the manifest, owner-only ACL on the temp file), C17
-  (--password-stdin and Windows PowerShell 5.1 turn non-ASCII into "?"), C18 (inject a clock into MainViewModel's progress throttle),
-  and the B1 WPF items, B3/B4, C2/C6/C8 (need people or decisions).
-- Stryker on the CLI's pure logic (parser, resolvers) was not run in Stage 5.
-- One unexplained flaky test failure from the antivirus (see above).
+CARRY-OVER (keep listed, do the cheap ones if time allows):
+- Waiting for the user from Stage 6: Sandbox run (docs/SANDBOX_TEST.md), ADR-15 decision, screenshots, any GitHub release.
+- Stage 5 "Things only the user can do" in docs/QUALITY_REPORT.md (cold start, VS profiler, SonarQube, class coupling, screenshots,
+  decision C1 EnableCompressionInSingleFile 134 -> 65 MB).
+- Backlog: C13 (CPU/disk flush overlap), C14 (symlink alias on Linux/macOS: now testable via 7.3), C15 (deterministic TryDeleteFile
+  retry test), C16 second half (owner-only ACL on the temp file), C17 (--password-stdin / PowerShell 5.1 non-ASCII), C18 (inject
+  TimeProvider into MainViewModel throttle), B1 WPF items, B3/B4, C2/C6/C8.
+- Stryker on the CLI's pure logic (parser, resolvers) was never run.
+- One unexplained flaky test failure from the antivirus.
 
 RULES: no limit or target is loosened to pass; warnings are errors; XML docs on public and private members; edit with Edit/Write
 (no Python or heredoc rewriting of source); Conventional Commits, first line <= 72 characters, NO AI attribution lines; never commit
 secrets, big binaries or artifacts/; ask before any outward-facing action. The pre-push hook runs scripts/verify.ps1 on `git push`:
-do not run it by hand per commit. Wrap-up: append ONE short "Stage 6" section to docs/LEARNING_LOG.md (append only, do not read it),
-CHANGELOG lines, plan rows 6.x marked honestly (amber for anything waiting on the user), replace this file with the Stage 7 hand-off
-(Avalonia windows for macOS/Linux), one reviewer agent on the whole diff, then the PR and the ccd_pr tools.
+do not run it by hand per commit. Wrap-up: append ONE short "Stage 7" section to docs/LEARNING_LOG.md (append only, do not read it),
+CHANGELOG lines, plan rows marked honestly (amber for anything waiting on the user), replace this file with the Stage 8 hand-off,
+one reviewer agent on the whole diff, then the PR and the ccd_pr tools.
 ~~~
