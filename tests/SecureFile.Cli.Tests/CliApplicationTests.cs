@@ -136,6 +136,28 @@ public sealed class CliApplicationTests : IDisposable
     }
 
     [Fact]
+    public async Task Encrypt_OutputIsTheInputThroughAFolderLink_IsRefusedWithAPlainMessage()
+    {
+        // Review CLI-1: a text comparison let this through and the engine's ArgumentException crashed the program.
+        string original = Write("a.txt", "x");
+        string alias = Path.Combine(_folder, "alias");
+        try
+        {
+            Directory.CreateSymbolicLink(alias, _folder);
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            Assert.Skip($"Symbolic links cannot be created here: {exception.Message}");
+        }
+
+        RunResult result = await RunAsync(["encrypt", original, "-o", Path.Combine(alias, "a.txt"), "--force", "--password-stdin"], stdin: Phrase + "\n");
+
+        Assert.Equal(ExitCodes.Failure, result.Code);
+        Assert.Contains("can't replace the file you chose", result.Err, StringComparison.Ordinal);
+        Assert.Equal("x", await File.ReadAllTextAsync(original, TestContext.Current.CancellationToken));
+    }
+
+    [Fact]
     public async Task Encrypt_OutputIsAFolderOrInvalidName_IsReportedWithoutACrash()
     {
         string original = Write("a.txt", "x");
@@ -224,6 +246,35 @@ public sealed class CliApplicationTests : IDisposable
     }
 
     [Fact]
+    public async Task PasswordStdinAtATerminal_IsRefusedInsteadOfEchoingThePassword()
+    {
+        // Review CLI-3: with nothing piped in, the line would be typed visibly and stay in the scrollback.
+        string original = Write("a.txt", "x");
+
+        RunResult result = await RunAsync(["encrypt", original, "--password-stdin"], prompt: new ScriptedPrompt());
+
+        Assert.Equal(ExitCodes.Failure, result.Code);
+        Assert.Contains("needs the password piped in", result.Err, StringComparison.Ordinal);
+        Assert.False(File.Exists(original + ".enc"));
+    }
+
+    [Fact]
+    public async Task FailureWithProgress_StartsTheMessageOnItsOwnLine()
+    {
+        // Review CLI-4: the error used to be glued to "Decrypting… 100 %".
+        string original = Write("a.txt", "x");
+        await RunAsync(["encrypt", original, "--password-stdin"], stdin: Phrase + "\n");
+
+        RunResult result = await RunAsync(["decrypt", original + ".enc", "-o", Path.Combine(_folder, "out.txt"), "--password-stdin"], stdin: "another phrase here\n", showProgress: true);
+
+        Assert.Equal(ExitCodes.Failure, result.Code);
+        Assert.Contains("%", result.Err, StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            result.Err.Split('\n'),
+            line => line.Contains('%', StringComparison.Ordinal) && line.Contains("Wrong password", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task Cancelled_ExitsWith130AndLeavesNoResult()
     {
         string original = Write("a.txt", "x");
@@ -281,13 +332,13 @@ public sealed class CliApplicationTests : IDisposable
     }
 
     /// <summary>Runs the program once with in-memory streams.</summary>
-    private static async Task<RunResult> RunAsync(string[] args, string stdin = "", IPasswordPrompt? prompt = null, bool inputRedirected = false, CancellationToken? token = null)
+    private static async Task<RunResult> RunAsync(string[] args, string stdin = "", IPasswordPrompt? prompt = null, bool inputRedirected = false, CancellationToken? token = null, bool showProgress = false)
     {
         using var input = new StringReader(stdin);
         using var output = new StringWriter();
         using var error = new StringWriter();
         bool redirected = inputRedirected || stdin.Length > 0 || (prompt is null && args.Contains("--password-stdin", StringComparer.Ordinal));
-        var environment = new CliEnvironment(input, output, error, redirected, ShowProgress: false);
+        var environment = new CliEnvironment(input, output, error, redirected, ShowProgress: showProgress);
         var application = new CliApplication(environment, new FileEncryptionService(), prompt ?? new ScriptedPrompt());
 
         int code = await application.RunAsync(args, token ?? TestContext.Current.CancellationToken);

@@ -75,7 +75,8 @@ Decrypted file saved as "holiday-restored.jpg".
 |---|---|
 | `-o`, `--output <path>` | Where to write the result. Default: `<file>.enc` when encrypting; the name without `.enc` (or `<file>.decrypted`) when decrypting. |
 | `-f`, `--force` | Replace the result file if it already exists. Without it the program refuses. |
-| `--password-stdin` | Read the password from the first line of standard input, for scripts. |
+| `--password-stdin` | Read the password from the first line of standard input, for scripts. It must be piped in: at a terminal the program refuses, so the password is never shown on screen. |
+| `--` | Everything after it is a file name, for a file whose name starts with `-`. |
 
 **Password rules (when locking):** at least 8 characters, typed twice. The program also tells you if the password is weak
 (repeats like `aaaaaaaa`, runs like `abcdefgh`, common words like `Password1234`); a few unrelated words are best.
@@ -99,7 +100,8 @@ $OutputEncoding = [Text.UTF8Encoding]::new()
 
 The hidden prompt (no `--password-stdin`) is not affected.
 
-**Ctrl+C** cancels safely: no half-written file is left behind.
+**Ctrl+C** cancels safely: no half-written file is left behind. A second Ctrl+C stops the program at once (for example
+while it waits for a pipe that never sends the password).
 
 **Exit codes:** `0` done · `1` failed in an expected way (wrong password, damaged or unsupported file, no permission, file in
 use, result already exists) · `2` wrong usage · `130` cancelled. Messages go to standard error; results go to standard output.

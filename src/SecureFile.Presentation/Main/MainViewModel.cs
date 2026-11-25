@@ -66,6 +66,7 @@ public sealed partial class MainViewModel : ObservableObject
     private string? _lastOutputPath;
 
     /// <summary>The success message of the last operation, kept so a failed "Open folder" can add to it instead of replacing it.</summary>
+    // Stryker disable once String : always set by a success before Open folder can read it (CanOpenFolder); equivalent mutant
     private string _lastSuccessMessage = string.Empty;
 
     /// <summary>Creates the ViewModel with the services it uses (pure dependency injection, ADR-09).</summary>
@@ -104,7 +105,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>Gets the current state; it decides which commands can run (see <see cref="MainViewState"/>).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsBusy), nameof(CanEditInputs), nameof(IsSucceeded), nameof(IsFailed), nameof(IsProgressIndeterminate))]
-    [NotifyCanExecuteChangedFor(nameof(BrowseCommand), nameof(OpenFileCommand), nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand), nameof(OpenFolderCommand))]
+    [NotifyCanExecuteChangedFor(nameof(BrowseCommand), nameof(OpenFileCommand), nameof(OpenFilesCommand), nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand), nameof(OpenFolderCommand))]
     public partial MainViewState State { get; private set; } = MainViewState.NoFile;
 
     /// <summary>Gets the details of the chosen file, or <see langword="null"/> when no file is chosen.</summary>
@@ -203,17 +204,19 @@ public sealed partial class MainViewModel : ObservableObject
     public partial string ProgressText { get; private set; } = string.Empty;
 
     /// <summary>Gets a value indicating whether the inputs (password, file choice) accept changes; they are locked while working.</summary>
-    public bool CanEditInputs => !IsBusy && !IsChoosingOutput;
+    public bool CanEditInputs => !IsBusy && !IsFileDialogOpen;
 
-    /// <summary>Gets a value indicating whether the Save dialog is open, so the inputs and actions are locked meanwhile.</summary>
+    /// <summary>Gets a value indicating whether the Open or Save dialog is open, so the inputs and actions are locked meanwhile.</summary>
     /// <remarks>
     /// Not every system's dialog blocks the window: the Linux desktop portal draws it in another process, so the user could
-    /// otherwise change the already-checked password, choose another file or start a second operation (ADR-16, C19).
+    /// otherwise change the already-checked password, choose another file or start a second operation (ADR-16, C19). The
+    /// Open dialog is locked too: a file picked there while an operation ran swapped the file mid-operation and re-enabled
+    /// every command (review VM-1).
     /// </remarks>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanEditInputs))]
-    [NotifyCanExecuteChangedFor(nameof(BrowseCommand), nameof(OpenFileCommand), nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand))]
-    public partial bool IsChoosingOutput { get; private set; }
+    [NotifyCanExecuteChangedFor(nameof(BrowseCommand), nameof(OpenFileCommand), nameof(OpenFilesCommand), nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand))]
+    public partial bool IsFileDialogOpen { get; private set; }
 
     /// <summary>Gets a value indicating whether the last operation succeeded (the window shows the result panel).</summary>
     public bool IsSucceeded => State == MainViewState.Succeeded;
@@ -254,7 +257,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <returns>A task that completes when the details are shown.</returns>
     private async Task BrowseCoreAsync()
     {
-        string? path = await _fileDialogs.ShowOpenFileDialogAsync().ConfigureAwait(true);
+        string? path = await ShowDialogLockedAsync(_fileDialogs.ShowOpenFileDialogAsync).ConfigureAwait(true);
         if (path is not null)
         {
             await LoadFileAsync(path).ConfigureAwait(true);
@@ -666,6 +669,8 @@ public sealed partial class MainViewModel : ObservableObject
     private void EndOperation()
     {
         _operationCts = null;
+
+        // Stryker disable once Statement : equivalent; every caller changes State right after, which notifies IsProgressIndeterminate again
         OnPropertyChanged(nameof(IsProgressIndeterminate));
         CancelCommand.NotifyCanExecuteChanged();
     }
@@ -744,6 +749,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         try
         {
+            // Stryker disable once Boolean : the BOM flag only affects GetPreamble, never GetByteCount; equivalent mutant
             _ = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true).GetByteCount(password);
             return true;
         }
@@ -782,6 +788,8 @@ public sealed partial class MainViewModel : ObservableObject
             return null;
         }
 
+        // Stryker disable once Logical : outside Failed, showing the guidance again is harmless either way; the requirement is
+        // that an old red message goes (B1 item 20), tested by Encrypt_SaveDialogCancelledAfterAFailure_ClearsTheOldErrorMessage
         if (outputPath is null && State == MainViewState.Failed)
         {
             // Cancelling the Save dialog is the user's choice, not an error: an old red message from an earlier try must go
@@ -793,29 +801,42 @@ public sealed partial class MainViewModel : ObservableObject
         return outputPath;
     }
 
-    /// <summary>Shows the Save dialog with the inputs and actions locked until it closes (<see cref="IsChoosingOutput"/>).</summary>
+    /// <summary>Shows the Save dialog with the inputs and actions locked until it closes (<see cref="IsFileDialogOpen"/>).</summary>
     /// <param name="suggestedFilePath">The path to suggest.</param>
     /// <returns>The chosen path, or <see langword="null"/> when the user cancelled.</returns>
-    private async Task<string?> ShowSaveDialogLockedAsync(string suggestedFilePath)
+    private Task<string?> ShowSaveDialogLockedAsync(string suggestedFilePath)
     {
-        IsChoosingOutput = true;
+        return ShowDialogLockedAsync(() => _fileDialogs.ShowSaveFileDialogAsync(suggestedFilePath));
+    }
+
+    /// <summary>Shows a file dialog with the inputs and actions locked until it closes (<see cref="IsFileDialogOpen"/>).</summary>
+    /// <param name="showDialog">Opens the Open or Save dialog.</param>
+    /// <returns>The chosen path, or <see langword="null"/> when the user cancelled.</returns>
+    private async Task<string?> ShowDialogLockedAsync(Func<Task<string?>> showDialog)
+    {
+        IsFileDialogOpen = true;
         try
         {
-            return await _fileDialogs.ShowSaveFileDialogAsync(suggestedFilePath).ConfigureAwait(true);
+            return await showDialog().ConfigureAwait(true);
         }
         finally
         {
-            IsChoosingOutput = false;
+            IsFileDialogOpen = false;
         }
     }
 
-    /// <summary>Compares full paths ignoring case, like Core's own check (Windows and macOS ignore case).</summary>
-    /// <param name="first">One path.</param>
-    /// <param name="second">The other path.</param>
+    /// <summary>Tells whether writing <paramref name="output"/> would replace <paramref name="input"/>.</summary>
+    /// <param name="input">The chosen file.</param>
+    /// <param name="output">The path from the Save dialog.</param>
     /// <returns><see langword="true"/> when both name the same file.</returns>
-    private static bool IsSameFile(string first, string second)
+    /// <remarks>
+    /// Uses Core's own check (links, case and Unicode aliases): a plain text comparison let a folder link through, and
+    /// Core's <see cref="ArgumentException"/> then reached the safety net as an "unexpected" error (review VM-2). A link
+    /// loop throws <see cref="IOException"/>, which the guarded command turns into a plain message.
+    /// </remarks>
+    private static bool IsSameFile(string input, string output)
     {
-        return string.Equals(Path.GetFullPath(first), Path.GetFullPath(second), StringComparison.OrdinalIgnoreCase);
+        return FileIdentity.AreSameFile(Path.GetFullPath(input), Path.GetFullPath(output));
     }
 
     /// <summary>
@@ -854,7 +875,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <returns><see langword="true"/> when the user may choose a file.</returns>
     private bool CanBrowse()
     {
-        return !IsBusy && !IsChoosingOutput;
+        return !IsBusy && !IsFileDialogOpen;
     }
 
     /// <summary>Encrypt also needs a password of at least the minimum length that was typed the same twice.</summary>
@@ -879,7 +900,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <returns><see langword="true"/> when the user may start an operation.</returns>
     private bool CanRunFileOperation()
     {
-        return SelectedFile is not null && Password.Length > 0 && !IsBusy && !IsChoosingOutput;
+        return SelectedFile is not null && Password.Length > 0 && !IsBusy && !IsFileDialogOpen;
     }
 
     /// <summary>Suggests <c>report.pdf.enc</c> next to <c>report.pdf</c>.</summary>

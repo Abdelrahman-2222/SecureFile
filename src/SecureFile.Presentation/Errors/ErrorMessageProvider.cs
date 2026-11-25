@@ -22,10 +22,10 @@ public static class ErrorMessageProvider
     /// <summary>The message for an exception this class does not know; the ViewModel never catches these (Layer 3 does).</summary>
     private const string UnexpectedMessage = "Something unexpected went wrong. Your files were not changed. Details were saved to the log.";
 
-    /// <summary>Windows <c>ERROR_HANDLE_DISK_FULL</c> as an <see cref="int"/> HResult.</summary>
+    /// <summary>Windows <c>ERROR_DISK_FULL</c> (112, 0x70) as an <see cref="int"/> HResult.</summary>
     private const int WindowsDiskFull = unchecked((int)0x80070070);
 
-    /// <summary>Windows <c>ERROR_HANDLE_DISK_FULL</c> (the handle variant) as an <see cref="int"/> HResult.</summary>
+    /// <summary>Windows <c>ERROR_HANDLE_DISK_FULL</c> (39, 0x27, the handle variant) as an <see cref="int"/> HResult.</summary>
     private const int WindowsHandleDiskFull = unchecked((int)0x80070027);
 
     /// <summary>Linux and macOS <c>ENOSPC</c>: no space left on the device.</summary>

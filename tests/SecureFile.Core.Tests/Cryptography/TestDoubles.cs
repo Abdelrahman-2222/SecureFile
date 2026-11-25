@@ -20,6 +20,12 @@ internal sealed class TrickleStream(byte[] content) : MemoryStream(content)
     }
 }
 
+/// <summary>Claims a length of 0 but returns its content, like <c>/dev/zero</c> on Linux and macOS (review CORE-1).</summary>
+internal sealed class DeviceLikeStream(byte[] content) : MemoryStream(content)
+{
+    public override long Length => 0;
+}
+
 /// <summary>
 /// Records every report synchronously, in order (the real <see cref="Progress{T}"/> posts reports asynchronously,
 /// so their order and timing are not exact), and can run an action on each report.

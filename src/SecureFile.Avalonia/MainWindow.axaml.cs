@@ -149,8 +149,8 @@ internal sealed partial class MainWindow : Window
             case nameof(MainViewModel.State):
                 OnStateChanged();
                 break;
-            case nameof(MainViewModel.IsChoosingOutput):
-                OnChoosingOutputChanged();
+            case nameof(MainViewModel.IsFileDialogOpen):
+                OnFileDialogOpenChanged();
                 break;
         }
     }

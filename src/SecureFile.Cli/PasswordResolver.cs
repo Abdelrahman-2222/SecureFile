@@ -67,7 +67,10 @@ internal sealed class PasswordResolver
     {
         if (options.PasswordFromStdin)
         {
-            return ReadFromStandardInput();
+            // Typed at a terminal, the line would be echoed and stay in the scrollback (review CLI-3).
+            return _environment.InputRedirected
+                ? ReadFromStandardInput()
+                : new PasswordResult(null, "--password-stdin needs the password piped in. Leave it out to type the password hidden.");
         }
 
         return _environment.InputRedirected
@@ -133,6 +136,7 @@ internal sealed class PasswordResolver
     {
         try
         {
+            // Stryker disable once Boolean : the BOM flag only affects GetPreamble, never GetByteCount; equivalent mutant
             _ = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true).GetByteCount(password);
             return true;
         }

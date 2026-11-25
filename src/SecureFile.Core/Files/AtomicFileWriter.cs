@@ -317,7 +317,8 @@ internal static class AtomicFileWriter
     /// <summary>One try to delete a file, without throwing.</summary>
     /// <param name="path">The file to delete. A missing file counts as deleted.</param>
     /// <returns><see langword="true"/> when the file is gone.</returns>
-    private static bool TryDeleteOnce(string path)
+    /// <remarks>Internal so a test can pair the real delete with a pause that releases a lock, without timing races.</remarks>
+    internal static bool TryDeleteOnce(string path)
     {
         try
         {

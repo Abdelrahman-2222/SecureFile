@@ -5,7 +5,8 @@
 #   end-to-end test runs headless (no screen). Together with job 1 this is the Windows/Ubuntu/macOS matrix (Step 7.3).
 # Jobs 3 + 4 (cross-OS golden files): each system encrypts the same sample with the CLI, then every system decrypts all
 #   of them, so a file made on one OS is proven to open on the others.
-# Job 5 scans the full Git history for leaked secrets with gitleaks.
+# Job 5 scans for leaked secrets with gitleaks: on a push only the pushed commits, on a pull request the PR's commits,
+#   and the full history on a manual run (workflow_dispatch) - the gitleaks action picks the range by event.
 #
 # Security: actions are pinned to an exact commit (SHA) instead of a movable tag, and the checkout does not keep
 # the GitHub token on disk while build tools run. Dependabot keeps the pinned SHAs up to date.
@@ -36,6 +37,7 @@ jobs:
   quality-gate:
     name: Windows - quality gate (full solution)
     runs-on: windows-latest
+    timeout-minutes: 30 # a hung test must not hold a runner for the 6-hour default
     steps:
       - name: Check out the code (full history for the commit-message check)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -51,6 +53,12 @@ jobs:
       - name: Run the quality gate (format, build, tests, coverage, audit, secrets, patterns, commits)
         shell: pwsh
         run: ./scripts/verify.ps1
+
+      - name: Run the WPF end-to-end tests (FlaUI; the runner has a desktop, the local gate skips them)
+        shell: pwsh
+        env:
+          SECUREFILE_UI_TESTS: '1'
+        run: dotnet test --project tests/SecureFile.Wpf.UiTests -c Release
 
       - name: Upload the coverage report
         if: always()
@@ -69,6 +77,7 @@ jobs:
         # pushes to main and manual runs test both systems.
         os: ${{ fromJSON(github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feature/') && '["ubuntu-latest"]' || '["ubuntu-latest", "macos-latest"]') }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30 # a hung test must not hold a runner for the 6-hour default
     steps:
       - name: Check out the code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -94,6 +103,7 @@ jobs:
         # Same cost rule as above: macOS only for pull requests, main and manual runs.
         os: ${{ fromJSON(github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feature/') && '["windows-latest", "ubuntu-latest"]' || '["windows-latest", "ubuntu-latest", "macos-latest"]') }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30 # a hung test must not hold a runner for the 6-hour default
     steps:
       - name: Check out the code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -128,6 +138,7 @@ jobs:
       matrix:
         os: ${{ fromJSON(github.event_name == 'push' && startsWith(github.ref, 'refs/heads/feature/') && '["windows-latest", "ubuntu-latest"]' || '["windows-latest", "ubuntu-latest", "macos-latest"]') }}
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 30 # a hung test must not hold a runner for the 6-hour default
     steps:
       - name: Check out the code
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -153,8 +164,9 @@ jobs:
         run: ./scripts/cross-os-golden.ps1 -Mode Decrypt -Directory golden
 
   secrets-scan:
-    name: Secrets scan (gitleaks, full history)
+    name: Secrets scan (gitleaks)
     runs-on: ubuntu-latest
+    timeout-minutes: 30 # a hung test must not hold a runner for the 6-hour default
     # On pull requests the gitleaks action lists the PR's commits through the GitHub API; without this read
     # permission it fails with "403 Resource not accessible by integration" before scanning anything.
     permissions:
@@ -167,7 +179,7 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
-      - name: Scan every commit for secrets
+      - name: Scan the commits of this event for secrets (all of them on a manual run)
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

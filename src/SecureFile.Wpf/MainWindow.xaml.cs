@@ -1,4 +1,6 @@
 using System.Windows;
+using System.Windows.Automation.Peers;
+using System.Windows.Threading;
 using SecureFile.Presentation.Main;
 
 namespace SecureFile.Wpf;
@@ -208,9 +210,9 @@ internal sealed partial class MainWindow : Window
         {
             OnStateChanged();
         }
-        else if (e.PropertyName == nameof(MainViewModel.IsChoosingOutput))
+        else if (e.PropertyName == nameof(MainViewModel.IsFileDialogOpen))
         {
-            OnChoosingOutputChanged();
+            OnFileDialogOpenChanged();
         }
         else if (e.PropertyName == nameof(MainViewModel.SelectedFile))
         {
@@ -218,6 +220,20 @@ internal sealed partial class MainWindow : Window
             // text by accident (review item 24). A failure keeps the file, so the choice stays for the retry.
             ShowPasswordCheck.IsChecked = false;
         }
+        else if (e.PropertyName == nameof(MainViewModel.StatusMessage))
+        {
+            Dispatcher.BeginInvoke(DispatcherPriority.Background, AnnounceStatus);
+        }
+    }
+
+    /// <summary>Tells a screen reader that the status line changed, so it reads the new message.</summary>
+    /// <remarks>
+    /// <c>AutomationProperties.LiveSetting</c> in the XAML only marks the text as a live region; WPF announces nothing until
+    /// code raises <c>LiveRegionChanged</c> (review UI-2). It runs after the binding has put the new text in place.
+    /// </remarks>
+    private void AnnounceStatus()
+    {
+        UIElementAutomationPeer.CreatePeerForElement(StatusText).RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
     }
 
     /// <summary>Tells whether any of the four boxes shows something other than the ViewModel's password or confirmation.</summary>
@@ -237,23 +253,49 @@ internal sealed partial class MainWindow : Window
     /// <summary>Writes the texts into the hidden and visible boxes of both fields without sending them back to the ViewModel.</summary>
     /// <param name="password">The password to show (empty clears both of its boxes).</param>
     /// <param name="confirmation">The confirmation to show (empty clears both of its boxes).</param>
+    /// <remarks>
+    /// Only a box whose text differs is written. Writing <c>PasswordBox.Password</c> moves its caret to the start, and
+    /// this runs on every keystroke (the other box of the pair is behind), so rewriting the box being typed in put each
+    /// new character first: "hello" was stored as "olleh" behind the dots (user report, 2026-11-25).
+    /// </remarks>
     private void SetBoxes(string password, string confirmation)
     {
         _syncingPassword = true;
         try
         {
-            PasswordInput.Password = password;
-            PasswordVisibleInput.Text = password;
-            ConfirmInput.Password = confirmation;
-            ConfirmVisibleInput.Text = confirmation;
-
-            // Setting Text puts the caret at the start; typing afterwards must continue at the end.
-            PasswordVisibleInput.CaretIndex = password.Length;
-            ConfirmVisibleInput.CaretIndex = confirmation.Length;
+            SetHiddenBox(PasswordInput, password);
+            SetVisibleBox(PasswordVisibleInput, password);
+            SetHiddenBox(ConfirmInput, confirmation);
+            SetVisibleBox(ConfirmVisibleInput, confirmation);
         }
         finally
         {
             _syncingPassword = false;
+        }
+    }
+
+    /// <summary>Writes a password box only when its text differs, so the box being typed in keeps its caret.</summary>
+    /// <param name="box">The hidden password box.</param>
+    /// <param name="text">The text it must hold.</param>
+    private static void SetHiddenBox(System.Windows.Controls.PasswordBox box, string text)
+    {
+        if (box.Password != text)
+        {
+            box.Password = text;
+        }
+    }
+
+    /// <summary>Writes a visible text box only when its text differs, and then leaves the caret at the end.</summary>
+    /// <param name="box">The plain text box used while "Show password" is on.</param>
+    /// <param name="text">The text it must hold.</param>
+    private static void SetVisibleBox(System.Windows.Controls.TextBox box, string text)
+    {
+        if (box.Text != text)
+        {
+            box.Text = text;
+
+            // Setting Text puts the caret at the start; typing afterwards must continue at the end.
+            box.CaretIndex = text.Length;
         }
     }
 

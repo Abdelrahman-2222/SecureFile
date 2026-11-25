@@ -153,7 +153,7 @@ internal sealed class CliApplication
             return $"The file \"{input}\" can't be found (or it is a folder).";
         }
 
-        if (OutputPathResolver.IsSameFile(input, output))
+        if (IsSameFileOrLoop(input, output))
         {
             return "The result can't replace the file you chose. Give a different name with --output.";
         }
@@ -171,6 +171,26 @@ internal sealed class CliApplication
             : null;
     }
 
+    /// <summary>Tells whether the output would replace the input; a link loop in either path counts as "yes".</summary>
+    /// <param name="input">The chosen file.</param>
+    /// <param name="output">Where the result would go.</param>
+    /// <returns><see langword="true"/> when the result must be refused.</returns>
+    /// <remarks>
+    /// A loop means the identity cannot be decided; refusing is the safe answer, and choosing another
+    /// <c>--output</c> is the fix either way.
+    /// </remarks>
+    private static bool IsSameFileOrLoop(string input, string output)
+    {
+        try
+        {
+            return OutputPathResolver.IsSameFile(input, output);
+        }
+        catch (IOException)
+        {
+            return true;
+        }
+    }
+
     /// <summary>Runs the engine with a progress line and turns the expected failures into plain messages.</summary>
     /// <param name="encrypt"><see langword="true"/> to encrypt, <see langword="false"/> to decrypt.</param>
     /// <param name="input">The chosen file.</param>
@@ -184,7 +204,15 @@ internal sealed class CliApplication
         ProgressLine? progress = _environment.ShowProgress ? new ProgressLine(_environment.Error, encrypt ? "Encrypting" : "Decrypting") : null;
         try
         {
-            await RunEngineAsync(encrypt, input, output, password, force, progress, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await RunEngineAsync(encrypt, input, output, password, force, progress, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                // Before any catch below writes its message: otherwise the error is glued to "… 100 %" (review CLI-4).
+                progress?.Finish();
+            }
         }
         catch (SecureFileException exception)
         {
@@ -201,10 +229,6 @@ internal sealed class CliApplication
         catch (NotSupportedException exception)
         {
             return FailFrom(exception);
-        }
-        finally
-        {
-            progress?.Finish();
         }
 
         return ReportSuccess(encrypt, output);

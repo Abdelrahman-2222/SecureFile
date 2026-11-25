@@ -280,17 +280,18 @@ public sealed class AtomicFileWriterTests : IDisposable
         // (On Linux and macOS an open file can be deleted at once, so the first try succeeds and the test still holds.)
         string path = PathInFolder("held.bin");
         await File.WriteAllTextAsync(path, "x", Ct);
+        // The lock is released inside the first pause, not after a timer: no race with a busy machine (review CI-3).
         await using var holder = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None);
-        var release = Task.Run(async () =>
-        {
-            await Task.Delay(150, Ct);
-            await holder.DisposeAsync();
-        }, Ct);
+        int pauses = 0;
 
-        bool deleted = AtomicFileWriter.TryDeleteFile(path);
-        await release;
+        bool deleted = AtomicFileWriter.TryDeleteFile(path, AtomicFileWriter.TryDeleteOnce, _ =>
+        {
+            pauses++;
+            holder.Dispose();
+        });
 
         Assert.True(deleted);
+        Assert.True(pauses <= 1);
         Assert.False(File.Exists(path));
     }
 

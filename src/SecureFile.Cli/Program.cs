@@ -17,7 +17,10 @@ internal static class Program
         using CancellationTokenSource cancellation = new();
         Console.CancelKeyPress += (_, e) =>
         {
-            e.Cancel = true; // let the running operation clean up (no half-written file) and exit with code 130
+            // The first Ctrl+C lets the running operation clean up (no half-written file) and exit with code 130. A second
+            // one ends the process: while the program waits on a pipe that never sends a line, the token is not watched,
+            // and swallowing every Ctrl+C would make it impossible to stop (review CLI-2).
+            e.Cancel = !cancellation.IsCancellationRequested;
             cancellation.Cancel();
         };
 

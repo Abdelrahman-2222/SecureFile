@@ -1,0 +1,16 @@
+{
+  "stryker-config": {
+    "project": "SecureFile.Cli.csproj",
+    "test-runner": "mtp",
+    "configuration": "Release",
+    "ignore-methods": [ "ConfigureAwait" ],
+    "mutate": [
+      "**/CliArgumentParser.cs",
+      "**/OutputPathResolver.cs",
+      "**/PasswordResolver.cs",
+      "**/CliOptions.cs"
+    ],
+    "reporters": [ "html", "json", "progress" ],
+    "thresholds": { "high": 90, "low": 80, "break": 80 }
+  }
+}

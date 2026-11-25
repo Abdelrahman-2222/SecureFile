@@ -184,7 +184,38 @@ The survivors, and what was done:
   that can be listed but not read), and `throwOnEndOfStream` (equivalent: `EndOfStreamException` is an `IOException`
   caught with the same result).
 - Total disabled mutants in Core, including those from earlier steps: 207 (each has a comment with its reason).
-- Stryker on the CLI's pure logic (parser, resolvers) was **not run** (time-box); recorded as an open item.
+- Stryker on the CLI's pure logic (parser, resolvers) was not run in Stage 5 (time-box); it ran in Stage 9.1 (below).
+
+### 9.1 Mutation testing: Presentation (C18) and the CLI's pure logic (C22)
+
+Configs `tests/SecureFile.Presentation.Tests/stryker-config.json` (the whole Presentation project) and
+`tests/SecureFile.Cli.Tests/stryker-config.json` (`CliArgumentParser`, `OutputPathResolver`, `PasswordResolver`,
+`CliOptions`; the console and process code is covered by the end-to-end CLI tests, not mutated). Both: MTP runner,
+Release, thresholds high 90 / low 80 / break 80 (same as Core). Run from the test project folder:
+`dotnet dotnet-stryker -O ../../artifacts/stryker-<name>`.
+
+| Run | Presentation | CLI pure logic |
+|---|---|---|
+| 1 (first run) | 83.06 % | 82.86 % |
+| 2 (after new ViewModel, log, formatter and `PasswordResolverTests`) | 86.70 % | 98.36 % |
+| 3 (after the first survivor pass) | 93.45 % (327 killed, 17 survived, 6 no coverage, 1 timeout) | **100 %** (120 of 120) |
+| 4 (after the second survivor pass) | 99.71 % (342 killed, 1 survived) | |
+| 5 (final) | **100 %** (343 killed + 1 timeout, 0 survived) | |
+
+How the survivors were handled:
+- **Killed with tests:** an empty dropped path, the "Reading the file details…" status, progress cleared when a new
+  file is chosen, after Cancel and after an unexpected failure, the exact minimum length (guidance and Encrypt enabled),
+  Enter on an encrypted file needing no confirmation, typing while an operation runs, the Cancel button's
+  re-check notifications, the speed computed from the chosen file's size, Decrypt's overwrite flag, a
+  `NotSupportedException` path, the log's rotation, missing folder and exact 1 MB boundary, the formatter's arrow and
+  five-level limit, and every `PasswordResolver` rule and prompt.
+- **Disabled with a written reason (equivalent or unobservable):** the log's trace lines and their catch blocks (a
+  failed log write stays silent by design), the regex-timeout fallback (cannot be provoked reliably), the UTF-8
+  identifier flag (equivalent), the initial success message, the extra `IsProgressIndeterminate` notification (every
+  caller changes `State` right after), and the Save-cancel refresh outside the Failed state (harmless either way; the
+  requirement has its own test).
+- The timeout is the `Cancel` statement mutant: removing the cancellation makes the waiting test hang, which Stryker
+  counts as detected.
 
 ## 5.4 Security and threat model
 
@@ -222,6 +253,7 @@ before the rename. That is now written down as "verify-then-commit"; an extra HM
 | 11 | Coverage Core (5.3) | >= 90 % lines, >= 85 % branches | 98.7 % / 98.6 % | Met |
 | 12 | Coverage Presentation (5.3) | >= 85 % | 95.8 % lines, about 91 % branches | Met |
 | 13 | Mutation score Core (5.3) | >= 80 % (goal 100 %) | 100 % of the 379 tested mutants; 207 further mutants are disabled, each with a written reason (35 % of all 586 generated), one timeout counts as killed | Met |
+| 13b | Mutation score Presentation and CLI logic (9.1) | >= 80 % | 100 % each (343 + 1 timeout; 120 of 120), survivors killed or justified (§9.1) | Met |
 | 14 | NuGet vulnerabilities (5.4) | 0 | 0 | Met |
 | 15 | Analyzer warnings / secrets (5.4) | 0 | 0 / none | Met |
 | 16 | Threat model (5.4) | every threat has a mitigation or a stated limit | 20 threats, all covered | Met |

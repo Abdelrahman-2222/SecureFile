@@ -93,7 +93,30 @@ public sealed class SecureFileAppTests : IDisposable
         }
     }
 
-    /// <summary>Closes the app (killing it if a dialog keeps it open) and removes the temp folder without hiding a test failure.</summary>
+    [Fact]
+    public async Task HiddenPassword_TypingAfterLeavingAndClickingBackAtTheEnd_AddsToTheEnd()
+    {
+        // User report 2026-11-25: "hello", click elsewhere, click back at the end, "asd" gave "asdhello".
+        Assert.SkipUnless(IsEnabled(), "Set SECUREFILE_UI_TESTS=1 to run the UI tests.");
+        string original = Path.Combine(_folder, "notes.txt");
+        await File.WriteAllTextAsync(original, "notes", TestContext.Current.CancellationToken);
+        Window window = StartApp();
+        ChooseFile(window, original);
+
+        AutomationElement password = Find(window, "PasswordInput");
+        password.Click();
+        Keyboard.Type("hello");
+        Find(window, "ConfirmInput").Click();
+        Keyboard.Type("hel");
+        System.Drawing.Rectangle bounds = password.BoundingRectangle;
+        Mouse.Click(new System.Drawing.Point(bounds.Right - 8, bounds.Top + (bounds.Height / 2)));
+        Keyboard.Type("asd");
+        Find(window, "ShowPasswordCheck").Click();
+
+        string shown = Retry.WhileNull(() => Find(window, "PasswordVisibleInput").Patterns.Value.Pattern.Value.Value, Timeout).Result ?? string.Empty;
+        Assert.Equal("helloasd", shown);
+    }
+
     [Fact]
     public void AboutDialog_OpensWithF1_ShowsTheVersionAndHasAccessibleControls()
     {

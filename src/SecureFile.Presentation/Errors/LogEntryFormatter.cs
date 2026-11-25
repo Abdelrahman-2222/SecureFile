@@ -69,9 +69,11 @@ internal static partial class LogEntryFormatter
             result = BareWindowsPath().Replace(result, Bare);
             return BareUnixPath().Replace(result, Bare);
         }
+        // Stryker disable once Block : reached only when a regex times out, which no test can provoke reliably
         catch (RegexMatchTimeoutException)
         {
             // Fail closed: text that cannot be scanned in time is not written at all.
+            // Stryker disable once String : reached only when a regex times out, which no test can provoke reliably
             return "<text removed: it could not be checked for paths>";
         }
     }

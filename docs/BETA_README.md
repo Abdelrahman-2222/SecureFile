@@ -21,13 +21,13 @@ completely on your computer and needs no internet.
 | Your computer | In this beta |
 |---|---|
 | **Windows 10 or 11, 64-bit** (almost every PC) | **Ready.** Use the `win-x64` zip and follow "How to run it" below. |
-| **Windows 11 on an ARM PC** (Surface Pro X, Copilot+ PC; Settings → System → About says "ARM-based processor") | **Built but never run.** Use the `win-arm64` zip. It was made on another kind of PC and has not been tried on real ARM hardware, so please tell me if it starts. (The `win-x64` zip also runs on ARM PCs, a little slower.) |
+| **Windows 11 on an ARM PC** (Surface Pro X, Copilot+ PC; Settings → System → About says "ARM-based processor") | **Built, not published in this beta** (never run on real ARM hardware). Use the `win-x64` zip: it also runs on ARM PCs, a little slower. Ask me for the ARM build if you want to try it. |
 | **macOS** and **Linux** | **Preview.** A window like this one exists for both (`SecureFile-<version>-osx-…` / `-linux-…` `.tar.gz` on the release page, with its own README). It passes automated tests but you may be the first person to run it on a real Mac or Linux desktop, so please tell me how it went. |
 
 ## How to run it
 
 1. Unzip the folder anywhere (for example your Desktop).
-2. Double-click **SecureFile.exe**. There is nothing to install. Windows 10 or 11, 64-bit (x64 or ARM).
+2. Double-click **SecureFile.exe**. There is nothing to install. Windows 10 or 11, 64-bit.
 
 ## Try it in one minute
 
@@ -40,7 +40,7 @@ completely on your computer and needs no internet.
 1. Browse to the `.enc` file you just made.
 2. Type the same password and click **Decrypt file**. Save it under a new name and open it: it should be exactly your file.
 
-Useful keys: **Ctrl+O** browse, **Enter** in the password box starts the action, **Esc** cancels, **F1** About.
+Useful keys: **Ctrl+O** browse, **Enter** in the password box moves to Confirm while it is still empty, then starts the action, **Esc** cancels, **F1** About.
 
 ## What I would love to hear
 

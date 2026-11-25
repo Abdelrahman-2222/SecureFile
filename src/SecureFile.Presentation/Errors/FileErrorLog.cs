@@ -33,6 +33,7 @@ public sealed class FileErrorLog : IErrorLog
     /// Creates a log that writes to <c>SecureFile/logs/securefile.log</c> in the user's local application data folder:
     /// <c>%LOCALAPPDATA%</c> on Windows, <c>~/Library/Application Support</c> on macOS, <c>~/.local/share</c> on Linux.
     /// </summary>
+    // Stryker disable once String : the real per-user path; a test must not write into the user's profile (the path is checked by review)
     public FileErrorLog()
         : this(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SecureFile", "logs", "securefile.log"))
     {
@@ -76,20 +77,28 @@ public sealed class FileErrorLog : IErrorLog
                 File.AppendAllText(_logFilePath, entry);
             }
         }
+        // Stryker disable once Block : the block holds only the trace line below; removing it leaves the same silent result
         catch (IOException logFailure)
         {
+            // Stryker disable once Statement,String : a trace line for a debugger; a failed log write must stay silent for the user, nothing to observe
             Trace.TraceWarning($"The error log could not be written: {logFailure.GetType().Name}");
         }
+        // Stryker disable once Block : the block holds only the trace line below; removing it leaves the same silent result
         catch (UnauthorizedAccessException logFailure)
         {
+            // Stryker disable once Statement,String : a trace line for a debugger; a failed log write must stay silent for the user, nothing to observe
             Trace.TraceWarning($"The error log could not be written: {logFailure.GetType().Name}");
         }
+        // Stryker disable once Block : the block holds only the trace line below; removing it leaves the same silent result
         catch (NotSupportedException logFailure)
         {
+            // Stryker disable once Statement,String : a trace line for a debugger; a failed log write must stay silent for the user, nothing to observe
             Trace.TraceWarning($"The error log could not be written: {logFailure.GetType().Name}");
         }
+        // Stryker disable once Block : the block holds only the trace line below; removing it leaves the same silent result
         catch (ArgumentException logFailure)
         {
+            // Stryker disable once Statement,String : a trace line for a debugger; a failed log write must stay silent for the user, nothing to observe
             Trace.TraceWarning($"The error log could not be written: {logFailure.GetType().Name}");
         }
     }

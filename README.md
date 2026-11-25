@@ -7,7 +7,7 @@ Under the hood it uses **AES-256-CBC** with an **HMAC-SHA256** check (a wrong pa
 derived from your password with PBKDF2 (600,000 rounds), and big files are processed in a stream. It is written in C# on
 .NET 10; the Windows app uses WPF, the macOS and Linux windows use Avalonia, and there is a command-line version. All of
 them share the same engine and screen logic, and a file locked on one system opens on the others (checked automatically
-on Windows, Ubuntu and macOS for every change).
+on Windows, Ubuntu and macOS for every pull request and every change to main; a push to a feature branch skips macOS).
 
 > **Status:** pre-release `0.1.0-beta2` (2026-11-25). The Windows app and the Windows command line work. The macOS and
 > Linux windows are a **preview for testers**: they pass the automated tests, but have not yet been tried on a real Mac or

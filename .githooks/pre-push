@@ -28,6 +28,14 @@ while read -r local_ref local_sha remote_ref remote_sha; do
   fi
 done
 
+# The gate checks the working tree, not the pushed commits: an uncommitted edit or an untracked file (a test that was
+# never added) could make it pass while the pushed commit fails, or the other way round (review CI-5).
+if [ -n "$(git status --porcelain)" ]; then
+  echo "pre-push: the working tree has uncommitted or untracked changes; commit or stash them first, so the gate checks what is pushed." >&2
+  git status --short >&2
+  exit 1
+fi
+
 echo "pre-push: running the quality gate (scripts/verify.ps1)..."
 pwsh -NoProfile -File scripts/verify.ps1
 status=$?

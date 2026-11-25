@@ -27,7 +27,7 @@ namespace SecureFile.Core.Files;
 /// a false refusal the user fixes by choosing another name, never a lost file.
 /// </para>
 /// </remarks>
-internal static class FileIdentity
+public static class FileIdentity
 {
     /// <summary>How many links are followed before the path counts as a loop (Linux uses 40 too).</summary>
     private const int MaximumLinkHops = 40;
@@ -44,7 +44,7 @@ internal static class FileIdentity
     /// target. In the output path the file name itself is not followed: the rename replaces a link there, not its target.
     /// </remarks>
     /// <exception cref="IOException">A path holds a link loop (more than 40 links).</exception>
-    internal static bool AreSameFile(string inputFilePath, string outputFilePath)
+    public static bool AreSameFile(string inputFilePath, string outputFilePath)
     {
         string input = ResolveLinks(inputFilePath, followLastPart: true);
         string output = ResolveLinks(outputFilePath, followLastPart: false);

@@ -14,9 +14,12 @@ internal sealed class FakeFileDialogService : IFileDialogService
 
     public string? SuggestedSavePath { get; private set; }
 
+    /// <summary>When set, the Open dialog stays "open" until this task completes (a non-modal dialog, as on Linux).</summary>
+    public Task<string?>? PendingOpen { get; set; }
+
     public Task<string?> ShowOpenFileDialogAsync()
     {
-        return Task.FromResult(OpenResult);
+        return PendingOpen ?? Task.FromResult(OpenResult);
     }
 
     /// <summary>When set, the Save dialog stays "open" until this task completes (a non-modal dialog, as on Linux).</summary>
@@ -106,6 +109,9 @@ internal sealed class FakeFileDetailsReader : IFileDetailsReader
     /// <summary>When set, decides whether the file counts as encrypted, whatever its name.</summary>
     public bool? IsEncryptedOverride { get; set; }
 
+    /// <summary>The size every file reports; small by default.</summary>
+    public long SizeInBytes { get; set; } = 1536;
+
     public FileDetails Read(string filePath)
     {
         if (ExceptionToThrow is not null)
@@ -116,7 +122,7 @@ internal sealed class FakeFileDetailsReader : IFileDetailsReader
         // By default the fake decides "encrypted" by name; a test sets the override to model content that differs from the
         // name (a renamed encrypted file, or a damaged ".enc"). The real reader's content check has its own tests.
         bool encrypted = IsEncryptedOverride ?? filePath.EndsWith(".enc", StringComparison.OrdinalIgnoreCase);
-        return new FileDetails(filePath, Path.GetFileName(filePath), Path.GetExtension(filePath), 1536, DateTime.UnixEpoch, encrypted);
+        return new FileDetails(filePath, Path.GetFileName(filePath), Path.GetExtension(filePath), SizeInBytes, DateTime.UnixEpoch, encrypted);
     }
 }
 

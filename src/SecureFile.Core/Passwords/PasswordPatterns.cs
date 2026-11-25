@@ -83,12 +83,21 @@ internal static class PasswordPatterns
     /// </returns>
     /// <remarks>
     /// Both readings are checked because a digit can be a real digit: <c>pass1234</c> must still match as "pass", which
-    /// only the plain reading gives. Backlog C3: the look-alike reading closes the best-known gap.
+    /// only the plain reading gives. Backlog C3: the look-alike reading closes the best-known gap. A third reading drops
+    /// the digits and symbols at the end first: otherwise the suffix of <c>P@ssw0rd2024</c> is read as letters too
+    /// ("passwordoa") and one of the most common passwords was rated Strong (review CORE-2).
     /// </remarks>
     private static bool IsCommonWord(string password)
     {
-        return CommonWords.Contains(LettersOf(password)) || CommonWords.Contains(LettersOf(ReadLookAlikes(password)));
+        return CommonWords.Contains(LettersOf(password))
+            || CommonWords.Contains(LettersOf(ReadLookAlikes(password)))
+            || CommonWords.Contains(LettersOf(ReadLookAlikes(password.TrimEnd(TrailingSuffixCharacters))));
     }
+
+    /// <summary>Gets the characters dropped from the end of a password before the third reading: digits and symbols.</summary>
+    /// <remarks>Built once: every ASCII character that is not a letter. Non-ASCII letters are never in it.</remarks>
+    private static char[] TrailingSuffixCharacters { get; } =
+        Enumerable.Range(0x21, 0x7E - 0x21 + 1).Select(code => (char)code).Where(character => !char.IsAsciiLetter(character)).ToArray();
 
     /// <summary>Keeps only the letters of a text.</summary>
     /// <param name="text">Any text.</param>

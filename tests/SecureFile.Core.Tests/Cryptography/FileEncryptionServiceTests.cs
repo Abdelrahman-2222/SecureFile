@@ -363,6 +363,29 @@ public sealed class FileEncryptionServiceTests : IDisposable
         Assert.True(input.ReadCount > 3, "the stream must really have returned short reads");
     }
 
+    [Fact]
+    public async Task WriteEncryptedFileAsync_InputLongerThanItsLength_ThrowsIOExceptionInsteadOfRunningOn()
+    {
+        // Review CORE-1: a device reports length 0 and never ends; the loop must not run until the disk is full.
+        var header = EncryptedFileHeader.CreateNew(TestIterations);
+        using var input = new DeviceLikeStream(new byte[100]);
+        using var output = new MemoryStream();
+
+        await Assert.ThrowsAsync<IOException>(
+            () => FileEncryptionService.WriteEncryptedFileAsync(input, output, header, Password, progress: null, Ct));
+    }
+
+    [Fact]
+    public async Task EncryptAsync_DeviceFileOnLinuxOrMacOS_ThrowsIOExceptionAndLeavesNothing()
+    {
+        Assert.SkipWhen(OperatingSystem.IsWindows(), "/dev/zero exists only on Linux and macOS.");
+
+        await Assert.ThrowsAsync<IOException>(
+            () => CreateService().EncryptAsync("/dev/zero", OutputPath(), Password, overwriteExisting: false, cancellationToken: Ct));
+
+        Assert.Empty(FileNamesInFolder());
+    }
+
     // ---- Helpers ---------------------------------------------------------------------------------------------------
 
     private void AssertRejectedAsNotAFile(string outputPath)
