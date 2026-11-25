@@ -31,7 +31,7 @@ internal static class AtomicFileWriter
     /// <summary>The ending of every temp file, so a leftover after a crash is easy to recognise.</summary>
     internal const string TempFileSuffix = ".securefile-tmp";
 
-    /// <summary>How many times deleting a temp file is tried before giving up (see <see cref="TryDeleteFile"/>).</summary>
+    /// <summary>How many times deleting a temp file is tried before giving up (see <see cref="TryDeleteFile(string)"/>).</summary>
     private const int DeleteAttempts = 5;
 
     /// <summary>The pause before the second try; each further pause is this much longer (40, 80, 120, 160 ms).</summary>
@@ -284,19 +284,30 @@ internal static class AtomicFileWriter
     /// </remarks>
     internal static bool TryDeleteFile(string path)
     {
-        // Stryker disable once Equality : one attempt more or fewer is only observable with a scanner that lets go at an exact moment (backlog C15)
+        return TryDeleteFile(path, TryDeleteOnce, Thread.Sleep);
+    }
+
+    /// <summary>The retry loop of <see cref="TryDeleteFile(string)"/>, with the delete and the pause passed in.</summary>
+    /// <param name="path">The file to delete.</param>
+    /// <param name="tryDeleteOnce">One delete attempt; <see langword="true"/> when the file is gone.</param>
+    /// <param name="pause">Waits for the given time between attempts.</param>
+    /// <returns><see langword="true"/> when an attempt succeeded.</returns>
+    /// <remarks>
+    /// Separate so a test can count the attempts and pauses exactly, instead of racing a real lock (backlog C15).
+    /// </remarks>
+    internal static bool TryDeleteFile(string path, Func<string, bool> tryDeleteOnce, Action<TimeSpan> pause)
+    {
         for (int attempt = 1; attempt <= DeleteAttempts; attempt++)
         {
-            if (TryDeleteOnce(path))
+            if (tryDeleteOnce(path))
             {
                 return true;
             }
 
-            // Stryker disable once Equality : only skips or adds the last pause before giving up; not observable without a timed lock (backlog C15)
             if (attempt < DeleteAttempts)
             {
                 // Only on the failure path, and a few tenths of a second at most: a scanner usually lets go within that.
-                Thread.Sleep(DeleteRetryStep * attempt);
+                pause(DeleteRetryStep * attempt);
             }
         }
 

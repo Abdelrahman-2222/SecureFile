@@ -306,6 +306,42 @@ public sealed class AtomicFileWriterTests : IDisposable
         Assert.True(File.Exists(path));
     }
 
+    [Fact]
+    public void TryDeleteFile_FailsTwiceThenSucceeds_TriesThreeTimesWithGrowingPauses()
+    {
+        // Deterministic, unlike the timed lock above (backlog C15): the attempts and pauses are counted exactly.
+        int attempts = 0;
+        var pauses = new List<TimeSpan>();
+
+        bool deleted = AtomicFileWriter.TryDeleteFile("any", _ => ++attempts == 3, pauses.Add);
+
+        Assert.True(deleted);
+        Assert.Equal(3, attempts);
+        Assert.Equal([TimeSpan.FromMilliseconds(40), TimeSpan.FromMilliseconds(80)], pauses);
+    }
+
+    [Fact]
+    public void TryDeleteFile_AlwaysFails_GivesUpAfterFiveTriesWithoutAPauseAfterTheLast()
+    {
+        int attempts = 0;
+        var pauses = new List<TimeSpan>();
+
+        bool deleted = AtomicFileWriter.TryDeleteFile("any", _ => { attempts++; return false; }, pauses.Add);
+
+        Assert.False(deleted);
+        Assert.Equal(5, attempts);
+        Assert.Equal([40, 80, 120, 160], pauses.Select(pause => pause.TotalMilliseconds));
+    }
+
+    [Fact]
+    public void TryDeleteFile_FirstTrySucceeds_NeverPauses()
+    {
+        var pauses = new List<TimeSpan>();
+
+        Assert.True(AtomicFileWriter.TryDeleteFile("any", _ => true, pauses.Add));
+        Assert.Empty(pauses);
+    }
+
     /// <summary>The test run's token (xUnit1051).</summary>
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
 
