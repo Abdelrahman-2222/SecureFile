@@ -92,25 +92,26 @@ internal sealed partial class MainWindow : Window
         e.Handled = true;
     }
 
-    /// <summary>Tells whether a drop would be used: it must carry files.</summary>
+    /// <summary>Tells whether a drop would be used: it must carry files, and no operation may be running.</summary>
     /// <param name="e">The drag information.</param>
     /// <returns><see langword="true"/> when the drop zone accepts it.</returns>
-    private static bool AcceptsDrop(DragEventArgs e)
+    /// <remarks>While busy the drop would do nothing, so the cursor says "not allowed" instead of "copy" (review item 12).</remarks>
+    private bool AcceptsDrop(DragEventArgs e)
     {
-        return e.DataTransfer.Contains(DataFormat.File);
+        return e.DataTransfer.Contains(DataFormat.File) && _viewModel.OpenFilesCommand.CanExecute(null);
     }
 
-    /// <summary>Hands the first dropped file to the ViewModel; the ViewModel decides whether it can be used.</summary>
+    /// <summary>Hands the dropped paths to the ViewModel; it uses the first and says so when there were more.</summary>
     /// <param name="sender">The drop zone.</param>
     /// <param name="e">The drop information.</param>
-    /// <remarks>Only the first item is used (one file at a time); an item without a local path (a folder in a sandbox) is ignored.</remarks>
+    /// <remarks>An item without a local path (for example in a sandbox) is left out.</remarks>
     private void OnFileDropped(object? sender, DragEventArgs e)
     {
         DropZone.Classes.Set("dragover", false);
-        string? path = e.DataTransfer.TryGetFiles() is { Length: > 0 } items ? items[0].TryGetLocalPath() : null;
-        if (path is not null && _viewModel.OpenFileCommand.CanExecute(path))
+        string[] paths = [.. (e.DataTransfer.TryGetFiles() ?? []).Select(item => item.TryGetLocalPath()).OfType<string>()];
+        if (paths.Length > 0 && _viewModel.OpenFilesCommand.CanExecute(paths))
         {
-            _viewModel.OpenFileCommand.Execute(path);
+            _viewModel.OpenFilesCommand.Execute(paths);
         }
 
         e.Handled = true;

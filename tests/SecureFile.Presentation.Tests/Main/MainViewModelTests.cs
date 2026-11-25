@@ -447,6 +447,48 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public async Task OpenFiles_DroppedFolder_SaysItIsAFolderAndLogsItAsExpected()
+    {
+        MainViewModel viewModel = CreateViewModel();
+        string folder = Path.Combine(Path.GetTempPath(), "Holiday photos");
+        _detailsReader.ExceptionToThrow = new PathIsFolderException("folder", folder);
+
+        await viewModel.OpenFilesCommand.ExecuteAsync([folder]);
+
+        Assert.Equal(MainViewState.Failed, viewModel.State);
+        Assert.Contains("This is a folder.", viewModel.StatusMessage, StringComparison.Ordinal);
+        Assert.Equal(1, _errorLog.ExpectedCount); // no stack trace for it in the log (review item 29)
+    }
+
+    [Fact]
+    public async Task OpenFiles_SeveralDropped_UsesTheFirstAndSaysSo()
+    {
+        MainViewModel viewModel = CreateViewModel();
+        string second = Path.Combine(Path.GetTempPath(), "second.txt");
+
+        await viewModel.OpenFilesCommand.ExecuteAsync([InputPath, second, second]);
+
+        Assert.Equal(InputPath, viewModel.SelectedFile?.FullPath);
+        Assert.StartsWith(
+            $"You dropped 3 files. SecureFile works on one file at a time, so only \"{Path.GetFileName(InputPath)}\" is used.",
+            viewModel.StatusMessage,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OpenFiles_NothingOrOneFile_BehavesLikeOpenFile()
+    {
+        MainViewModel viewModel = CreateViewModel();
+
+        await viewModel.OpenFilesCommand.ExecuteAsync([]);
+        Assert.Equal(MainViewState.NoFile, viewModel.State);
+
+        await viewModel.OpenFilesCommand.ExecuteAsync([InputPath]);
+        Assert.Equal(InputPath, viewModel.SelectedFile?.FullPath);
+        Assert.DoesNotContain("You dropped", viewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Browse_FileChosenAfterAFailure_ShowsGuidanceAndKeepsThePasswords()
     {
         MainViewModel viewModel = await CreateWithFileAsync(InputPath);
@@ -588,6 +630,7 @@ public sealed class MainViewModelTests
         Assert.False(viewModel.CanEditInputs);
         Assert.False(viewModel.BrowseCommand.CanExecute(null));
         Assert.False(viewModel.OpenFileCommand.CanExecute(InputPath));
+        Assert.False(viewModel.OpenFilesCommand.CanExecute(null)); // the windows show no copy cursor while busy (item 12)
         Assert.False(viewModel.DecryptCommand.CanExecute(null));
         viewModel.Password = "x"; // a dialog that does not block the window (Linux portal) let the user type
 

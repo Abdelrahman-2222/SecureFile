@@ -61,7 +61,7 @@ checked: nothing leaves your computer.** Every suggestion below serves one of th
 
 | Suggestion | Why / benefit | Priority | Effort | Ref |
 |---|---|---|---|---|
-| Clearer drop zone: "Drop a file here or Browse…", a highlight while dragging, a plain message for a folder or several files | People see at once what to do | Should | S | B1 (12, 17, 31) |
+| ✅ Clearer drop zone: "Drop a file here or Browse…", a highlight while dragging, a plain message for a folder or several files (built in Stage 9.0) | People see at once what to do | Should | S | B1 (12, 17, 31) |
 | File card with folder, date, exact size and a tooltip for long names | Users can tell they picked the right file | Should | S | B1 (16, 33) |
 | Keyboard and focus fixes (Enter moves to Confirm, Cancel focused while working, shortcut keys with "Show password") | Keyboard users are not slowed down | Should | S | B1 (7, 8, 9, 11, 30) |
 | Error dialogs say where the log file is | Faster help when something goes wrong | Should | S | B1 (15) |
