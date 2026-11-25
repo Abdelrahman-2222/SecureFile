@@ -67,9 +67,8 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 - **DONE (Stage 9.0):** `Cli_DoesNotReferenceUserInterfaceOrNetworkAssemblies` in `SecureFile.Architecture.Tests` covers the Cli project.
 
 ### B6. Documents still out of line
-- PROJECT_PLAN §11.1 describes a mode switch, a "Change…" output button, a file-card tooltip and date, and "Drop a file here or Browse…"
-  that do not exist (update the plan or build them). `FileErrorLog.LogFilePath` says the dialog shows the path (it does not).
-- TESTPLAN: rows for Alt mnemonics, a dropped folder, several dropped files, Esc with no operation; section J sits before I.
+- **DONE (Stage 9.0):** PROJECT_PLAN §11.1 now describes the app as built (no mode switch, no "Change…" button; the drop wording and the file-card tooltip were built); `FileErrorLog.LogFilePath` is shown by the safety-net dialogs, as its remarks say.
+- **DONE (Stage 9.0):** TESTPLAN has rows for Alt mnemonics (B8), focus while working and after a cancelled Save (B9), Esc with no operation (B10), a dropped folder and several files (E2, E3), the drag highlight (E5), the file-card tooltip (E6) and a log without paths (H2); section I now comes before J.
 
 ## C. Open: found after the review
 
