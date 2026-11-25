@@ -7,12 +7,16 @@ items (C14, C16, #29, #24, C17, #9, #17/#31, #12, #16/#33, #15, #11/#30, #7, #25
 
 ## Things only the user can do (still open)
 
-- [ ] Merge the Stage 9.0 PR (`feature/stage-9-burndown`) after its CI is green on Windows, Ubuntu and macOS (the link
-  tests in `FileIdentityTests` only really run there; on Windows they need Developer Mode).
+- [x] Merge the Stage 9.0 PR (`feature/stage-9-burndown`): done 2026-11-25 (PR #9, squash), CI green on Windows,
+  Ubuntu and macOS.
 - [ ] Run the new TESTPLAN rows by hand on the WPF app: B8-B10 (Alt mnemonics with Show password, Cancel focus, Esc
   with no operation), E2-E6 (folder, several files, drag highlight, busy cursor, file-card tooltip), H2 (log has no paths).
-- [ ] Decide: should a **Weak** password ask "Encrypt anyway?" before encrypting? Today the strength meter only advises
-  (8 characters minimum is the only hard rule, as NIST SP 800-63B recommends). Record the answer in `docs/SUGGESTIONS.md`.
+- [x] Decided 2026-11-25: **no** "Encrypt anyway?" dialog for a Weak password (the warning is already beside the field;
+  a confirm dialog is clicked through by habit). Weak stays an amber caution. Follow-up is backlog C24: refuse passwords
+  on the common-password list, like Too short (`docs/SUGGESTIONS.md` §4.2). Do not reopen the dialog question.
+- [ ] **Final tester release (user request, 2026-11-25):** after 9.1-9.3, publish the finished build as three separate
+  per-OS packages named `SecureFile-beta2-for-testers` for Windows, Linux and macOS, each with notes only for that
+  system. Ask the user before publishing (outward-facing).
 - [ ] **Antivirus (C4):** add a Kaspersky exclusion for `%TEMP%\SecureFile*` (do not disable it).
 - [ ] **Stage 7 real systems (plan 7.4):** collect tester answers for the macOS/Linux preview (C19/C21), then decide on
   the "preview" label (`docs/RELEASING.md`).
