@@ -128,6 +128,28 @@ public sealed class AtomicFileWriterTests : IDisposable
         Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(output));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")] // for the analyzer (CA1416); the skip below keeps it on Windows
+    public async Task WriteAsync_SensitiveOnWindows_TempAndResultHaveAnOwnerOnlyAcl(bool isSensitive)
+    {
+        // Backlog C16: a sensitive file must not inherit the folder's rights, so other accounts cannot read it.
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "Access control lists are checked on Windows; Unix uses the file mode.");
+        string output = PathInFolder("result.txt");
+        bool tempWasOwnerOnly = false;
+
+        await AtomicFileWriter.WriteAsync(output, overwriteExisting: false, isSensitive, _ =>
+        {
+            tempWasOwnerOnly = IsOwnerOnly(_folder.GetFiles().Single());
+            return Task.CompletedTask;
+        });
+
+        Assert.Equal(isSensitive, tempWasOwnerOnly);
+        Assert.Equal(isSensitive, IsOwnerOnly(new FileInfo(output)));
+        Assert.Empty(await File.ReadAllBytesAsync(output, Ct)); // the owner can still read it
+    }
+
     [Fact]
     public async Task WriteAsync_WriterFailsAndTheTempFileCannotBeDeleted_LeavesItEmpty()
     {
@@ -286,6 +308,18 @@ public sealed class AtomicFileWriterTests : IDisposable
 
     /// <summary>The test run's token (xUnit1051).</summary>
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    /// <summary>Whether the file inherits nothing and grants rights to the current user only.</summary>
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    private static bool IsOwnerOnly(FileInfo file)
+    {
+        using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+        System.Security.AccessControl.FileSecurity security = file.GetAccessControl();
+        var rules = security.GetAccessRules(true, true, typeof(System.Security.Principal.SecurityIdentifier))
+            .Cast<System.Security.AccessControl.FileSystemAccessRule>()
+            .ToList();
+        return security.AreAccessRulesProtected && rules.Count > 0 && rules.TrueForAll(rule => rule.IdentityReference.Equals(identity.User));
+    }
 
     private string PathInFolder(string name)
     {

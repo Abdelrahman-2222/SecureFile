@@ -49,7 +49,7 @@ checked: nothing leaves your computer.** Every suggestion below serves one of th
 |---|---|---|---|---|
 | **File format version 2**: authenticate in chunks and store a quick password check | Today a wrong password on a very large file is found only at the end; this finds it at once | Should | L | B4 (6) |
 | ✅ Same-file check on macOS/Linux by file identity, not by name (built in Stage 9.0) | A folder shortcut or a different letter case could make the output replace the input there (Windows is safe) | Should | M | C14 |
-| Owner-only access rights on the temporary and result files (Windows) | Other accounts on a shared PC cannot read the work in progress | Should | S | C16 |
+| ✅ Owner-only access rights on the temporary and result files (Windows; built in Stage 9.0) | Other accounts on a shared PC cannot read the work in progress | Should | S | C16 |
 | Written file-format description with sample files | Other tools can read the format; upgrades are safer (the cross-system samples are a start) | Should | S | — |
 | Free-disk-space check before a large run | A full disk is reported at the start, not at 99 % | Could | S | B4 (34) |
 | Clean up leftovers after a crash or power cut on the next start | No hidden temporary file stays behind after a hard stop | Could | M | B4 (2) |

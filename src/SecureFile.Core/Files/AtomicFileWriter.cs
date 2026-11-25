@@ -1,5 +1,8 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Runtime.Versioning;
+using System.Security.AccessControl;
 using System.Security.Cryptography;
+using System.Security.Principal;
 
 namespace SecureFile.Core.Files;
 
@@ -56,7 +59,8 @@ internal static class AtomicFileWriter
     /// <see langword="true"/> when the content is sensitive (decryption: not-yet-verified plaintext, ADR-07). On Windows
     /// the temp file then gets the <i>hidden</i> attribute while it is written, removed again before the move so the
     /// result is never hidden. On Linux and macOS (where the leading dot already hides it) it is created readable and
-    /// writable by its owner only (0600), and the result keeps that: a decrypted file stays private to the user.
+    /// writable by its owner only (0600); on Windows it gets an owner-only ACL instead of the folder's (backlog C16).
+    /// The result keeps either: a decrypted file stays private to the user.
     /// </param>
     /// <param name="writeContent">
     /// Writes the content into the stream it receives. If it throws, the temp file is emptied and deleted, and the
@@ -179,14 +183,20 @@ internal static class AtomicFileWriter
 
     /// <summary>Creates the empty temp file, refusing to open a file that already exists.</summary>
     /// <param name="tempFilePath">The new file's path.</param>
-    /// <param name="isSensitive">On Linux and macOS: create it readable and writable by its owner only.</param>
+    /// <param name="isSensitive">Create it readable and writable by its owner only (Unix mode 0600, or an owner-only ACL on Windows).</param>
     /// <returns>The open stream; the caller disposes it.</returns>
     /// <remarks>
     /// On Linux and macOS the default (usually 0644) lets every local user read the file, and <see cref="FileShare.None"/>
-    /// is only an advisory lock there (Review Board 1.6, M2). Windows has no Unix mode, so it is set only elsewhere.
+    /// is only an advisory lock there (Review Board 1.6, M2). On Windows the file would inherit the folder's ACL, which in
+    /// a shared folder lets other accounts read the plaintext (backlog C16), so it gets its own ACL instead.
     /// </remarks>
     private static FileStream CreateTempFile(string tempFilePath, bool isSensitive)
     {
+        if (isSensitive && OperatingSystem.IsWindows())
+        {
+            return CreateOwnerOnlyWindowsFile(tempFilePath);
+        }
+
         var options = new FileStreamOptions
         {
             Mode = FileMode.CreateNew,
@@ -203,6 +213,39 @@ internal static class AtomicFileWriter
         }
 
         return new FileStream(tempFilePath, options);
+    }
+
+    /// <summary>
+    /// Creates the temp file on Windows with an ACL that grants full control to the current user only and inherits
+    /// nothing from the folder (backlog C16).
+    /// </summary>
+    /// <param name="tempFilePath">The new file's path.</param>
+    /// <returns>The open stream; the caller disposes it.</returns>
+    /// <remarks>
+    /// <para>
+    /// The ACL is part of the create call, so there is no moment in which the file exists with the folder's rights.
+    /// A rename inside one volume keeps the file's own ACL, so the result stays owner-only, like 0600 on Unix.
+    /// </para>
+    /// <para>
+    /// Administrators can still take ownership, and backup or antivirus software running as SYSTEM reads files through
+    /// its backup privilege, not through the ACL; those are outside the threat model (THREAT_MODEL §4).
+    /// </para>
+    /// </remarks>
+    [SupportedOSPlatform("windows")]
+    private static FileStream CreateOwnerOnlyWindowsFile(string tempFilePath)
+    {
+        using var identity = WindowsIdentity.GetCurrent();
+        var security = new FileSecurity();
+        security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+        security.AddAccessRule(new FileSystemAccessRule(
+            identity.User!, FileSystemRights.FullControl, AccessControlType.Allow));
+        return new FileInfo(tempFilePath).Create(
+            FileMode.CreateNew,
+            FileSystemRights.Write | FileSystemRights.ReadAttributes,
+            FileShare.None,
+            bufferSize: 1, // this overload refuses 0; FileStream treats 1 as "no buffer" too
+            FileOptions.Asynchronous,
+            security);
     }
 
     /// <summary>Builds the temp file path: <c>.~&lt;output name&gt;.&lt;8 random hex&gt;.securefile-tmp</c> in the output folder.</summary>
