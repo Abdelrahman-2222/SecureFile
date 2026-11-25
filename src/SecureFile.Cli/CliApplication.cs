@@ -204,7 +204,15 @@ internal sealed class CliApplication
         ProgressLine? progress = _environment.ShowProgress ? new ProgressLine(_environment.Error, encrypt ? "Encrypting" : "Decrypting") : null;
         try
         {
-            await RunEngineAsync(encrypt, input, output, password, force, progress, cancellationToken).ConfigureAwait(false);
+            try
+            {
+                await RunEngineAsync(encrypt, input, output, password, force, progress, cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                // Before any catch below writes its message: otherwise the error is glued to "… 100 %" (review CLI-4).
+                progress?.Finish();
+            }
         }
         catch (SecureFileException exception)
         {
@@ -221,10 +229,6 @@ internal sealed class CliApplication
         catch (NotSupportedException exception)
         {
             return FailFrom(exception);
-        }
-        finally
-        {
-            progress?.Finish();
         }
 
         return ReportSuccess(encrypt, output);
