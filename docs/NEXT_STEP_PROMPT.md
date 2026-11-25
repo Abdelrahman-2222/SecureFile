@@ -14,9 +14,8 @@ Last finished (2026-11-25):
 
 ## Things only the user can do (still open)
 
-- [ ] Switch the repository to public (Settings → General → Danger Zone → Change visibility), then in Settings →
-  Security turn on **Private vulnerability reporting**, and add a branch ruleset for `main` and a tag ruleset for `v*`
-  (backlog C9). After that, CodeQL can be enabled for free.
+- [x] Repository public (2026-11-25); private vulnerability reporting, secret scanning with push protection, and rulesets
+  for `main`, `release/**` and `v*` on (`docs/RELEASING.md`, backlog C9). Optional: CodeQL default setup (Security tab).
 - [ ] Share the Google Drive link with testers; collect answers per system (macOS/Linux: C19/C21).
 - [ ] Narrator check (UI-2): with Narrator on, a status change (wrong password, success) is read out once.
 - [ ] Rehearse the deck once with the speaker notes; add the three demo screenshots (`docs/SCREENSHOTS_NEEDED.md`).
@@ -24,7 +23,7 @@ Last finished (2026-11-25):
 - [x] **Antivirus (C4):** Kaspersky exclusion for `%TEMP%\SecureFile*\` added 2026-11-25 (the gate then passed first time).
 - [ ] **Stage 5** (`docs/QUALITY_REPORT.md`): cold start, VS profiler, SonarQube, class coupling, decision C1.
 - [ ] **Usability (C6):** a person runs `docs/TESTPLAN.md` and the friends session in `docs/USABILITY.md`.
-- [ ] Decision C7 (code signing, with ADR-15 in Prompt A). C9 is the visibility switch in the first item.
+- [ ] Decision C7 (code signing, with ADR-15 in Prompt A). C9 is done (first item).
 
 **Releases are kept (user decision, 2026-11-25):** `v0.1.0-beta1`, `v0.1.0-beta2` and `v0.1.0-beta3` stay published
 on GitHub, with their tags, branches and zips, as the record of progress. Every later build is a new release next to

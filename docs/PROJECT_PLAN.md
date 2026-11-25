@@ -792,7 +792,7 @@ What does a mutation score tell us that coverage does not?
 | 9.2 | `docs/FINAL_GUIDE.md` — the detailed explanation document (§14.1). | ✅ 2026-11-25: written, final test counts and mutation scores in. |
 | 9.3 | Team Lead presentation (`.pptx`) (§14.2) + Q&A preparation. | 🟡 2026-11-25: `docs/SecureFile_TeamLead.pptx`, 17 slides, Q&A in the speaker notes, v2 roadmap. Waiting on the user: demo screenshots and one rehearsal. |
 | 9.4 | 2-minute demo video as a backup for the live demo. | ⬜ (script and recording: Prompt C in `docs/NEXT_STEP_PROMPT.md`) |
-| 9.5 | Tester release and public repository. | 🟡 2026-11-25: `v0.1.0-beta3` tagged (`3cfb5b2`, branch `release/v0.1.0-beta3`) and published as a GitHub pre-release with per-OS files; beta1 and beta2 kept. MIT licence, CONTRIBUTING, Code of Conduct, issue templates and a public README added. Waiting on the user: switching the repository to public. |
+| 9.5 | Tester release and public repository. | ✅ 2026-11-25: `v0.1.0-beta3` tagged (`3cfb5b2`, branch `release/v0.1.0-beta3`) and published as a GitHub pre-release with per-OS files; beta1 and beta2 kept. MIT licence, CONTRIBUTING, Code of Conduct, issue templates and a public README added (PR #12). Repository public; private vulnerability reporting, secret scanning and rulesets for `main`, `release/**` and `v*` on. Tester folders shared on Google Drive. |
 
 ### Definition of Done (whole project)
 

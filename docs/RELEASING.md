@@ -86,16 +86,21 @@ for friends to try, not yet proven".
 
 ## What protects it, and what does not
 
-GitHub's branch protection and rulesets are not available for a private repository on the free plan (the API answers
-"Upgrade to GitHub Pro or make this repository public"), so GitHub itself will not stop someone with write access from
-deleting the branch on the website. What exists instead:
+Since the repository went public (2026-11-25), GitHub enforces three rulesets (Settings → Rules → Rulesets):
+
+| Ruleset | Applies to | Blocks / requires |
+|---|---|---|
+| Protect main | `main` | deletion and force-push; changes only through a pull request with resolved threads and these CI checks green: Windows quality gate, Ubuntu and macOS tests, gitleaks. The repository admin may merge a pull request past a failed check, never push directly. |
+| Protect release branches | `release/**` | deletion and force-push, no bypass |
+| Protect release tags | `v*` | deletion, moving (update) and force-push, no bypass; creating a new tag is allowed |
+
+Also on: private vulnerability reporting (the `SECURITY.md` route), secret scanning and push protection, Dependabot
+security updates. Before that, on the free private plan, rulesets were unavailable and only these existed (still in place):
 
 - The local `.githooks/pre-push` hook (enabled with `git config core.hooksPath .githooks`) refuses deleting any remote
   branch or tag, force-pushes and non-fast-forward updates, and pushing straight to `main`. It protects against mistakes on
   a clone that has the hook enabled; it can be skipped with `--no-verify`.
 - The **tag** is a second pointer to the same commit, and a GitHub Release with the programs attached keeps the binaries.
-- To make it permanent: make the repository public, or upgrade the plan and add a branch ruleset for `release/*` that blocks
-  deletion and force-pushes, and a tag ruleset for `v*`.
 
 ## Release history
 
