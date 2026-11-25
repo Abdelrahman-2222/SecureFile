@@ -25,9 +25,11 @@ items (C14, C16, #29, #24, C17, #9, #17/#31, #12, #16/#33, #15, #11/#30, #7, #25
 - [ ] **Usability (C6):** a person runs `docs/TESTPLAN.md` and the friends session in `docs/USABILITY.md`.
 - [ ] Decisions: C7 (code signing), C9 (public repository for CodeQL and branch protection).
 
-Order: **Prompt A (Stage 9.0b, production gaps) first**, then **Prompt B (Stage 9.1-9.3)**. 9.1 reviews the finished code, so
-the last code change (C24) lands before it. Tester answers for macOS/Linux (C19/C21) come in whenever they arrive; the user
-brings them to a chat and they are recorded then.
+Order (updated 2026-11-25): **Prompt B (Stage 9.1-9.3) is already running** in its own chat (branch
+`feature/stage-9-final`). **Prompt A (Stage 9.0b, production gaps) runs after Prompt B's PR is merged**; its C24 code
+change then gets its own review in Prompt A's PR. When the 9.1-9.3 chat rewrites this file at its wrap-up, it must keep
+Prompt A (still to do) next to the 9.4 and release hand-off. Tester answers for macOS/Linux (C19/C21) come in whenever
+they arrive; the user brings them to a chat and they are recorded then.
 
 ### Prompt A: Stage 9.0b (C24 common passwords, ADR-15 decision, clean-machine and manual test kit)
 
@@ -39,7 +41,9 @@ Avalonia app (macOS/Linux, bonus), command line; layers Wpf/Avalonia/Cli -> Pres
 row 9.0b) in this chat, then open the pull request. Do not read docs/PROJECT_PLAN.md or docs/LEARNING_LOG.md in full: grep
 the rows or sections you need. Terse chat updates.
 
-STEP 0: git status, git fetch --prune, branch feature/stage-9-production-gaps from main. Build and run all tests first.
+STEP 0: git status, git fetch --prune. Check that the Stage 9.1-9.3 PR (feature/stage-9-final) is merged; branch
+feature/stage-9-production-gaps from main. Build and run all tests first. Also update docs/FINAL_GUIDE.md and the
+presentation's password slide for C24 (they were written before it).
 
 COMMITS: one per item, Conventional Commits, first line <= 72 characters, NO AI attribution lines.
 
@@ -81,12 +85,13 @@ maintainability >= 60; ConfigureAwait(true) in Presentation, (false) in Core; AD
 `dotnet format SecureFile.slnx whitespace` after creating files; never commit secrets, big binaries or artifacts/; ask before
 any outward-facing action. The pre-push hook runs scripts/verify.ps1 on `git push`. Wrap-up: append ONE short "Stage 9.0b"
 section to docs/LEARNING_LOG.md (append only), CHANGELOG lines, plan row 9.0b marked honestly (amber while the user's
-manual results are missing), in this file remove Prompt A and keep Prompt B, then the PR and the ccd_pr tools.
+manual results are missing), in this file remove Prompt A and keep the 9.4 and release hand-off, then the PR and the
+ccd_pr tools.
 ~~~
 
-### Prompt B: Stage 9.1-9.3 (final review, guide, presentation)
+### Prompt B: Stage 9.1-9.3 (final review, guide, presentation) — started 2026-11-25, kept for the record
 
-Paste this into a new chat after Prompt A's PR is merged:
+The text as it was pasted:
 
 ~~~
 Follow CLAUDE.md (read it first). Project: SecureFile, AES-256-CBC + HMAC file encryption, .NET 10, WPF app (Windows),
@@ -94,7 +99,7 @@ Avalonia app (macOS/Linux, bonus), command line; layers Wpf/Avalonia/Cli -> Pres
 (plan rows 9.1, 9.2, 9.3) in this chat, then open the pull request. Do not read docs/PROJECT_PLAN.md or docs/LEARNING_LOG.md
 in full: grep the rows or sections you need (§13 Definition of Done, §14 deliverables, §15). Terse chat updates.
 
-STEP 0: git status, git fetch --prune. Check that the Stage 9.0b PR (feature/stage-9-production-gaps) is merged; branch
+STEP 0: git status, git fetch --prune. Check that the Stage 9.0 PR (feature/stage-9-burndown) is merged; branch
 feature/stage-9-final from main (if not merged, branch from it and target it). Build and run all tests first.
 
 COMMITS: many small commits, one per finding fixed or per document, Conventional Commits, first line <= 72 characters,
