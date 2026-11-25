@@ -61,6 +61,8 @@ public sealed class PasswordStrengthEvaluatorTests
     [InlineData("PASSWORD!!!!")]        // same, other case and symbols
     [InlineData("qwertyuiop123")]       // keyboard row
     [InlineData("MyPassword2026")]      // common phrase with digits
+    [InlineData("P@ssw0rd2024")]        // look-alikes plus a year: was rated Strong (review CORE-2)
+    [InlineData("W3lc0me2024!")]
     public void Evaluate_PredictablePasswords_AreWeakHoweverLongTheyLook(string password)
     {
         Assert.Equal(PasswordStrength.Weak, PasswordStrengthEvaluator.Evaluate(password));

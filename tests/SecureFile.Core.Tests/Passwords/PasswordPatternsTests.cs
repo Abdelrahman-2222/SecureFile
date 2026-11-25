@@ -37,6 +37,9 @@ public sealed class PasswordPatternsTests
     [InlineData("l3tmein")]     // 3 = e
     [InlineData("1loveyou")]    // 1 = i
     [InlineData("mus7ang")]     // 7 = t
+    [InlineData("P@ssw0rd1")]    // look-alikes plus a digit suffix (review CORE-2)
+    [InlineData("P@ssw0rd2024")]
+    [InlineData("W3lc0me2024!")]
     [InlineData("4dmin")]       // 4 = a
     public void IsPredictable_LookAlikeCharactersReadAsLetters_IsRecognised(string disguisedWord)
     {
