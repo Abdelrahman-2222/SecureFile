@@ -136,6 +136,7 @@ internal sealed class PasswordResolver
     {
         try
         {
+            // Stryker disable once Boolean : the BOM flag only affects GetPreamble, never GetByteCount; equivalent mutant
             _ = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true).GetByteCount(password);
             return true;
         }

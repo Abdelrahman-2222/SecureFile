@@ -72,6 +72,7 @@ internal static partial class LogEntryFormatter
         catch (RegexMatchTimeoutException)
         {
             // Fail closed: text that cannot be scanned in time is not written at all.
+            // Stryker disable once String : reached only when a regex times out, which no test can provoke reliably
             return "<text removed: it could not be checked for paths>";
         }
     }

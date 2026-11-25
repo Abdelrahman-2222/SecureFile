@@ -66,6 +66,7 @@ public sealed partial class MainViewModel : ObservableObject
     private string? _lastOutputPath;
 
     /// <summary>The success message of the last operation, kept so a failed "Open folder" can add to it instead of replacing it.</summary>
+    // Stryker disable once String : always set by a success before Open folder can read it (CanOpenFolder); equivalent mutant
     private string _lastSuccessMessage = string.Empty;
 
     /// <summary>Creates the ViewModel with the services it uses (pure dependency injection, ADR-09).</summary>
@@ -746,6 +747,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         try
         {
+            // Stryker disable once Boolean : the BOM flag only affects GetPreamble, never GetByteCount; equivalent mutant
             _ = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false, throwOnInvalidBytes: true).GetByteCount(password);
             return true;
         }

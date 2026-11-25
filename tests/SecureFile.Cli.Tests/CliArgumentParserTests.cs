@@ -9,6 +9,7 @@ public sealed class CliArgumentParserTests
     [InlineData("--help")]
     [InlineData("-h")]
     [InlineData("help")]
+    [InlineData("/?")]
     public void Parse_NoArgumentsOrHelp_ShowsHelp(params string[] args)
     {
         CliParseResult result = CliArgumentParser.Parse(args);

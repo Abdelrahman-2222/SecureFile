@@ -1059,13 +1059,102 @@ public sealed class MainViewModelTests
     {
         MainViewModel viewModel = await CreateWithFileAsync(InputPath);
         char loneSurrogate = (char)0xD800; // lives in the body: xUnit v3 cannot serialize it in InlineData
-        viewModel.Password = new string(['a', 'b', loneSurrogate]);
+        // Long enough and confirmed, so only the surrogate can stop it (a short one hid the check from Stryker).
+        string broken = "abcdefgh" + loneSurrogate;
+        viewModel.Password = broken;
+        viewModel.ConfirmPassword = broken;
+        _dialogs.SaveResult = InputPath + ".enc";
 
         await viewModel.EncryptCommand.ExecuteAsync(null);
 
         Assert.Equal(MainViewState.Failed, viewModel.State);
         Assert.Empty(_encryption.Calls);
-        Assert.Contains("password", viewModel.StatusMessage, StringComparison.Ordinal);
+        Assert.Equal("The password contains a character that can't be used. Please type it again.", viewModel.StatusMessage);
+    }
+
+    [Fact]
+    public async Task Decrypt_PasswordWithLoneSurrogate_ShowsMessageAndDoesNotCallCore()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(Path.Combine(Path.GetTempPath(), "report.pdf.enc"));
+        viewModel.Password = "ab" + (char)0xDC00;
+        _dialogs.SaveResult = InputPath;
+
+        await viewModel.DecryptCommand.ExecuteAsync(null);
+
+        Assert.Equal(MainViewState.Failed, viewModel.State);
+        Assert.Empty(_encryption.Calls);
+    }
+
+    [Fact]
+    public void StrengthText_WeakAndFair_GiveTheirSentences()
+    {
+        MainViewModel viewModel = CreateViewModel();
+
+        viewModel.Password = "Password1234";
+        string weak = viewModel.StrengthText;
+        viewModel.Password = "Hjkmnp7!x";
+        string fair = viewModel.StrengthText;
+
+        Assert.Equal("Weak: avoid repeats, sequences and common words. A few unrelated words are safer.", weak);
+        Assert.Equal("Fair.", fair);
+        Assert.Equal(string.Empty, viewModel.ProgressText);
+    }
+
+    [Fact]
+    public async Task NewPassword_OfExactlyTheMinimumLength_AsksForConfirmationAndEncrypts()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        string exact = new('k', PasswordStrengthEvaluator.MinimumLength);
+        viewModel.ConfirmPassword = string.Empty;
+        viewModel.Password = exact[1..];
+        string tooShortHint = viewModel.PasswordMatchText;
+        viewModel.Password = exact;
+        string hint = viewModel.PasswordMatchText;
+        viewModel.ConfirmPassword = exact;
+        _dialogs.SaveResult = InputPath + ".enc";
+
+        await viewModel.EncryptCommand.ExecuteAsync(null);
+
+        Assert.Equal(string.Empty, tooShortHint);
+        Assert.Equal("Type the password again to confirm it.", hint);
+        Assert.Equal(exact, Assert.Single(_encryption.Calls).Password);
+    }
+
+    [Theory]
+    [InlineData(true, "Encrypting…")]
+    [InlineData(false, "Decrypting…")]
+    public async Task WhileWorking_TheStatusNamesTheOperation(bool encrypt, string expected)
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(encrypt ? InputPath : Path.Combine(Path.GetTempPath(), "report.pdf.enc"));
+        _dialogs.SaveResult = Path.Combine(Path.GetTempPath(), "result.bin");
+        var release = new TaskCompletionSource();
+        _encryption.WaitFor = release.Task;
+
+        Task running = (encrypt ? viewModel.EncryptCommand : viewModel.DecryptCommand).ExecuteAsync(null);
+        string status = viewModel.StatusMessage;
+        bool indeterminate = viewModel.IsProgressIndeterminate;
+        release.SetResult();
+        await running;
+
+        Assert.Equal(expected, status);
+        Assert.False(indeterminate); // a running operation shows a real percentage
+    }
+
+    [Fact]
+    public async Task OpenFolder_AfterASuccessThenAFailure_IsNotAvailable()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        _dialogs.SaveResult = InputPath + ".enc";
+        await viewModel.EncryptCommand.ExecuteAsync(null);
+        await viewModel.OpenFileCommand.ExecuteAsync(InputPath);
+        viewModel.Password = ValidPassword;
+        viewModel.ConfirmPassword = ValidPassword;
+        _encryption.ExceptionToThrow = new IOException("disk gone");
+
+        await viewModel.EncryptCommand.ExecuteAsync(null);
+
+        Assert.Equal(MainViewState.Failed, viewModel.State);
+        Assert.False(viewModel.OpenFolderCommand.CanExecute(null)); // the earlier result path is still remembered
     }
 
     [Fact]

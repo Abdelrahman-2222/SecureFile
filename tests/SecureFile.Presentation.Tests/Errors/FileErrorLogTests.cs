@@ -86,6 +86,29 @@ public sealed class FileErrorLogTests : IDisposable
     }
 
     [Fact]
+    public void Write_LogPathIsAFolder_DoesNotThrow()
+    {
+        // Logging must never turn into a second failure: the write fails inside and is dropped.
+        var log = new FileErrorLog(_folder.FullName);
+
+        log.Write(new InvalidOperationException("x"));
+
+        Assert.True(Directory.Exists(_folder.FullName));
+    }
+
+    [Fact]
+    public void Write_SecondRotation_ReplacesTheOlderCopy()
+    {
+        var log = new FileErrorLog(Path.Combine(_folder.FullName, "test.log"));
+        File.WriteAllText(log.LogFilePath + ".1", "oldest");
+        File.WriteAllText(log.LogFilePath, new string('o', 1_000_001));
+
+        log.WriteExpected(new InvalidOperationException("fresh"));
+
+        Assert.Equal(1_000_001, new FileInfo(log.LogFilePath + ".1").Length); // one older copy is kept, not two
+    }
+
+    [Fact]
     public void Write_LogOfExactlyOneMegabyte_IsNotRotatedYet()
     {
         var log = new FileErrorLog(Path.Combine(_folder.FullName, "test.log"));
