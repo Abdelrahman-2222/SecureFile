@@ -1,0 +1,9 @@
+# GitGuardian configuration. Keeps every detector on and ignores ONE file of made-up test inputs.
+# Same idea as .gitleaks.toml: the allowance is narrow and explained, never a blanket "ignore tests/".
+version: 2
+
+secret:
+  # PasswordPatternsTests.cs feeds fake passwords (for example "P@ssw0rd-Tx9q") to the password-strength check to prove it
+  # recognises predictable patterns. They protect nothing: no account, no service, no real file.
+  paths-ignore:
+    - "tests/SecureFile.Core.Tests/Passwords/PasswordPatternsTests.cs"

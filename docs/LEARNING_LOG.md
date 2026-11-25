@@ -1792,3 +1792,102 @@ from Explorer, the Open folder click. Known flaky test (cleanup race, name saved
 3. Why are the UI tests skipped by default, and what would it take to run them in CI?
 4. Why is `ResetAfterUnexpectedError` a no-op while an operation is running, yet the `finally` in `RunGuardedAsync` resets?
 5. What does "0 failures" in Accessibility Insights automated checks prove, and what does it not prove?
+
+## Stage 4 — testing
+
+### Step 4.2 — large-file runs (T-27), 2026-11-24
+
+Run with `scripts/large-file-check.ps1` (work folder on D:, deleted afterwards; the folder was empty at the end).
+
+| Size | Encrypt | Decrypt | Peak working set | Result |
+|---|---|---|---|---|
+| 1 GiB (1024 MB) | 10.6 s (96 MB/s) | 10.3 s (100 MB/s) | 46 MB | passed, hash equal, limit 400 MB |
+| 4.5 GiB (4608 MB) | not measured | not measured | not measured | **blocked** (see below) |
+
+**Finding: the 4.5 GiB run was blocked by antivirus, not by the app.** Kaspersky Premium's System Watcher flagged
+`SecureFile.Integration.Tests.exe` as `PDM:Trojan.Win32.Generic` about 35 s into the run, terminated the process
+(a behavioral heuristic: a program writing gigabytes of random data and then encrypting it looks like ransomware) and
+deleted the exe the first time. Two attempts gave the same result; both died while the 4.5 GiB file was being written
+(555 MB written in the first). The memory assertion never ran for this size, so nothing is known about the app's
+behavior above 4 GB yet. We could not add an exclusion, and we did not change the antivirus settings.
+
+**To do:** run the 4.5 GiB case on a machine or CI runner without this heuristic (or after the user excludes the test
+output folder), then fill in the row above.
+
+**Questions to be able to answer.**
+1. Why is the peak working set a valid proof that the file is streamed? (A loading version needs at least the file size.)
+2. Why is a 4.5 GiB file used and not 4 GiB? (More than 2^32 bytes, so any 32-bit size or offset breaks.)
+3. Why do we not raise the memory limit or skip the case silently when it cannot run?
+
+---
+
+## Stage 5 — Quality: measure, harden, burn down (2026-11-24)
+
+**What was built.** A BenchmarkDotNet project (`benchmarks/SecureFile.Benchmarks`) and three scripts
+(`run-benchmarks.ps1`, `measure-startup.ps1`, `measure-memory.ps1`); `docs/QUALITY_REPORT.md` with every number and its
+verdict; `docs/THREAT_MODEL.md` (STRIDE, 20 threats); a progress throttle (10 updates per second); a CLI fix; look-alike
+reading in the strength check; and 13 new tests that took the Core mutation score from 95.34 % to 100 %.
+
+**Key decisions.**
+- *Report misses, do not hide them.* Three targets were not met (throughput vs copy, warm start, cold start) and are marked
+  "Not met" with the reason; a limit was never raised.
+- *Compare with the right baseline.* A plain `CopyTo` finishes in RAM (1.9 GB/s); the fair baseline is a copy that is
+  forced to disk like our atomic writer. Encrypt costs CPU time plus disk time because the two do not overlap (backlog C13).
+- *Do not touch the crash-safe path late.* The overlap fix needs its own design and tests, so it is recorded, not rushed.
+- *Disable a mutant only with a written reason.* 6 new `// Stryker disable` comments; the headline score says how many
+  mutants are excluded.
+- *The threat model is checked by a second pair of eyes.* The reviewer found that the table claimed "verified before any
+  plaintext is written", which the code does not do (verify-then-commit); the document was wrong, not the code.
+
+**Review table (security review, then product-owner/tester review).**
+
+| Review | Finding | Result |
+|---|---|---|
+| Security R1 | Threat table claimed the tag is checked before plaintext is written | Doc fixed (verify-then-commit) |
+| Security R2 | Same-file check is path-text only; on Linux/macOS a symlink alias can replace the input | Recorded C14 |
+| Security R3 | CLI crashed on `--output <folder>` | Fixed, test |
+| Security R4-R8 | Wrong temp-name text, ACL on Windows temp file, PowerShell 5.1 `?` password, log size, replay | Fixed or recorded C15-C17 |
+| Second review R1 | A failed drop kept the old file beside an unnamed error | Fixed: message names the file |
+| Second review R2, R3 | Cancel after success; trailing separator in `--output` | Fixed |
+| Second review R4 | Throttle boundary untestable (`Stopwatch`) | Recorded C18 |
+
+**Gate table.**
+
+| Gate | Result |
+|---|---|
+| Build, warnings as errors | 0 warnings, 0 errors |
+| Tests | 604 total, 596 passed, 8 skipped (large files, UI tests that need a desktop), 0 failed |
+| Core coverage | 98.7 % lines, 98.6 % branches |
+| Presentation coverage | 95.8 % lines |
+| Mutation score (Core) | 100 % of 379 tested mutants (207 disabled with reasons) |
+| Vulnerable packages | 0 |
+| Throughput / warm start / cold start | not met, explained |
+
+**Self-check questions.**
+1. Why is a plain file copy a misleading baseline for encryption speed, and what is a fairer one?
+2. Why does memory stay at about 28 MB for 1 MB and 1 GiB files alike?
+3. What does a mutation score of 100 % not prove, and why must a disabled mutant carry a reason?
+4. Why can a wrong password and a damaged file give the same error without weakening the design? (Hint: padding oracle.)
+5. Why was the threat table's "verified before any plaintext is written" wrong, and what is verify-then-commit?
+
+---
+
+## Stage 6: Publishing (2026-11-25)
+
+What was built: the publish scripts now build `win-arm64` next to `win-x64` (WPF and CLI), a Windows Sandbox config and click list,
+ADR-15 (installer and signing, **proposed**), a user-facing README, and a release-candidate procedure in `docs/RELEASING.md`.
+
+Why these choices:
+- **win-arm64 is cross-compiled**: .NET can target another CPU from an x64 PC because a self-contained build only needs the
+  matching runtime pack. Building proves it compiles and links (the exe header says ARM64, machine type 0xAA64); it does **not**
+  prove it runs. The docs say "built, never run" everywhere.
+- **No installer (proposed)**: a portable zip needs no admin rights and leaves nothing behind. An installer is also flagged by
+  SmartScreen unless signed, so it adds work without removing the warning. Signing costs money and identity checks: the user decides.
+- **Sandbox**: a throw-away clean Windows is the closest thing to a friend's PC. It is not enabled here (admin and reboot), so the
+  click list in `docs/SANDBOX_TEST.md` is a user task.
+- **CLI archive names** now start `securefile-cli-` because GitHub compares asset names without case, and `SecureFile-...zip`
+  would collide with `securefile-...zip`.
+- **`asInvoker`** in the WPF manifest states that the app never asks for administrator rights (half of backlog C16).
+
+Waiting for the user: run the Sandbox test, decide ADR-15, supply screenshots (`docs/SCREENSHOTS_NEEDED.md`), nothing published.
+Gotcha: `powershell -File script.ps1 -Runtimes a,b` passes `a,b` as ONE string; use one runtime, or call it from inside PowerShell.

@@ -91,6 +91,9 @@ internal sealed class FakeFileDetailsReader : IFileDetailsReader
 {
     public Exception? ExceptionToThrow { get; set; }
 
+    /// <summary>When set, decides whether the file counts as encrypted, whatever its name.</summary>
+    public bool? IsEncryptedOverride { get; set; }
+
     public FileDetails Read(string filePath)
     {
         if (ExceptionToThrow is not null)
@@ -98,6 +101,9 @@ internal sealed class FakeFileDetailsReader : IFileDetailsReader
             throw ExceptionToThrow;
         }
 
-        return new FileDetails(filePath, Path.GetFileName(filePath), Path.GetExtension(filePath), 1536, DateTime.UnixEpoch);
+        // By default the fake decides "encrypted" by name; a test sets the override to model content that differs from the
+        // name (a renamed encrypted file, or a damaged ".enc"). The real reader's content check has its own tests.
+        bool encrypted = IsEncryptedOverride ?? filePath.EndsWith(".enc", StringComparison.OrdinalIgnoreCase);
+        return new FileDetails(filePath, Path.GetFileName(filePath), Path.GetExtension(filePath), 1536, DateTime.UnixEpoch, encrypted);
     }
 }

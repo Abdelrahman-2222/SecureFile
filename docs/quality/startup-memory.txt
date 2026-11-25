@@ -1,0 +1,28 @@
+# Startup (plain Release build)
+ 1:   1,856 ms
+ 2:     655 ms
+ 3:     644 ms
+ 4:     641 ms
+ 5:     643 ms
+ 6:     647 ms
+ 7:     632 ms
+ 8:     627 ms
+ 9:     628 ms
+10:     645 ms
+First run (cold if the cache was empty): 1,856 ms
+Median: 643 ms   p95: 1,856 ms   (n=10)
+
+# Startup (published exes: single file, then single file + compression)
+== artifacts/beta/SecureFile-0.1.0-perf-win-x64/SecureFile.exe
+10:     723 ms
+First run (cold if the cache was empty): 2,637 ms
+Median: 707 ms   p95: 2,637 ms   (n=10)
+== artifacts/c1-compressed/SecureFile.exe
+10:   1,143 ms
+First run (cold if the cache was empty): 2,269 ms
+Median: 908 ms   p95: 2,269 ms   (n=10)
+
+# Memory vs file size (CLI)
+    1 MB | encrypt    1.0 s, peak   24.7 MB | decrypt    0.5 s, peak   23.5 MB | round trip OK
+  100 MB | encrypt    2.0 s, peak   27.5 MB | decrypt    2.7 s, peak   26.8 MB | round trip OK
+ 1024 MB | encrypt   14.5 s, peak   27.3 MB | decrypt   12.3 s, peak   28.1 MB | round trip OK

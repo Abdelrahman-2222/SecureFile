@@ -1,0 +1,24 @@
+<!--
+  Windows Sandbox configuration for the clean-machine test of SecureFile (plan Step 6.2).
+  Before double-clicking this file: create the folder C:\SecureFileSandbox and put the UNZIPPED win-x64 build in it
+  (SecureFile.exe and README.md), plus the test file(s) from docs/SANDBOX_TEST.md if you want. If you use another folder,
+  change HostFolder below. The folder is mapped READ-ONLY, so nothing the sandbox does can change it. Networking is off.
+  Full click list: docs/SANDBOX_TEST.md.
+-->
+<Configuration>
+  <VGpu>Default</VGpu>
+  <Networking>Disable</Networking>
+  <ClipboardRedirection>Disable</ClipboardRedirection>
+  <MemoryInMB>4096</MemoryInMB>
+  <MappedFolders>
+    <MappedFolder>
+      <HostFolder>C:\SecureFileSandbox</HostFolder>
+      <SandboxFolder>C:\Users\WDAGUtilityAccount\Desktop\Release</SandboxFolder>
+      <ReadOnly>true</ReadOnly>
+    </MappedFolder>
+  </MappedFolders>
+  <LogonCommand>
+    <!-- Copy the exe to a writable place and show its SHA-256 so it can be compared with the published value. -->
+    <Command>powershell.exe -NoExit -Command "Copy-Item C:\Users\WDAGUtilityAccount\Desktop\Release C:\Users\WDAGUtilityAccount\Desktop\SecureFile -Recurse; Get-FileHash C:\Users\WDAGUtilityAccount\Desktop\SecureFile\SecureFile.exe -Algorithm SHA256; Get-ChildItem C:\Users\WDAGUtilityAccount\Desktop\SecureFile"</Command>
+  </LogonCommand>
+</Configuration>

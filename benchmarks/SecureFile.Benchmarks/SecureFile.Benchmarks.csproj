@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Performance benchmarks (plan Step 5.1, §8.2). A console program, NOT a test project: it is never run by the
+    pre-push gate (verify.ps1 only builds it). Run it with scripts/run-benchmarks.ps1.
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>SecureFile.Benchmarks</RootNamespace>
+    <IsPackable>false</IsPackable>
+    <!--
+      Scoped relaxations, benchmark code only (the product projects keep every rule):
+        CS1591, CA1707 - benchmark classes are named by what they measure; no /// on every [Benchmark] method.
+        CA1515         - BenchmarkDotNet needs public classes to discover them.
+        CA1822         - [Benchmark] methods must be instance methods.
+        CA5394         - Random is used for test data only, never for keys.
+    -->
+    <NoWarn>$(NoWarn);CS1591;CA1707;CA1515;CA1822;CA5394</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" />
+    <ProjectReference Include="..\..\src\SecureFile.Core\SecureFile.Core.csproj" />
+  </ItemGroup>
+
+</Project>

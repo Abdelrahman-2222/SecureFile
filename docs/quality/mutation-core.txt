@@ -1,0 +1,8 @@
+Stryker.NET 5.1.0, Core, full run (Step 5.3)
+First full run:  379+ mutants, 367 killed, 16 survived, 2 no coverage, 1 timeout -> 95.34 %
+207   total mutants are skipped for the above mentioned reasons
+379   total mutants will be tested
+Killed:   378
+Survived:   0
+Timeout:    1
+The final mutation score is 100.00 %

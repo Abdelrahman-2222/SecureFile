@@ -696,7 +696,7 @@ Why does Core not reference WPF? What does `TreatWarningsAsErrors` buy us?
 | 1.5 | `FileEncryptionService.EncryptAsync` (§5.3): streaming, HMAC, progress, cancel, temp + move. | Round-trip tests at 0, 1, 15, 16, 17 bytes, 1 MiB ± 1; same input → different output each time. Keys: `using FileKeys keys = await Task.Run(() => KeyDerivation.DeriveKeys(password, header), ct);` (off the UI thread; pass the `string`, a span cannot be captured; Review Board 1.3, R9). | 🟨 done — golden file (Python + OpenSSL), chunked = one-call reference, short-read stream; `AtomicFileWriter` + `PercentageProgress` for 1.6; quality gate passed (Review Board: 1 High fixed, all Medium fixed or decided), mutation 100 % — self-check pending |
 | 1.6 | `FileEncryptionService.DecryptAsync` (§5.4): verify-then-commit. | Wrong password and every tamper/truncation case fail **and leave no output file**. Header read with `ReadAtLeast(buffer, 41, throwOnEndOfStream: false)` and only the bytes read passed to `EncryptedFileHeader.Read`, **before** `GetCiphertextLength` (Review Board 1.2, R1); tests: a 3-byte text file → `NotEncryptedFile`, an 80-byte file starting with `SFEN` → `Damaged`. Decrypt with our own `TransformBlock` loop and call `TransformFinalBlock` only after `FixedTimeEquals` succeeds (§5.4, Review Board 1.4, R1); test that chunked and one-call results are equal (R5). | 🟨 done — round trip at all boundaries, every tamper/truncation/wrong-password/cancel case leaves nothing; hidden decrypt temp file on Windows; `AuthenticationFailedException` pulled forward from 1.7 — self-check pending |
 | 1.7 | Error model (ADR-13 Layer 1): `AuthenticationFailedException` with the three standard constructors (`SecureFileException` and `InvalidEncryptedFileException` were pulled forward into Step 1.2). | Every failure in §9 maps to one exception type; tests prove no partial output. | ✅ done — failure map in ADR-13; bad padding after a valid tag wrapped as `InvalidEncryptedFileException(Damaged)`; lone-surrogate password refused at the call; T-22 tests added |
-| 1.8 | `PasswordStrengthEvaluator` (simple rules: length + character variety) and `PasswordGenerator` (`RandomNumberGenerator`). | Tests for empty, short, long, Unicode passwords. A maximum length (e.g. 1,024 characters, also `PasswordBox.MaxLength`) so a pasted 100 MB text cannot waste memory (Review Board 1.3, R5). | ⬜ |
+| 1.8 | `PasswordStrengthEvaluator` (simple rules: length + character variety) and `PasswordGenerator` (`RandomNumberGenerator`). | Tests for empty, short, long, Unicode passwords. A maximum length (e.g. 1,024 characters, also `PasswordBox.MaxLength`) so a pasted 100 MB text cannot waste memory (Review Board 1.3, R5). | 🟡 `PasswordStrengthEvaluator` done 2026-11-24 (min 8 characters enforced when encrypting, advisory strength bar, length cap 1,024 via `MaxLength`; no composition rules, see NIST 800-63B); `PasswordGenerator` not built (a "could" item) |
 
 **Checkpoint 1:** What is an IV and why must it be random for CBC? Why a salt? Why 600,000 iterations,
 and what does that cost the user? What is PKCS7 padding? Why encrypt-then-MAC and not MAC-then-encrypt?
@@ -710,7 +710,7 @@ Why `FixedTimeEquals` instead of `==`? Why HKDF instead of 64 bytes from PBKDF2?
 | 2.1 | Service interfaces: `IFileDialogService`, `IMessageService`, `IShellService` (open folder), `IClipboardService`. | Interfaces documented. | 🟨 slice form — `IFileDialogService` + `IErrorLog` (ADR-13 log); `IShellService` and `IClipboardService` come with the steps that use them (3.5, 1.8); no `IMessageService`: messages are shown in the window |
 | 2.2 | `MainViewModel` with clear states: *No file → File selected → Working → Succeeded / Failed*. | State diagram in `LEARNING_LOG.md`. | 🟨 slice form — `MainViewState` enum (diagram in its XML docs and the slice section of LEARNING_LOG); Browse shows name, extension and size |
 | 2.3 | Commands: Browse, Encrypt, Decrypt, Cancel, Generate password, Open folder; `CanExecute` rules. | Buttons enable/disable correctly in tests. | 🟨 slice form — Browse, Encrypt, Decrypt with CanExecute (file + password + not busy); Save dialog suggests `.enc` added/removed; Cancel, Generate password, Open folder come in 3.5/1.8 |
-| 2.4 | Auto-detect: if the file starts with `SFEN`, suggest Decrypt; otherwise Encrypt. A small Core method takes the path and returns `true`/`false` (built on `EncryptedFileFormat.HasSignature`), so the ViewModel never reads file bytes itself (Review Board 1.2, R8). | Tests for both cases. | ⬜ |
+| 2.4 | Auto-detect: if the file starts with `SFEN`, suggest Decrypt; otherwise Encrypt. A small Core method takes the path and returns `true`/`false` (built on `EncryptedFileFormat.HasSignature`), so the ViewModel never reads file bytes itself (Review Board 1.2, R8). | Tests for both cases. | ✅ done 2026-11-24 (Step 4.3 finding): `FileDetailsReader` reads the first 4 bytes and sets `FileDetails.IsEncrypted` (via `HasSignature`), so the ViewModel never reads bytes; the window offers Encrypt or Decrypt by content, not name. Core tests for both cases + a renamed file + a locked file; ViewModel tests for the buttons |
 | 2.5 | ViewModel tests with fake services (no window needed). | Presentation coverage ≥ 85%. | ⬜ |
 | 2.6 | `ErrorMessageProvider` + per-command `try/catch` with specific catches (ADR-13 Layer 2). | Every exception in the ADR-13 table gives its message; unexpected exceptions are **not** caught here. | ✅ |
 
@@ -736,20 +736,21 @@ responsive during a 4 GB encryption? Why do sizes/spacing follow a 4/8 px grid?
 
 | Step | Goal | Done when | Status |
 |---|---|---|---|
-| 4.1 | Integration tests on the real file system (§9.2). | All pass. | ⬜ |
-| 4.2 | Large-file runs: 1 GB and >4 GB (manual or nightly, not every commit). | Round-trip OK, memory stays flat. | ⬜ |
-| 4.3 | `TESTPLAN.md` manual script + exploratory session. | Every item ticked, bugs fixed. | ⬜ |
-| 4.4 | Short usability check with 2–3 non-technical people (task success, time to first encryption; SUS questionnaire optional). | All complete the task unaided; findings fixed or recorded. | ⬜ |
+| 4.1 | Integration tests on the real file system (§9.2). | All pass. | ✅ |
+| 4.2 | Large-file runs: 1 GB and >4 GB (manual or nightly, not every commit). | Round-trip OK, memory stays flat. | 🟡 1 GiB done (46 MB peak); 4.5 GiB blocked: Kaspersky kills the test exe (2026-11-24), rerun elsewhere |
+| 4.3 | `TESTPLAN.md` manual script + exploratory session. | Every item ticked, bugs fixed. | 🟡 script written (docs/TESTPLAN.md); first hand run found and fixed 5 issues (no clear result, file and password not cleared, empty "Save as type", no Show password, misleading warning and buttons); full run (sections A–I) still to do |
+| 4.4 | Short usability check with 2–3 non-technical people (task success, time to first encryption; SUS questionnaire optional). | All complete the task unaided; findings fixed or recorded. | 🟡 protocol written (docs/USABILITY.md); needs 3–5 real people |
 
 ### Stage 5 — Measure and harden (Phase 1 report) · ~½ day
 
 | Step | Goal | Done when | Status |
 |---|---|---|---|
-| 5.1 | BenchmarkDotNet: throughput by file size, KDF time (p50/p95), allocations. | Numbers in `QUALITY_REPORT.md`. | ⬜ |
-| 5.2 | Visual Studio Performance Profiler (Alt+F2): startup, CPU, memory, UI thread. | Targets in §8 met or explained. | ⬜ |
-| 5.3 | VS Code Metrics, VS Code Coverage, Stryker.NET mutation score. | Targets in §8 met. | ⬜ |
-| 5.4 | Security: analyzers, NuGet audit, SonarQube for IDE, CodeQL (if GitHub), gitleaks, threat model (STRIDE). | 0 open high issues; threat table written. | ⬜ |
-| 5.5 | Write `QUALITY_REPORT.md` (numbers + screenshots). | Done. | ⬜ |
+| 5.1 | BenchmarkDotNet: throughput by file size, KDF time (p50/p95), allocations. | Numbers in `QUALITY_REPORT.md`. | 🟡 done 2026-11-24: suite + numbers in QUALITY_REPORT; KDF 363 ms, no per-chunk buffer; throughput target (70 % of a plain copy) not met and explained (backlog C13) |
+| 5.2 | Visual Studio Performance Profiler (Alt+F2): startup, CPU, memory, UI thread. | Targets in §8 met or explained. | 🟡 measured by script (startup 0.64-0.71 s warm, memory flat 28 MB, progress throttled to 10 per s); waiting on the user: cold start after reboot and the VS profiler run (checklist in QUALITY_REPORT) |
+| 5.3 | VS Code Metrics, VS Code Coverage, Stryker.NET mutation score. | Targets in §8 met. | 🟡 coverage Core 98.7 %/98.6 %, Presentation 95.8 %, mutation 100 %, complexity and MI within limits; waiting on the user: class coupling from VS Code Metrics |
+| 5.4 | Security: analyzers, NuGet audit, SonarQube for IDE, CodeQL (if GitHub), gitleaks, threat model (STRIDE). | 0 open high issues; threat table written. | 🟡 THREAT_MODEL.md (20 threats), 0 vulnerable packages, security review done (R1-R8 fixed or recorded); waiting on the user: SonarQube for IDE; CodeQL needs a public repo |
+| 5.5 | Write `QUALITY_REPORT.md` (numbers + screenshots). | Done. | 🟡 report complete with summary table and user checklist; screenshots are listed, not invented |
+| 5.6 | Burn down `docs/REVIEW_BACKLOG.md` (items found by the independent review and afterwards, time-boxed: sections B1, B5, C1, C3 first), then re-run an independent review. | Fixed items ticked in the backlog and report; new findings recorded. | 🟡 fixed B1 items 20 and 12 (part), B5 VM and formatter tests, C3 look-alikes, C1 measured, plus review R3; B1 WPF items, B3/B4, C2/C6/C8 stay listed; second review appended to the backlog |
 
 **Checkpoint 5:** What is p95 and why report it instead of only the average? Why does memory stay flat?
 What does a mutation score tell us that coverage does not?
@@ -758,10 +759,11 @@ What does a mutation score tell us that coverage does not?
 
 | Step | Goal | Done when | Status |
 |---|---|---|---|
-| 6.1 | Publish profiles: `win-x64`, `win-arm64`, self-contained, single-file, ReadyToRun. | One `.exe` per architecture. | ⬜ |
-| 6.2 | Test in **Windows Sandbox** (clean Windows, nothing installed) with a `.wsb` config. | Full flow works on first run. | ⬜ |
-| 6.3 | Decide on installer (Velopack/MSIX) and code signing (Azure Artifact Signing). | Decision recorded (ADR). | ⬜ |
-| 6.4 | `README.md` "Try it in 60 seconds" with screenshots/GIF; SHA-256 checksums; release zip. | A non-technical person can follow it. | ⬜ |
+| 6.1 | Publish profiles: `win-x64`, `win-arm64`, self-contained, single-file, ReadyToRun. | One `.exe` per architecture. | 🟡 win-x64 and win-arm64 zips (WPF and CLI) build via the publish scripts (2026-11-25). **win-arm64 never run** (no ARM machine). ReadyToRun not used (it would add size; start time is measured in QUALITY_REPORT) |
+| 6.2 | Test in **Windows Sandbox** (clean Windows, nothing installed) with a `.wsb` config. | Full flow works on first run. | 🟡 `scripts/sandbox-test.wsb` + `docs/SANDBOX_TEST.md` written; **not run**, Windows Sandbox is not enabled (admin + reboot): user task |
+| 6.3 | Decide on installer (Velopack/MSIX) and code signing (Azure Artifact Signing). | Decision recorded (ADR). | 🟡 ADR-15 written and **Proposed** (zip + SHA-256, no installer, Azure Artifact Signing for a public release); the user decides |
+| 6.4 | `README.md` "Try it in 60 seconds" with screenshots/GIF; SHA-256 checksums; release zip. | A non-technical person can follow it. | 🟡 README written (60 seconds, SHA-256, SmartScreen, limits); **screenshots missing**, listed in `docs/SCREENSHOTS_NEEDED.md` for the user |
+| 6.5 | Release candidate: publish scripts produce the archives, `docs/RELEASING.md` has the procedure. | Archives and hashes build; nothing uploaded without asking. | 🟡 scripts and procedure done (2026-11-25); no release published; the Sandbox run and the signing decision come first |
 
 ### Stage 7 — Bonus: cross-platform (Phase 5, presented in Phase 6) · ~1 day after the required track
 
@@ -770,15 +772,15 @@ What does a mutation score tell us that coverage does not?
 | 7.1 | Avalonia app reusing the same `MainViewModel`. | Same features as WPF. | ⬜ |
 | 7.2 | Avalonia service implementations (StorageProvider dialogs, launcher, clipboard). | Works on Windows. | ⬜ |
 | 7.3 | CI matrix on Windows, Ubuntu, macOS; cross-OS "golden file" tests (files encrypted on one OS decrypt on all). | All green. | ⬜ |
-| 7.4 | Publish `osx-arm64`, `osx-x64`, `linux-x64`, `linux-arm64`; test Linux in WSL2/WSLg; macOS on a Mac or VM. | Runs on each. | ⬜ |
+| 7.4 | Publish `osx-arm64`, `osx-x64`, `linux-x64`, `linux-arm64`; test Linux in WSL2/WSLg; macOS on a Mac or VM. | Runs on each. | 🟡 CLI archives for linux-x64, linux-arm64, osx-arm64, osx-x64 are built by `scripts/publish-cli.ps1` but NOT released: macOS and Linux releases wait for the Avalonia window (7.1, 7.2); decision 2026-11-24 |
 | 7.5 | Size comparison: WPF (no trimming) vs Avalonia trimmed/AOT. | Numbers in the report. | ⬜ |
-| 7.6 | Optional `SecureFile.Cli`. | `securefile encrypt <in> <out>` works. | ⬜ |
+| 7.6 | Optional `SecureFile.Cli`. | `securefile encrypt <in> <out>` works. | ✅ built early (2026-11-24): `src/SecureFile.Cli` + 39 tests; Windows binary run by hand; Linux and macOS binaries built but only the Ubuntu/macOS CI test run exercises them |
 
 ### Stage 8 — Stakeholder suggestions (Phase 6) · ~2 hours
 
 | Step | Goal | Status |
 |---|---|---|
-| 8.1 | Write `SUGGESTIONS.md` (§13): what, why, benefit, priority, effort — marking which are already built. | ⬜ |
+| 8.1 | Write `SUGGESTIONS.md` (§13): what, why, benefit, priority, effort — marking which are already built. | 🟡 first full draft written early (docs/SUGGESTIONS.md, 2026-11-24): algorithm decision, AI guardrails, roadmap tables; refresh at Stage 8 |
 
 ### Stage 9 — Final deliverables · ~½ day (only after everything is tested and confirmed)
 

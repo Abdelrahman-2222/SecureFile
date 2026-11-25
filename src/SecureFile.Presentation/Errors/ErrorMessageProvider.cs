@@ -72,7 +72,7 @@ public static class ErrorMessageProvider
         {
             InvalidEncryptedFileReason.UnsupportedVersion => "This file was made by a newer version of SecureFile. Update the app to open it.",
             InvalidEncryptedFileReason.Damaged => "This encrypted file is damaged or incomplete, so it can't be decrypted.",
-            _ => "This isn't a file encrypted by SecureFile. Choose a file that ends in .enc.",
+            _ => "This isn't a file encrypted by SecureFile, or its start is damaged. Choose the encrypted file you want to open.",
         };
     }
 

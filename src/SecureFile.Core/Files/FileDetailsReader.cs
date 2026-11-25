@@ -1,3 +1,5 @@
+using SecureFile.Core.Cryptography;
+
 namespace SecureFile.Core.Files;
 
 /// <summary>
@@ -32,7 +34,40 @@ public sealed class FileDetailsReader : IFileDetailsReader
             Name: selectedFile.Name,
             Extension: selectedFile.Extension,
             SizeInBytes: contentFile.Length,
-            LastModifiedUtc: contentFile.LastWriteTimeUtc);
+            LastModifiedUtc: contentFile.LastWriteTimeUtc,
+            IsEncrypted: StartsWithSignature(contentFile));
+    }
+
+    /// <summary>Reads the first bytes of the file and checks for the SecureFile signature.</summary>
+    /// <param name="contentFile">The file that holds the content.</param>
+    /// <returns>
+    /// <see langword="true"/> when the file starts with the signature; <see langword="false"/> when it does not, or
+    /// when the start cannot be read (the file is locked or not readable: the real operation then reports why).
+    /// </returns>
+    /// <remarks>
+    /// Only <see cref="EncryptedFileFormat.SignatureLength"/> bytes are read, so this is independent of the file size.
+    /// Sharing is permissive so that a file another program has open for reading or writing can still be recognised.
+    /// </remarks>
+    private static bool StartsWithSignature(FileInfo contentFile)
+    {
+        try
+        {
+            using FileStream stream = new(contentFile.FullName, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
+            Span<byte> start = stackalloc byte[EncryptedFileFormat.SignatureLength];
+            // Stryker disable once Boolean : equivalent mutant - EndOfStreamException is an IOException, caught below with the same result (false)
+            int read = stream.ReadAtLeast(start, start.Length, throwOnEndOfStream: false);
+            return EncryptedFileFormat.HasSignature(start[..read]);
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+        // Stryker disable once Block : needs a file the user may list but not read; no portable test can create one (the same branch is covered for IOException)
+        catch (UnauthorizedAccessException)
+        {
+            // Stryker disable once Boolean : same reason as the block above
+            return false;
+        }
     }
 
     /// <summary>

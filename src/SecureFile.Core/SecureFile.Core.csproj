@@ -12,6 +12,8 @@
   <ItemGroup>
     <!-- Lets the unit tests reach "internal" helpers without making them public. -->
     <InternalsVisibleTo Include="SecureFile.Core.Tests" />
+    <!-- The benchmarks time the internal key derivation directly (Step 5.1). -->
+    <InternalsVisibleTo Include="SecureFile.Benchmarks" />
   </ItemGroup>
 
 </Project>

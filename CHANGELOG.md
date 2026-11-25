@@ -8,6 +8,26 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `.gitguardian.yaml`: GitGuardian flagged the made-up passwords in `PasswordPatternsTests.cs` as "Generic Password"; that one
+  test file is now ignored by path (all detectors stay on). The old incidents are dismissed on the GitGuardian dashboard as "test credential".
+- Stage 6 (publishing), step 6.1: `scripts/publish-beta.ps1` and `scripts/publish-cli.ps1` also build `win-arm64`
+  (cross-compiled on x64; PE header checked as ARM64; **never run**, there is no ARM machine here). Sizes of this
+  build: WPF zip x64 56.2 MB / arm64 52.0 MB (exe 133.6 / 144.0 MB); CLI zip 5.6 / 5.5 MB (exe 12.6 / 13.0 MB).
+  `publish-beta.ps1` now writes a `SHA256SUMS.txt` next to the zips.
+- Step 6.2: `scripts/sandbox-test.wsb` (read-only mapped folder, no network) and `docs/SANDBOX_TEST.md` (setup and click
+  list). **Not run**: Windows Sandbox is not enabled on the development PC (needs admin and a reboot); waiting for the user.
+- Step 6.3: `docs/adr/0015-installer-and-code-signing.md` compares zip, MSIX, Inno/WiX and the signing options; proposes
+  zip + SHA-256, no installer, Azure Artifact Signing for a public release. Status **Proposed**: the user decides.
+- Step 6.4: user-facing `README.md` (what it is, which download, verify the SHA-256, SmartScreen note, limits, forgotten
+  password = lost). Screenshots are **not included**: `docs/SCREENSHOTS_NEEDED.md` lists them for the author to supply.
+- Step 6.5: `docs/RELEASING.md` has the release-candidate procedure (nothing is published or uploaded without asking). CLI
+  archives are now named `securefile-cli-<v>-<label>-<rid>` so they cannot clash with the window's `SecureFile-...` zip on
+  GitHub (asset names are case-insensitive).
+- Stage 5 quality work: BenchmarkDotNet suite (`benchmarks/SecureFile.Benchmarks`, `scripts/run-benchmarks.ps1`),
+  `scripts/measure-startup.ps1` and `scripts/measure-memory.ps1`, `docs/QUALITY_REPORT.md` with the raw numbers under
+  `docs/quality/`, and `docs/THREAT_MODEL.md` (STRIDE, 20 threats) with the independent security review; `SECURITY.md`
+  lists the known limits.
+- Strength check reads look-alike characters (`P@ssw0rd`, `l3tmein`) as letters.
 - Vertical slice: a first working Windows app window (Browse, password, Encrypt, Decrypt, progress, status text) that
   encrypts and decrypts a real file; `ErrorMessageProvider` turns each expected error into a fixed plain message
   (ADR-13 Layer 2); `MainViewModel` logs and shows them; the WPF app adds a local error log
@@ -17,6 +37,13 @@ and the project uses [Semantic Versioning](https://semver.org/).
   time left; Cancel (Esc) that leaves no output file; "Open folder" after success; inputs locked while working.
 - App icon (padlock) for the executable and both windows, and an About dialog (button or F1) that shows the version
   read from the assembly (`0.1.0`).
+- Integration tests on real files (Step 4.1): overwrite replaces atomically, locked source, source deleted after
+  selection, wrong password, plain text given to Decrypt, double encryption, and a committed golden `.enc` file that
+  must always decrypt (protects the file format).
+- Opt-in large-file round trip (Step 4.2, `scripts/large-file-check.ps1`): 1 GiB passes with a 46 MB peak working
+  set; the 4.5 GiB case is still to be run on a machine whose antivirus does not stop the test program.
+- Manual test script (`docs/TESTPLAN.md`, Step 4.3) and usability-check protocol with SUS form
+  (`docs/USABILITY.md`, Step 4.4); both still have to be run by people.
 - The pre-push hook now also refuses pushes straight to main, branch deletions and force-pushes (a local stand-in for
   branch protection, which GitHub does not enforce on private repositories without a paid plan).
 - UI tests with FlaUI (`tests/SecureFile.Wpf.UiTests`): the real app encrypts and decrypts a file, shows the friendly
@@ -80,6 +107,49 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ### Changed
 
+- Progress on screen is updated at most 10 times per second (it was about 70 per second for a 100 MB file); the time
+  left is shown as "2 h 5 min" from one hour on.
+- Cancelling the Save dialog clears an old error message; a bad drop or Browse keeps the previous good file.
+- The command-line program refuses a folder or an invalid name as `--output` with a plain message instead of crashing.
+- Mutation score of Core is 100 % (new killing tests; 7 equivalent or untestable mutants disabled with written reasons).
+- Found in the manual test run (Step 4.3): after a successful Encrypt or Decrypt the chosen file and the password are
+  cleared (the result message and "Open folder" stay); the result is a green banner and an error a red one; the Save
+  dialog's "Save as type" lists the file type and all files; a "Show password" check box reveals the typed password;
+  the "if you forget this password" warning
+  is shown only when a password is being chosen (an encrypted file shows "enter the password that was used" instead);
+  Encrypt is greyed out for an encrypted file and Decrypt for a normal one; "encrypted" is decided by the file's
+  content (its SecureFile signature), so a renamed encrypted file is still recognised.
+- The "if you forget this password" note is an amber caution box with a warning symbol and bold text while a password is
+  being chosen (not red: red is for errors).
+- Password rules when encrypting: at least 8 characters, a confirmation box that must match, an advisory strength bar and
+  text (`PasswordStrengthEvaluator`, plan Step 1.8), and a Caps Lock warning. Decrypting applies no rules and shows no
+  confirmation box. No symbol/digit rules on purpose.
+- The window height now follows its content: it grows when text appears (match line, messages, the confirm box) and
+  shrinks when it goes away, up to the screen height, after which it scrolls.
+- The line under the buttons is a live "next step": it follows the typed password and confirmation (for example "The two
+  passwords are not the same yet." or "Ready. Choose Encrypt file."), and typing clears an old error.
+- Friends build: `scripts/publish-beta.ps1` makes a self-contained single-file `win-x64` zip of the Windows app with
+  `docs/BETA_README.md` and a SHA-256 file (`artifacts/beta/`, not committed); the README has safety notes, a one-minute
+  try-out, a "Which computers" table and feedback questions.
+- `docs/SUGGESTIONS.md`: why there is one versioned encryption design (not user-chosen, not random), rules for any AI
+  feature, and a roadmap by area with priority and effort.
+- Command-line version `securefile` (plan Step 7.6, `src/SecureFile.Cli`): `encrypt` and `decrypt` with a hidden password
+  prompt (asked twice when encrypting), `--output`, `--force`, `--password-stdin` for scripts (no `--password` on purpose,
+  it would stay in the shell history), a progress line on a terminal, Ctrl+C cancels with no leftover file, exit codes
+  0, 1, 2 and 130. Same engine, password rules and messages as the Windows app, so files are interchangeable between
+  systems. `scripts/publish-cli.ps1` builds self-contained, trimmed single-file archives (about 6 MB each) for win-x64,
+  linux-x64, linux-arm64, osx-arm64 and osx-x64 with a `SHA256SUMS.txt`; `docs/CLI_README.md` ships inside each.
+  Tests: `SecureFile.Cli.Tests` (39), also in the Ubuntu/macOS CI job.
+- Deleting a temp file after a failed or cancelled run is now tried up to 5 times with short pauses (about 0.4 s in all, failure path only), because a virus scanner may hold the just-closed file for a moment (tested).
+- Everything found by the independent review that is not fixed is kept in `docs/REVIEW_BACKLOG.md` (working list, with a suggested order and later findings) and `docs/REVIEW_REPORT_2026-11-24.md` (the full report with evidence and a status per item); plan Step 5.6 covers the burn-down.
+- Release `v0.1.0-beta1` (GitHub pre-release) contains the **Windows app only**; the command-line archives for Linux and macOS are not
+  released until the Avalonia windows exist (plan Steps 7.1 and 7.2). `docs/RELEASING.md` has the process and the history.
+- Review pass (product owner and tester review, see `docs/REVIEW_BACKLOG.md`): typed passwords no longer stay on screen after a  success with Show password on; closing the window during an operation asks first and cancels cleanly; the strength check  rates repeats, runs (`abcdefgh`, `12345678`) and common words (`Password1234`) as Weak; the confirm line prompts when empty,  and a mismatch is red; Cancel is a neutral message (no red banner, nothing logged); old progress text is cleared; a failed  Open folder keeps the success message; a `.enc` file with a damaged start explains itself and still allows Decrypt; focus  moves sensibly (Browse at start, password after a failure, Open folder after success); mnemonic Co_nfirm.
+- The confirm box, strength bar and the password warning appear only once a normal file is chosen (not with no file, not
+  for an encrypted file); the strength and match texts are coloured to match their meaning; a visible password cannot be
+  copied or cut (paste still works).
+- Encrypt (and Enter) stay disabled until the password has at least 8 characters and matches its confirmation; the
+  Encrypt/Decrypt tooltips appear only while the button is off because of the chosen file.
 - Decryption reports invalid padding after a valid tag (only possible for a file another program wrote) as
   `InvalidEncryptedFileException(Damaged)` with the original `CryptographicException` inside, so callers handle one
   documented type (Step 1.7). New constructor `InvalidEncryptedFileException(message, reason, innerException)`.

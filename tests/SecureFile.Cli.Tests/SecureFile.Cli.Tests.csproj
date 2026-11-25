@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Tests for the command-line version: real files in a temporary folder, the real engine, a fake password prompt. -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SecureFile.Cli\SecureFile.Cli.csproj" />
+  </ItemGroup>
+
+</Project>
