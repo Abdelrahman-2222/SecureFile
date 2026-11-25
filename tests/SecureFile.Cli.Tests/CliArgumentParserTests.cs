@@ -55,11 +55,31 @@ public sealed class CliArgumentParserTests
     [InlineData("encrypt", "a.txt", "--password", "x")] // a password on the command line is refused on purpose
     [InlineData("encrypt", "a.txt", "--output")]      // option without value
     [InlineData("decrypt", "a.enc", "--nope")]        // unknown option
+    [InlineData("encrypt", "a.txt", "-o", "--force")] // an option is not a file name (review CLI-5)
+    [InlineData("encrypt", "a.txt", "-o", "x", "-o", "y")] // a second --output does not quietly win
+    [InlineData("encrypt", "a.txt", "--", "b.txt")]   // still one input file after --
     public void Parse_InvalidCommandLine_GivesAMessageAndNoOptions(params string[] args)
     {
         CliParseResult result = CliArgumentParser.Parse(args);
 
         Assert.Null(result.Options);
         Assert.False(string.IsNullOrWhiteSpace(result.Error));
+    }
+
+    [Theory]
+    [InlineData("encrypt", "--help")]
+    [InlineData("decrypt", "a.enc", "-h")]
+    public void Parse_HelpAfterTheCommand_ShowsHelp(params string[] args)
+    {
+        Assert.Equal(CliCommand.Help, CliArgumentParser.Parse(args).Options?.Command);
+    }
+
+    [Fact]
+    public void Parse_DoubleDash_TakesTheNextArgumentAsAFileEvenWhenItStartsWithADash()
+    {
+        CliOptions options = Assert.IsType<CliOptions>(CliArgumentParser.Parse(["encrypt", "-f", "--", "-notes.txt"]).Options);
+
+        Assert.Equal("-notes.txt", options.Input);
+        Assert.True(options.Force);
     }
 }

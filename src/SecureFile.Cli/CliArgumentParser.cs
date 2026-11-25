@@ -45,6 +45,11 @@ internal static class CliArgumentParser
         OperationArguments collected = new();
         for (int i = 1; i < args.Count; i++)
         {
+            if (!collected.OptionsEnded && IsHelp(args[i]))
+            {
+                return Ok(new CliOptions(CliCommand.Help)); // "encrypt --help" is a question, not a mistake (review CLI-7)
+            }
+
             string? problem = collected.Apply(args, ref i);
             if (problem is not null)
             {
@@ -72,6 +77,10 @@ internal static class CliArgumentParser
         /// <summary>Gets a value indicating whether <c>--password-stdin</c> was given.</summary>
         public bool PasswordFromStdin { get; private set; }
 
+        /// <summary>Gets a value indicating whether <c>--</c> was seen: every later argument is a file name.</summary>
+        /// <remarks>The usual convention, so a file whose name starts with <c>-</c> can be given (review CLI-6).</remarks>
+        public bool OptionsEnded { get; private set; }
+
         /// <summary>Takes the argument at position <paramref name="index"/>, and the next one when the option has a value.</summary>
         /// <param name="args">All arguments.</param>
         /// <param name="index">The position of the argument; moved forward when a value was consumed.</param>
@@ -79,23 +88,44 @@ internal static class CliArgumentParser
         public string? Apply(IReadOnlyList<string> args, ref int index)
         {
             string arg = args[index];
-            if (!arg.StartsWith('-'))
+            if (OptionsEnded || !arg.StartsWith('-'))
             {
                 return ApplyFile(arg);
             }
 
-            if (arg is "--output" or "-o")
+            if (arg == "--")
             {
-                if (index + 1 >= args.Count)
-                {
-                    return $"{arg} needs a file name.";
-                }
-
-                Output = args[++index];
+                OptionsEnded = true;
                 return null;
             }
 
-            return ApplyFlag(arg);
+            return arg is "--output" or "-o" ? ApplyOutput(args, ref index) : ApplyFlag(arg);
+        }
+
+        /// <summary>Takes <c>--output</c> and its value.</summary>
+        /// <param name="args">All arguments.</param>
+        /// <param name="index">The position of the option; moved to its value.</param>
+        /// <returns>The problem, or <see langword="null"/>.</returns>
+        /// <remarks>
+        /// A value that looks like an option is refused: <c>-o --force</c> would otherwise write a file named
+        /// <c>--force</c> and silently drop the option. A second <c>--output</c> is refused like a second input file
+        /// instead of quietly winning (review CLI-5).
+        /// </remarks>
+        private string? ApplyOutput(IReadOnlyList<string> args, ref int index)
+        {
+            string arg = args[index];
+            if (Output is not null)
+            {
+                return $"{arg} was given twice.";
+            }
+
+            if (index + 1 >= args.Count || args[index + 1].StartsWith('-'))
+            {
+                return $"{arg} needs a file name (write ./-name for a name that starts with -).";
+            }
+
+            Output = args[++index];
+            return null;
         }
 
         /// <summary>Takes a name that is not an option: the one input file.</summary>
