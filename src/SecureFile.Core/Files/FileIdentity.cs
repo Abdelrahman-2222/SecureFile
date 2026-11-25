@@ -125,7 +125,23 @@ internal static class FileIdentity
     /// </remarks>
     private static string? GetLinkTarget(string path)
     {
-        string? target = new FileInfo(path).LinkTarget;
+        string? target;
+        try
+        {
+            target = new FileInfo(path).LinkTarget;
+        }
+        catch (IOException)
+        {
+            // On Unix readlink also fails for a missing folder or a file used as a folder: then this part cannot be a
+            // link the rename would go through, and the write itself reports the real problem (Stage 9.0 review).
+            return null;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            // A folder the user may not enter: the same reasoning; the write fails with the access error.
+            return null;
+        }
+
         return target is null ? null : Path.GetFullPath(target, Path.GetDirectoryName(path) ?? path);
     }
 }
