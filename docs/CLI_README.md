@@ -4,7 +4,8 @@ Locks a file with a password and unlocks it again, on **Windows, macOS and Linux
 SecureFile Windows app (AES-256 with an integrity check), so a file locked on one system opens on another. Nothing is uploaded:
 it works completely on your computer and needs no internet. There is nothing to install; the program is one file.
 
-**This is an early test version. Please read the safety notes first.**
+**This is an early test version. Please read the safety notes first.** Public releases so far attach only the Windows
+build; the Linux and macOS builds are made with `scripts/publish-cli.ps1` and have only been run by the automated tests.
 
 ## Safety notes
 
@@ -19,8 +20,8 @@ it works completely on your computer and needs no internet. There is nothing to 
 **Linux** (`securefile-cli-…-linux-x64.tar.gz` for most PCs, `linux-arm64` for Raspberry Pi and ARM servers)
 
 ```bash
-tar -xzf securefile-cli-0.1.0-beta1-linux-x64.tar.gz
-cd securefile-cli-0.1.0-beta1-linux-x64
+tar -xzf securefile-cli-<version>-linux-x64.tar.gz
+cd securefile-cli-<version>-linux-x64
 chmod +x securefile            # only if "Permission denied" (older archives were packed without the program flag)
 ./securefile --version
 ```
@@ -28,8 +29,8 @@ chmod +x securefile            # only if "Permission denied" (older archives wer
 **macOS** (`osx-arm64` for Apple-silicon Macs M1 and newer, `osx-x64` for Intel Macs)
 
 ```bash
-tar -xzf securefile-cli-0.1.0-beta1-osx-arm64.tar.gz
-cd securefile-cli-0.1.0-beta1-osx-arm64
+tar -xzf securefile-cli-<version>-osx-arm64.tar.gz
+cd securefile-cli-<version>-osx-arm64
 chmod +x securefile            # only if "Permission denied"
 xattr -d com.apple.quarantine securefile   # one time: tell macOS you trust this download
 ./securefile --version

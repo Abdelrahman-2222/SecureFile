@@ -22,7 +22,7 @@ completely on your computer and needs no internet.
 |---|---|
 | **Windows 10 or 11, 64-bit** (almost every PC) | **Ready.** Use the `win-x64` zip and follow "How to run it" below. |
 | **Windows 11 on an ARM PC** (Surface Pro X, Copilot+ PC; Settings → System → About says "ARM-based processor") | **Built but never run.** Use the `win-arm64` zip. It was made on another kind of PC and has not been tried on real ARM hardware, so please tell me if it starts. (The `win-x64` zip also runs on ARM PCs, a little slower.) |
-| **macOS** and **Linux** | **Not in this release.** A desktop version for both is planned as the next step (a window, like the Windows one). Tell me your system and I will send you the first build when it exists. Your opinion on the idea still helps. |
+| **macOS** and **Linux** | **Preview.** A window like this one exists for both (`SecureFile-<version>-osx-…` / `-linux-…` `.tar.gz` on the release page, with its own README). It passes automated tests but you may be the first person to run it on a real Mac or Linux desktop, so please tell me how it went. |
 
 ## How to run it
 
@@ -66,7 +66,7 @@ The person who sent you the zip also sent a long code (SHA-256). To check that y
 folder with the zip and run:
 
 ```powershell
-Get-FileHash .\SecureFile-0.1.0-beta1-win-x64.zip -Algorithm SHA256
+Get-FileHash .\SecureFile-0.1.0-beta2-win-x64.zip -Algorithm SHA256
 ```
 
 The `Hash` line must match the code you were given. If it does not, do not run it and tell me.
