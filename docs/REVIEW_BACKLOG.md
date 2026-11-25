@@ -64,7 +64,7 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 - VM: (done in Step 5.6, see A2)
   operation; a file chosen after a failure; passwords surviving a file change. `RunPrimary_ChoosesTheOperationFromTheFileName` is misnamed.
 - (`ProgressTextFormatter` tests done in Step 5.6.) Open: the Save filter (`BuildSaveFilter`). Close during an operation.
-- A "Cli is free of UI and network assemblies" rule in `SecureFile.Architecture.Tests` (the Cli project is not covered).
+- **DONE (Stage 9.0):** `Cli_DoesNotReferenceUserInterfaceOrNetworkAssemblies` in `SecureFile.Architecture.Tests` covers the Cli project.
 
 ### B6. Documents still out of line
 - PROJECT_PLAN §11.1 describes a mode switch, a "Change…" output button, a file-card tooltip and date, and "Drop a file here or Browse…"

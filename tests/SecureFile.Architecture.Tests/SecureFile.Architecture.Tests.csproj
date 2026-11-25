@@ -12,6 +12,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\SecureFile.Core\SecureFile.Core.csproj" />
     <ProjectReference Include="..\..\src\SecureFile.Presentation\SecureFile.Presentation.csproj" />
+    <!-- The command line (backlog B5): its rule loads the assembly by name, so no type of it has to be public. -->
+    <ProjectReference Include="..\..\src\SecureFile.Cli\SecureFile.Cli.csproj" />
   </ItemGroup>
 
 </Project>

@@ -20,6 +20,9 @@ public sealed class LayerDependencyTests
 
     private static readonly Assembly PresentationAssembly = typeof(MainViewModel).Assembly;
 
+    /// <summary>The command line (assembly name <c>securefile</c>); all its types are internal, so it is loaded by name.</summary>
+    private static readonly Assembly CliAssembly = Assembly.Load(new AssemblyName("securefile"));
+
     /// <summary>Assemblies that only a user-interface project may reference.</summary>
     private static readonly string[] UserInterfaceAssemblyPrefixes =
     [
@@ -57,6 +60,17 @@ public sealed class LayerDependencyTests
         string[] forbidden = [.. UserInterfaceAssemblyPrefixes, .. NetworkAssemblyPrefixes];
 
         Assert.Empty(FindReferencesStartingWith(PresentationAssembly, forbidden));
+    }
+
+    [Fact]
+    public void Cli_DoesNotReferenceUserInterfaceOrNetworkAssemblies()
+    {
+        // The command line is the third shell (Cli -> Presentation -> Core); it must stay free of any window toolkit, so it
+        // runs on a server without a desktop, and of the network (ADR-12). Backlog B5.
+        string[] forbidden = [.. UserInterfaceAssemblyPrefixes, .. NetworkAssemblyPrefixes];
+
+        Assert.NotEmpty(CliAssembly.GetTypes()); // the right assembly was loaded, so the rule is meaningful
+        Assert.Empty(FindReferencesStartingWith(CliAssembly, forbidden));
     }
 
     [Fact]
