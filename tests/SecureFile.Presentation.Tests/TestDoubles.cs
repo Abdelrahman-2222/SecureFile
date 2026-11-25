@@ -87,6 +87,15 @@ internal sealed class FakeErrorLog : IErrorLog
     {
         Exceptions.Add(exception);
     }
+
+    public void WriteExpected(Exception exception)
+    {
+        Exceptions.Add(exception);
+        ExpectedCount++;
+    }
+
+    /// <summary>How many of <see cref="Exceptions"/> were logged as expected failures (no stack trace).</summary>
+    public int ExpectedCount { get; private set; }
 }
 
 /// <summary>Returns details made from the path, or throws a prepared exception, like the real reader's contract.</summary>
@@ -108,5 +117,23 @@ internal sealed class FakeFileDetailsReader : IFileDetailsReader
         // name (a renamed encrypted file, or a damaged ".enc"). The real reader's content check has its own tests.
         bool encrypted = IsEncryptedOverride ?? filePath.EndsWith(".enc", StringComparison.OrdinalIgnoreCase);
         return new FileDetails(filePath, Path.GetFileName(filePath), Path.GetExtension(filePath), 1536, DateTime.UnixEpoch, encrypted);
+    }
+}
+
+/// <summary>A clock that moves only when the test says so, for the progress throttle (backlog C18).</summary>
+internal sealed class ManualTimeProvider : TimeProvider
+{
+    private long _ticks;
+
+    public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+    public override long GetTimestamp()
+    {
+        return _ticks;
+    }
+
+    public void Advance(TimeSpan duration)
+    {
+        _ticks += duration.Ticks;
     }
 }

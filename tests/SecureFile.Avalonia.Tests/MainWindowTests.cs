@@ -101,6 +101,14 @@ public sealed class MainWindowTests : IDisposable
         Dispatcher.UIThread.RunJobs();
         Assert.Equal("before", await clipboard.TryGetTextAsync());
         Assert.Equal(Password, password.Text); // Cut removed nothing either
+        Assert.False(password.IsUndoEnabled); // no undo history of password text (review item 24)
+
+        // A new file starts with the password hidden again (review item 24).
+        string next = Path.Combine(_folder, "next.txt");
+        await File.WriteAllTextAsync(next, "next", TestContext.Current.CancellationToken);
+        await ChooseFileAsync(window, viewModel, next);
+        Assert.False(Find<CheckBox>(window, "ShowPasswordCheck").IsChecked);
+        Assert.False(password.RevealPassword);
         window.Close();
     }
 

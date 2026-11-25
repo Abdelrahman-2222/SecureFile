@@ -21,8 +21,11 @@ public interface IFileDetailsReader
     /// <exception cref="ArgumentException">
     /// <paramref name="filePath"/> is empty, contains only white space, or contains a null character.
     /// </exception>
+    /// <exception cref="PathIsFolderException">
+    /// <paramref name="filePath"/> is a folder (a <see cref="FileNotFoundException"/>, so older callers still catch it).
+    /// </exception>
     /// <exception cref="FileNotFoundException">
-    /// No file can be found at <paramref name="filePath"/>: it does not exist, it is a folder, it is a link whose target
+    /// No file can be found at <paramref name="filePath"/>: it does not exist, it is a link whose target
     /// is missing, its drive or network location is unavailable, its name contains characters the file system does not
     /// allow, or the folder that contains it cannot be accessed.
     /// </exception>

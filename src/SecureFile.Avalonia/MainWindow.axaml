@@ -33,6 +33,8 @@
             <Setter Property="FontSize" Value="14" />
             <Setter Property="MaxLength" Value="1024" />
             <Setter Property="PasswordChar" Value="•" />
+            <!-- No undo history: it would keep earlier password text in memory (review item 24). -->
+            <Setter Property="IsUndoEnabled" Value="False" />
         </Style>
         <!-- Status colours: the words carry the meaning too, colour is only an extra cue. -->
         <Style Selector="TextBlock.critical">
@@ -53,6 +55,9 @@
         <Style Selector="ProgressBar.success">
             <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
         </Style>
+        <Style Selector="Border#DropZone.dragover">
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
+        </Style>
         <Style Selector="Border.banner.success">
             <Setter Property="Background" Value="{DynamicResource SuccessBackgroundBrush}" />
         </Style>
@@ -71,12 +76,12 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="24">
 
-            <!-- 1. Drop zone -->
+            <!-- 1. Drop zone: says "drop" so drag-and-drop can be found; highlighted (class dragover) while a file is over it. -->
             <Border x:Name="DropZone" AutomationProperties.AutomationId="DropZone"
                     BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}" BorderThickness="2"
                     CornerRadius="8" Padding="24" Background="Transparent" DragDrop.AllowDrop="True">
                 <StackPanel HorizontalAlignment="Center">
-                    <TextBlock Text="Choose a file to encrypt or decrypt" FontSize="18" HorizontalAlignment="Center" />
+                    <TextBlock Text="Drop a file here or" FontSize="18" HorizontalAlignment="Center" />
                     <Button x:Name="BrowseButton" AutomationProperties.AutomationId="BrowseButton"
                             AutomationProperties.Name="Browse for a file"
                             Content="_Browse…" ToolTip.Tip="Browse (Ctrl+O, ⌘O on macOS)" Command="{Binding BrowseCommand}"
@@ -84,8 +89,8 @@
                 </StackPanel>
             </Border>
 
-            <!-- 2. File card -->
-            <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1"
+            <!-- 2. File card; the tooltip has the full name, folder, date and exact size (review items 16 and 33). -->
+            <Border ToolTip.Tip="{Binding FileCardToolTip}" BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1"
                     CornerRadius="8" Padding="16" Margin="0,16,0,0">
                 <TextBlock AutomationProperties.AutomationId="FileSummary" Text="{Binding FileSummary}"
                            FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
@@ -97,11 +102,7 @@
             <TextBox x:Name="PasswordInput" Classes="password" AutomationProperties.AutomationId="PasswordInput"
                      AutomationProperties.Name="Password"
                      Text="{Binding Password}" IsEnabled="{Binding CanEditInputs}"
-                     RevealPassword="{Binding #ShowPasswordCheck.IsChecked, FallbackValue=False}">
-                <TextBox.KeyBindings>
-                    <KeyBinding Gesture="Enter" Command="{Binding RunPrimaryCommand}" />
-                </TextBox.KeyBindings>
-            </TextBox>
+                     RevealPassword="{Binding #ShowPasswordCheck.IsChecked, FallbackValue=False}" />
 
             <!-- Only when a password is being chosen (encrypting): strength advice and the confirmation box. -->
             <StackPanel IsVisible="{Binding IsEncrypting}">
@@ -162,7 +163,7 @@
                                  IsIndeterminate="{Binding IsProgressIndeterminate, Mode=OneWay}" />
                     <TextBlock AutomationProperties.AutomationId="ProgressText" Text="{Binding ProgressText}" Margin="0,8,0,0" />
                 </StackPanel>
-                <Button Grid.Column="1" AutomationProperties.AutomationId="CancelButton" AutomationProperties.Name="Cancel"
+                <Button x:Name="CancelButton" Grid.Column="1" AutomationProperties.AutomationId="CancelButton" AutomationProperties.Name="Cancel"
                         Content="Cancel" ToolTip.Tip="Cancel (Esc)" Command="{Binding CancelCommand}" Margin="16,0,0,0" />
             </Grid>
 

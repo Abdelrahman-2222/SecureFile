@@ -77,19 +77,31 @@ internal sealed partial class MainWindow
             return;
         }
 
-        Action? focus = state switch
-        {
-            MainViewState.Succeeded => () => OpenFolderButton.Focus(),
-            MainViewState.Failed => FocusAfterFailure,
-            MainViewState.FileSelected when previous == MainViewState.Working => () => PasswordInput.Focus(),
-            _ => null,
-        };
-
+        Action? focus = ChooseFocus(state, previous);
         if (focus is not null)
         {
             // After the binding has enabled the controls again; focusing a disabled control does nothing.
             Dispatcher.UIThread.Post(focus, DispatcherPriority.Input);
         }
+    }
+
+    /// <summary>Picks where the focus goes after a state change, or <see langword="null"/> to leave it.</summary>
+    /// <param name="state">The new state.</param>
+    /// <param name="previous">The state before it.</param>
+    /// <returns>The action that moves the focus, or <see langword="null"/>.</returns>
+    private Action? ChooseFocus(MainViewState state, MainViewState previous)
+    {
+        return state switch
+        {
+            MainViewState.Succeeded => () => OpenFolderButton.Focus(),
+            MainViewState.Failed => FocusAfterFailure,
+            MainViewState.FileSelected when previous == MainViewState.Working => () => PasswordInput.Focus(),
+            MainViewState.NoFile when previous == MainViewState.Working => () => BrowseButton.Focus(),
+
+            // The disabled password boxes cannot keep the focus; Cancel is the one thing left to do (review item 7).
+            MainViewState.Working when _viewModel.CancelCommand.CanExecute(null) => () => CancelButton.Focus(),
+            _ => null,
+        };
     }
 
     /// <summary>After a failure: back to the password (all selected, to retype it) or, when no file is left, to Browse.</summary>
@@ -103,5 +115,47 @@ internal sealed partial class MainWindow
 
         PasswordInput.Focus();
         PasswordInput.SelectAll();
+    }
+
+    /// <summary>
+    /// After the Save dialog closed without starting an operation (the user cancelled it), puts the focus back in the
+    /// password box: the button that opened it was disabled while it was open and lost the focus (review item 7).
+    /// </summary>
+    private void OnChoosingOutputChanged()
+    {
+        if (!_viewModel.IsChoosingOutput)
+        {
+            Dispatcher.UIThread.Post(
+                () =>
+                {
+                    // Checked when it runs: a chosen file has started the operation by then, which focuses Cancel instead.
+                    if (_viewModel.State is MainViewState.FileSelected or MainViewState.Failed)
+                    {
+                        PasswordInput.Focus();
+                    }
+                },
+                DispatcherPriority.Input);
+        }
+    }
+
+    /// <summary>Enter in the first password box: on to the confirmation while it is still needed, otherwise run (items 11 and 30).</summary>
+    /// <param name="sender">The first password box.</param>
+    /// <param name="e">The key that was pressed.</param>
+    private void OnFirstPasswordKeyDown(object? sender, global::Avalonia.Input.KeyEventArgs e)
+    {
+        if (e.Key != global::Avalonia.Input.Key.Enter)
+        {
+            return;
+        }
+
+        e.Handled = true;
+        if (_viewModel.EnterMovesToConfirm)
+        {
+            ConfirmInput.Focus();
+        }
+        else if (_viewModel.RunPrimaryCommand.CanExecute(null))
+        {
+            _viewModel.RunPrimaryCommand.Execute(null);
+        }
     }
 }

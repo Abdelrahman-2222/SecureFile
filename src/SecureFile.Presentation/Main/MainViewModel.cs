@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -29,6 +28,12 @@ namespace SecureFile.Presentation.Main;
 /// </remarks>
 public sealed partial class MainViewModel : ObservableObject
 {
+    /// <summary>
+    /// The status line while no file is chosen. It adds what the drop zone ("Drop a file here or Browse…") and the file
+    /// card ("No file selected.") do not say, instead of repeating them a third time (review item 17).
+    /// </summary>
+    internal const string NoFileGuidance = "Any file can be encrypted; a SecureFile file (.enc) is decrypted. The file you choose is never changed.";
+
     /// <summary>The ending added to a decrypted file's name when the encrypted file does not end in <c>.enc</c>.</summary>
     private const string DecryptedFileExtension = ".decrypted";
 
@@ -37,7 +42,10 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly IFileDialogService _fileDialogs;
     private readonly IErrorLog _errorLog;
     private readonly IFolderOpener _folderOpener;
-    private readonly Stopwatch _operationClock = new();
+    private readonly TimeProvider _timeProvider;
+
+    /// <summary>When the running operation started, as a <see cref="TimeProvider.GetTimestamp"/> value.</summary>
+    private long _operationStart;
 
     /// <summary>The shortest time between two screen updates of the progress bar (10 per second).</summary>
     private static readonly TimeSpan MinimumProgressInterval = TimeSpan.FromMilliseconds(100);
@@ -45,7 +53,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>The percentage at which the throttle never skips an update.</summary>
     private const int ProgressComplete = 100;
 
-    /// <summary>When (on <see cref="_operationClock"/>) the progress was last shown; used by the throttle.</summary>
+    /// <summary>When (time since <see cref="_operationStart"/>) the progress was last shown; used by the throttle.</summary>
     private TimeSpan _lastProgressUpdate;
 
     /// <summary>The name of the file being read by Browse or drop; <see langword="null"/> when no read is running.</summary>
@@ -66,13 +74,18 @@ public sealed partial class MainViewModel : ObservableObject
     /// <param name="fileDialogs">Shows the Open and Save dialogs.</param>
     /// <param name="errorLog">Records the technical details of handled errors.</param>
     /// <param name="folderOpener">Shows the result in the file manager.</param>
+    /// <param name="timeProvider">
+    /// The clock for the progress throttle and speed; <see langword="null"/> for the system clock. Tests pass a fake one,
+    /// so the 100 ms boundary is checked exactly instead of with the wall clock (backlog C18).
+    /// </param>
     /// <exception cref="ArgumentNullException">A service is <see langword="null"/>.</exception>
     public MainViewModel(
         IFileEncryptionService encryptionService,
         IFileDetailsReader fileDetailsReader,
         IFileDialogService fileDialogs,
         IErrorLog errorLog,
-        IFolderOpener folderOpener)
+        IFolderOpener folderOpener,
+        TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(encryptionService);
         ArgumentNullException.ThrowIfNull(fileDetailsReader);
@@ -81,6 +94,7 @@ public sealed partial class MainViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(folderOpener);
 
         _folderOpener = folderOpener;
+        _timeProvider = timeProvider ?? TimeProvider.System;
         _errorLog = errorLog;
         _encryptionService = encryptionService;
         _fileDetailsReader = fileDetailsReader;
@@ -95,7 +109,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Gets the details of the chosen file, or <see langword="null"/> when no file is chosen.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(FileSummary), nameof(PasswordHint), nameof(IsEncryptOffered), nameof(IsDecryptOffered), nameof(IsEncrypting), nameof(IsDecrypting))]
+    [NotifyPropertyChangedFor(nameof(FileSummary), nameof(FileCardToolTip), nameof(PasswordHint), nameof(IsEncryptOffered), nameof(IsDecryptOffered), nameof(IsEncrypting), nameof(IsDecrypting))]
     [NotifyCanExecuteChangedFor(nameof(EncryptCommand), nameof(DecryptCommand), nameof(RunPrimaryCommand))]
     public partial FileDetails? SelectedFile { get; private set; }
 
@@ -212,7 +226,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Gets the message that tells the user what happened and what to do next.</summary>
     [ObservableProperty]
-    public partial string StatusMessage { get; private set; } = "Choose a file to encrypt or decrypt.";
+    public partial string StatusMessage { get; private set; } = NoFileGuidance;
 
     /// <summary>Gets a value indicating whether an operation is running (the window shows a busy indicator).</summary>
     public bool IsBusy => State == MainViewState.Working;
@@ -304,7 +318,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (SelectedFile is null)
         {
-            return "Choose a file to encrypt or decrypt.";
+            return NoFileGuidance;
         }
 
         if (!SelectedFile.IsEncrypted && HasEncryptedName(SelectedFile))
@@ -343,7 +357,20 @@ public sealed partial class MainViewModel : ObservableObject
             return "Type the password again to confirm it.";
         }
 
-        return PasswordsMatch ? "Ready. Choose Encrypt file." : "The two passwords are not the same yet.";
+        return PasswordsMatch ? ReadyToEncryptGuidance() : "The two passwords are not the same yet.";
+    }
+
+    /// <summary>The "go" line, which admits a weak password instead of a plain "Ready".</summary>
+    /// <returns>The sentence to show.</returns>
+    /// <remarks>
+    /// A weak password is allowed on purpose (only the minimum length is a rule; the meter is advice), but a red warning
+    /// next to a plain "Ready" looked contradictory. The line now says both: it is weak, and encrypting is still possible.
+    /// </remarks>
+    private string ReadyToEncryptGuidance()
+    {
+        return Strength == PasswordStrength.Weak
+            ? "The password is weak. You can still choose Encrypt file, but a few unrelated words would be safer."
+            : "Ready. Choose Encrypt file.";
     }
 
     /// <summary>Keeps the guidance line in step with the typed password.</summary>
@@ -540,7 +567,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// </remarks>
     private void Fail(Exception exception)
     {
-        _errorLog.Write(exception);
+        _errorLog.WriteExpected(exception);
         ClearProgress();
         State = MainViewState.Failed;
         string message = ErrorMessageProvider.GetMessage(exception);
@@ -578,20 +605,21 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         await ExecuteOperationAsync(encrypt, inputPath, outputPath, password).ConfigureAwait(true);
-        ShowSuccess(encrypt, outputPath);
+        ShowSuccess(encrypt, inputPath, outputPath);
     }
 
     /// <summary>Shows the result and forgets the file and the passwords.</summary>
     /// <param name="encrypt">Whether the finished operation was encryption.</param>
+    /// <param name="inputPath">The file that was read (named in the reminder after encryption).</param>
     /// <param name="outputPath">The file that was written.</param>
     /// <remarks>
     /// The job is done, so the window shows the real new state (nothing chosen) and the passwords do not stay in memory
     /// or on screen longer than needed. On failure they are kept on purpose: the user fixes the password and tries again.
     /// </remarks>
-    private void ShowSuccess(bool encrypt, string outputPath)
+    private void ShowSuccess(bool encrypt, string inputPath, string outputPath)
     {
         _lastOutputPath = outputPath;
-        _lastSuccessMessage = SuccessMessage(encrypt, Path.GetFileName(outputPath));
+        _lastSuccessMessage = SuccessMessage(encrypt, Path.GetFileName(inputPath), outputPath);
         State = MainViewState.Succeeded;
         StatusMessage = _lastSuccessMessage;
         SelectedFile = null;
@@ -626,7 +654,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         _operationCts = cancellation;
         CancelCommand.NotifyCanExecuteChanged();
-        _operationClock.Restart();
+        _operationStart = _timeProvider.GetTimestamp();
         _lastProgressUpdate = TimeSpan.FromMilliseconds(-1) - MinimumProgressInterval; // the first report always shows
         State = MainViewState.Working;
         ProgressPercentage = 0;
@@ -638,7 +666,6 @@ public sealed partial class MainViewModel : ObservableObject
     private void EndOperation()
     {
         _operationCts = null;
-        _operationClock.Stop();
         OnPropertyChanged(nameof(IsProgressIndeterminate));
         CancelCommand.NotifyCanExecuteChanged();
     }
@@ -656,7 +683,7 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
-        TimeSpan now = _operationClock.Elapsed;
+        TimeSpan now = _timeProvider.GetElapsedTime(_operationStart);
         if (percentage < ProgressComplete && now - _lastProgressUpdate < MinimumProgressInterval)
         {
             return;
@@ -664,7 +691,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         _lastProgressUpdate = now;
         ProgressPercentage = percentage;
-        ProgressText = ProgressTextFormatter.Format(percentage, SelectedFile?.SizeInBytes ?? 0, _operationClock.Elapsed, CultureInfo.CurrentCulture);
+        ProgressText = ProgressTextFormatter.Format(percentage, SelectedFile?.SizeInBytes ?? 0, now, CultureInfo.CurrentCulture);
     }
 
     /// <summary>Fails the action with a message when the password cannot be used.</summary>
@@ -791,15 +818,36 @@ public sealed partial class MainViewModel : ObservableObject
         return string.Equals(Path.GetFullPath(first), Path.GetFullPath(second), StringComparison.OrdinalIgnoreCase);
     }
 
-    /// <summary>The success message; after encryption it says the original is unchanged (PROJECT_PLAN §11.1).</summary>
+    /// <summary>
+    /// The success message: the result's name and folder, and after encryption a reminder that the unencrypted original
+    /// is still on the disk (review item 25).
+    /// </summary>
     /// <param name="encrypt">Whether the operation was encryption.</param>
-    /// <param name="outputName">The result's file name (never the full path).</param>
+    /// <param name="inputName">The original file's name.</param>
+    /// <param name="outputPath">The file that was written.</param>
     /// <returns>The message to show.</returns>
-    private static string SuccessMessage(bool encrypt, string outputName)
+    /// <remarks>
+    /// "Your original file was not changed" was true but read by some as "it is safe now"; the new text says plainly
+    /// that the readable original is still there. Only the folder's name is shown, not its full path, so the banner
+    /// stays short; Open folder shows the rest.
+    /// </remarks>
+    internal static string SuccessMessage(bool encrypt, string inputName, string outputPath)
     {
+        string outputName = Path.GetFileName(outputPath);
+        string folder = FolderName(outputPath);
         return encrypt
-            ? $"Encrypted copy saved as \"{outputName}\". Your original file was not changed."
-            : $"Decrypted file saved as \"{outputName}\".";
+            ? $"Encrypted copy saved as \"{outputName}\" in the folder \"{folder}\". The unencrypted original \"{inputName}\" is still there: delete it yourself if only the encrypted copy should remain."
+            : $"Decrypted file saved as \"{outputName}\" in the folder \"{folder}\".";
+    }
+
+    /// <summary>The name of the folder that holds <paramref name="filePath"/>, or the drive (such as <c>C:\</c>) at the top.</summary>
+    /// <param name="filePath">A full file path.</param>
+    /// <returns>The folder's own name.</returns>
+    private static string FolderName(string filePath)
+    {
+        string folder = Path.GetDirectoryName(filePath) ?? filePath;
+        string name = Path.GetFileName(folder);
+        return name.Length > 0 ? name : folder;
     }
 
     /// <summary>Browse is available whenever no operation is running.</summary>

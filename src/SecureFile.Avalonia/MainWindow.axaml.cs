@@ -43,16 +43,25 @@ internal sealed partial class MainWindow : Window
     /// <summary>Connects the events that XAML cannot express: drop zone, About, F1 and the clipboard guard.</summary>
     private void WireEvents()
     {
-        DropZone.AddHandler(DragDrop.DragOverEvent, OnDragOver);
-        DropZone.AddHandler(DragDrop.DropEvent, OnFileDropped);
+        WireDropZone();
         AboutButton.Click += (_, _) => ShowAbout();
         KeyDown += OnWindowKeyDown;
         Opened += (_, _) => BrowseButton.Focus(); // a keyboard user starts on the first action
+        PasswordInput.KeyDown += OnFirstPasswordKeyDown;
         foreach (TextBox box in new[] { PasswordInput, ConfirmInput })
         {
             box.CopyingToClipboard += BlockClipboard;
             box.CuttingToClipboard += BlockClipboard;
         }
+    }
+
+    /// <summary>Connects the drop zone: cursor and highlight while dragging, the file on drop.</summary>
+    private void WireDropZone()
+    {
+        DropZone.AddHandler(DragDrop.DragEnterEvent, OnDragOver);
+        DropZone.AddHandler(DragDrop.DragOverEvent, OnDragOver);
+        DropZone.AddHandler(DragDrop.DragLeaveEvent, (_, _) => DropZone.Classes.Set("dragover", false));
+        DropZone.AddHandler(DragDrop.DropEvent, OnFileDropped);
     }
 
     /// <summary>Opens the About dialog.</summary>
@@ -73,25 +82,37 @@ internal sealed partial class MainWindow : Window
         }
     }
 
-    /// <summary>Shows the "copy" cursor over the drop zone for files, and "not allowed" for anything else.</summary>
+    /// <summary>Shows the "copy" cursor and highlights the drop zone for files, and "not allowed" for anything else.</summary>
     /// <param name="sender">The drop zone.</param>
     /// <param name="e">The drag information.</param>
     private void OnDragOver(object? sender, DragEventArgs e)
     {
-        e.DragEffects = e.DataTransfer.Contains(DataFormat.File) ? DragDropEffects.Copy : DragDropEffects.None;
+        bool accepted = AcceptsDrop(e);
+        e.DragEffects = accepted ? DragDropEffects.Copy : DragDropEffects.None;
+        DropZone.Classes.Set("dragover", accepted); // accent border (review item 31), styled in MainWindow.axaml
         e.Handled = true;
     }
 
-    /// <summary>Hands the first dropped file to the ViewModel; the ViewModel decides whether it can be used.</summary>
+    /// <summary>Tells whether a drop would be used: it must carry files, and no operation may be running.</summary>
+    /// <param name="e">The drag information.</param>
+    /// <returns><see langword="true"/> when the drop zone accepts it.</returns>
+    /// <remarks>While busy the drop would do nothing, so the cursor says "not allowed" instead of "copy" (review item 12).</remarks>
+    private bool AcceptsDrop(DragEventArgs e)
+    {
+        return e.DataTransfer.Contains(DataFormat.File) && _viewModel.OpenFilesCommand.CanExecute(null);
+    }
+
+    /// <summary>Hands the dropped paths to the ViewModel; it uses the first and says so when there were more.</summary>
     /// <param name="sender">The drop zone.</param>
     /// <param name="e">The drop information.</param>
-    /// <remarks>Only the first item is used (one file at a time); an item without a local path (a folder in a sandbox) is ignored.</remarks>
+    /// <remarks>An item without a local path (for example in a sandbox) is left out.</remarks>
     private void OnFileDropped(object? sender, DragEventArgs e)
     {
-        string? path = e.DataTransfer.TryGetFiles() is { Length: > 0 } items ? items[0].TryGetLocalPath() : null;
-        if (path is not null && _viewModel.OpenFileCommand.CanExecute(path))
+        DropZone.Classes.Set("dragover", false);
+        string[] paths = [.. (e.DataTransfer.TryGetFiles() ?? []).Select(item => item.TryGetLocalPath()).OfType<string>()];
+        if (paths.Length > 0 && _viewModel.OpenFilesCommand.CanExecute(paths))
         {
-            _viewModel.OpenFileCommand.Execute(path);
+            _viewModel.OpenFilesCommand.Execute(paths);
         }
 
         e.Handled = true;
@@ -123,19 +144,24 @@ internal sealed partial class MainWindow : Window
                 break;
             case nameof(MainViewModel.SelectedFile):
                 ApplyButtonTooltips();
+                ShowPasswordCheck.IsChecked = false; // a new file starts hidden again (review item 24)
                 break;
             case nameof(MainViewModel.State):
                 OnStateChanged();
                 break;
+            case nameof(MainViewModel.IsChoosingOutput):
+                OnChoosingOutputChanged();
+                break;
         }
     }
 
-    /// <summary>Red for too short and weak, amber for fair, green for strong (the WPF window's DataTriggers).</summary>
+    /// <summary>Red for too short (blocks), amber for weak and fair (advice), green for strong (the WPF window's DataTriggers).</summary>
     private void ApplyStrengthColour()
     {
         PasswordStrength strength = _viewModel.Strength;
-        bool critical = strength is PasswordStrength.TooShort or PasswordStrength.Weak;
-        bool caution = strength == PasswordStrength.Fair;
+        // Red only for what blocks (too short); a weak password is allowed, so it is a caution like Fair.
+        bool critical = strength == PasswordStrength.TooShort;
+        bool caution = strength is PasswordStrength.Weak or PasswordStrength.Fair;
         bool success = strength == PasswordStrength.Strong;
         foreach (StyledElement element in new StyledElement[] { StrengthBar, StrengthLabel })
         {

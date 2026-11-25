@@ -48,8 +48,8 @@ checked: nothing leaves your computer.** Every suggestion below serves one of th
 | Suggestion | Why / benefit | Priority | Effort | Ref |
 |---|---|---|---|---|
 | **File format version 2**: authenticate in chunks and store a quick password check | Today a wrong password on a very large file is found only at the end; this finds it at once | Should | L | B4 (6) |
-| Same-file check on macOS/Linux by file identity, not by name | A folder shortcut or a different letter case could make the output replace the input there (Windows is safe) | Should | M | C14 |
-| Owner-only access rights on the temporary and result files (Windows) | Other accounts on a shared PC cannot read the work in progress | Should | S | C16 |
+| ✅ Same-file check on macOS/Linux by file identity, not by name (built in Stage 9.0) | A folder shortcut or a different letter case could make the output replace the input there (Windows is safe) | Should | M | C14 |
+| ✅ Owner-only access rights on the temporary and result files (Windows; built in Stage 9.0) | Other accounts on a shared PC cannot read the work in progress | Should | S | C16 |
 | Written file-format description with sample files | Other tools can read the format; upgrades are safer (the cross-system samples are a start) | Should | S | — |
 | Free-disk-space check before a large run | A full disk is reported at the start, not at 99 % | Could | S | B4 (34) |
 | Clean up leftovers after a crash or power cut on the next start | No hidden temporary file stays behind after a hard stop | Could | M | B4 (2) |
@@ -61,13 +61,13 @@ checked: nothing leaves your computer.** Every suggestion below serves one of th
 
 | Suggestion | Why / benefit | Priority | Effort | Ref |
 |---|---|---|---|---|
-| Clearer drop zone: "Drop a file here or Browse…", a highlight while dragging, a plain message for a folder or several files | People see at once what to do | Should | S | B1 (12, 17, 31) |
-| File card with folder, date, exact size and a tooltip for long names | Users can tell they picked the right file | Should | S | B1 (16, 33) |
-| Keyboard and focus fixes (Enter moves to Confirm, Cancel focused while working, shortcut keys with "Show password") | Keyboard users are not slowed down | Should | S | B1 (7, 8, 9, 11, 30) |
-| Error dialogs say where the log file is | Faster help when something goes wrong | Should | S | B1 (15) |
+| ✅ Clearer drop zone: "Drop a file here or Browse…", a highlight while dragging, a plain message for a folder or several files (built in Stage 9.0) | People see at once what to do | Should | S | B1 (12, 17, 31) |
+| ✅ File card with folder, date, exact size and a tooltip for long names (built in Stage 9.0, as a tooltip) | Users can tell they picked the right file | Should | S | B1 (16, 33) |
+| ✅ Keyboard and focus fixes (Enter moves to Confirm, Cancel focused while working, shortcut keys with "Show password"; built in Stage 9.0) | Keyboard users are not slowed down | Should | S | B1 (7, 8, 9, 11, 30) |
+| ✅ Error dialogs say where the log file is (built in Stage 9.0) | Faster help when something goes wrong | Should | S | B1 (15) |
 | Screen-reader announcements, high-contrast check, small screens and high scaling | Usable by everyone; needs a person with a screen reader | Should | M | B3 |
 | **Passphrase generator** ("blue river coffee lamp"), local word list, secure random, clipboard cleared after 30 s | Memorable and strong passwords | Should | S | B2 (24, 38) |
-| Success message reminds that the unencrypted original is still on disk | People do not think the original is gone | Could | S | B2 (25) |
+| ✅ Success message reminds that the unencrypted original is still on disk (built in Stage 9.0) | People do not think the original is gone | Could | S | B2 (25) |
 | Larger list of common passwords, including Arabic | Better advice on weak passwords | Could | S | C3 |
 | "This looks like a key or password file" hint | Helps people notice what they protect | Could | S | — |
 | Right-click "Encrypt with SecureFile" in Explorer / Finder | Fits how people already work | Could | M | — |

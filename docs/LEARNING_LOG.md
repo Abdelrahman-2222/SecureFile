@@ -1928,3 +1928,37 @@ Gotcha: inside `namespace SecureFile.Avalonia`, `Avalonia.Media.X` resolves to `
   headless test server is not a real desktop with a real keyboard and file dialog.
 - **One reviewer pass** caught missing backlog references (C17, C19, C21), a size figure taken from the wrong row, and
   Stryker on the CLI tracked nowhere (now C22).
+
+## Stage 9.0: backlog burn-down (2026-11-25)
+
+Seventeen "fix now" items, one commit each, on `feature/stage-9-burndown`; 646 tests green on Windows (608 before).
+
+**What was done.** Security: the same-file check now resolves links and ignores case and Unicode normalisation
+(`FileIdentity`, C14); decrypted files on Windows get an owner-only ACL in the create call (C16); the error log replaces
+paths by `<path>` and logs expected failures without a stack trace (`LogEntryFormatter`, `IErrorLog.WriteExpected`, #29).
+Interface (shared ViewModel, so WPF and Avalonia both): drop-zone wording and highlight, folder and multi-file drops,
+file-card tooltip, Enter to Confirm, Cancel focus, safety-net dialogs that name the log, a success message that says the
+original is still there. Tests: deterministic delete retry (C15), an injected `TimeProvider` for the 100 ms throttle (C18),
+a CLI architecture rule (B5). Docs: CLI_README PowerShell 5.1 note (C17), plan §11.1 and TESTPLAN as built (B6).
+
+**Why it was done this way.**
+- *File identity by resolving paths, not by inode.* .NET exposes no inode number, and a P/Invoke into `stat` needs a
+  struct layout per OS and CPU. Walking the path and following every link (with a 40-hop loop guard) gives the same
+  answer for links; hard links need no check because the rename only replaces one name. The output's own file name is
+  not followed: the rename replaces a link there, not its target. Comparing without case everywhere can refuse two real
+  files on case-sensitive Linux; that false refusal is safe, a false accept loses data.
+- *ACL in the create call* (`FileSystemAclExtensions.Create`), so there is no moment with the folder's rights. Lesson:
+  that overload refuses `bufferSize: 0`; `1` also means "no buffer".
+- *Two log methods instead of type sniffing.* Only the caller knows whether an `IOException` was expected (ViewModel) or
+  a crash (safety net), so the interface says it; the formatter fails closed (writes nothing) if its regex times out.
+- *`PathIsFolderException` derives from `FileNotFoundException`,* so every caller that already handled a folder keeps
+  working; only the message became precise.
+- *Maintainability index (CA1505) bit three times* (link walk, `WireEvents`, `OnStateChanged`): extracting one small,
+  named step each time was enough. Lesson: write the helper first when a method gets a loop plus two branches.
+
+**Alternatives not taken.** Inode comparison via P/Invoke (portability); `Microsoft.Extensions.TimeProvider.Testing`
+(a 20-line manual clock is enough); a whole-window drop target (#12 rest, left open); background tint for the WPF drop
+highlight (a null background stops WPF drag events, so only the border changes).
+
+**Still open / waiting on the user.** Manual TESTPLAN rows B8-B10, E2-E6, H2; the Ubuntu/macOS CI run of the link tests;
+the "if time" items (#18, #19, #21, #22, #28, #34, B3 code part) were not started and stay in the backlog.

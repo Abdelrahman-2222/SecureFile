@@ -73,25 +73,57 @@ internal sealed partial class MainWindow : Window
         }
     }
 
-    /// <summary>Shows the "copy" cursor over the drop zone for files, and "not allowed" for anything else.</summary>
+    /// <summary>
+    /// Shows the "copy" cursor and highlights the drop zone for files, and "not allowed" for anything else.
+    /// </summary>
     /// <param name="sender">The drop zone.</param>
     /// <param name="e">The drag information.</param>
     private void OnDragOver(object sender, DragEventArgs e)
     {
-        e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
+        bool accepted = AcceptsDrop(e);
+        e.Effects = accepted ? DragDropEffects.Copy : DragDropEffects.None;
+        SetDropHighlight(accepted);
         e.Handled = true;
     }
 
-    /// <summary>Hands the first dropped file to the ViewModel; the ViewModel decides whether it can be used.</summary>
+    /// <summary>Removes the highlight when the drag leaves the drop zone without dropping.</summary>
+    /// <param name="sender">The drop zone.</param>
+    /// <param name="e">Unused.</param>
+    private void OnDragLeave(object sender, DragEventArgs e)
+    {
+        SetDropHighlight(false);
+    }
+
+    /// <summary>Tells whether a drop would be used: it must carry files, and no operation may be running.</summary>
+    /// <param name="e">The drag information.</param>
+    /// <returns><see langword="true"/> when the drop zone accepts it.</returns>
+    /// <remarks>While busy the drop would do nothing, so the cursor says "not allowed" instead of "copy" (review item 12).</remarks>
+    private bool AcceptsDrop(DragEventArgs e)
+    {
+        return e.Data.GetDataPresent(DataFormats.FileDrop) && _viewModel.OpenFilesCommand.CanExecute(null);
+    }
+
+    /// <summary>Gives the drop zone the theme's accent border while a usable drag is over it (review item 31).</summary>
+    /// <param name="on">Whether to highlight.</param>
+    /// <remarks>
+    /// The theme resource is referenced (not copied), so the highlight follows light, dark and high-contrast themes. Only
+    /// the border changes: the transparent background must stay, because without a background WPF stops sending drag events.
+    /// </remarks>
+    private void SetDropHighlight(bool on)
+    {
+        DropZone.SetResourceReference(System.Windows.Controls.Border.BorderBrushProperty, on ? "AccentFillColorDefaultBrush" : "ControlStrongStrokeColorDefaultBrush");
+    }
+
+    /// <summary>Hands the dropped paths to the ViewModel; it uses the first and says so when there were more.</summary>
     /// <param name="sender">The drop zone.</param>
     /// <param name="e">The drop information.</param>
-    /// <remarks>Only the first file is used: the app works on one file at a time.</remarks>
     private void OnFileDropped(object sender, DragEventArgs e)
     {
+        SetDropHighlight(false);
         if (e.Data.GetData(DataFormats.FileDrop) is string[] { Length: > 0 } paths
-            && _viewModel.OpenFileCommand.CanExecute(paths[0]))
+            && _viewModel.OpenFilesCommand.CanExecute(paths))
         {
-            _viewModel.OpenFileCommand.Execute(paths[0]);
+            _viewModel.OpenFilesCommand.Execute(paths);
         }
 
         e.Handled = true;
@@ -146,6 +178,10 @@ internal sealed partial class MainWindow : Window
         SetBoxes(_viewModel.Password, _viewModel.ConfirmPassword);
         SwapVisibility(PasswordInput, PasswordVisibleInput, show);
         SwapVisibility(ConfirmInput, ConfirmVisibleInput, show);
+
+        // Alt+P and Alt+N must reach the box that is shown; a collapsed target cannot take the focus (review item 9).
+        PasswordLabel.Target = show ? PasswordVisibleInput : PasswordInput;
+        ConfirmLabel.Target = show ? ConfirmVisibleInput : ConfirmInput;
         (show ? PasswordVisibleInput : (System.Windows.Controls.Control)PasswordInput).Focus();
     }
 
@@ -171,6 +207,16 @@ internal sealed partial class MainWindow : Window
         else if (e.PropertyName == nameof(MainViewModel.State))
         {
             OnStateChanged();
+        }
+        else if (e.PropertyName == nameof(MainViewModel.IsChoosingOutput))
+        {
+            OnChoosingOutputChanged();
+        }
+        else if (e.PropertyName == nameof(MainViewModel.SelectedFile))
+        {
+            // A new file (or none, after a success) starts hidden again, so the next password is never typed in plain
+            // text by accident (review item 24). A failure keeps the file, so the choice stays for the retry.
+            ShowPasswordCheck.IsChecked = false;
         }
     }
 

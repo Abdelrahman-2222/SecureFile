@@ -44,10 +44,13 @@ Result column: ✅ pass · ❌ fail (write the bug id) · ➖ not applicable.
 | B1 | Press Tab repeatedly through the whole window. | Every control gets a clearly visible focus; the order follows reading order (top→bottom, left→right); no control is skipped; focus never gets trapped. | |
 | B2 | Shift+Tab backwards. | Reverse order, same controls. | |
 | B3 | Ctrl+O. | Browse dialog opens; pick a file with the keyboard. | |
-| B4 | Type the passphrase, press Enter. | Starts Encrypt or Decrypt (the one offered). | |
+| B4 | Type the passphrase, press Enter. | Decrypt: starts at once. Encrypt: Enter in the first box moves to Confirm; Enter there starts Encrypt once both match. | |
 | B5 | Start the 500 MB file, press Esc. | Cancels; no output file left; inputs unlock. | |
 | B6 | F1. | About dialog opens; Esc or Enter closes it and returns focus to the window. | |
 | B7 | Complete one full encrypt + decrypt with the keyboard only. | Possible without the mouse. | |
+| B8 | Tick Show password (Alt+S), then press Alt+P and Alt+N. | The focus goes to the visible password and confirmation boxes (Stage 9.0, #9). | |
+| B9 | Start an operation and look at the focus; then open the Save dialog and cancel it. | While working Cancel has the focus (Space or Esc cancels). After the cancelled dialog the focus is back in the password box (#7). | |
+| B10 | With no operation running, press Esc. | Nothing happens; no message, no error. | |
 
 ## C. Screen reader (Narrator, Win+Ctrl+Enter) (T-41)
 
@@ -74,8 +77,10 @@ Result column: ✅ pass · ❌ fail (write the bug id) · ➖ not applicable.
 | # | Step | Expected | Result |
 |---|---|---|---|
 | E1 | Drag `small.txt` from Explorer onto the window. | File is selected as if browsed. | |
-| E2 | Drag a folder onto the window. | Friendly refusal (a folder is not a file), no crash. | |
-| E3 | Drag two files at once. | Defined behavior (one used or refused with a message), no crash. | |
+| E2 | Drag a folder onto the window. | "This is a folder. SecureFile works on one file at a time…"; the previous file (if any) stays selected; no crash. | |
+| E3 | Drag two files at once. | The first is used and the status says "You dropped 2 files… only "<name>" is used."; no crash. | |
+| E5 | Drag a file over the drop zone slowly, then away; then drag one during an encryption. | Accent border while over the zone, gone after leaving; during an operation the cursor says "not allowed" and nothing changes. | |
+| E6 | Choose a file with a long name and hover over the file card. | Tooltip with the full name, the folder, the last-modified time and the exact size in bytes. | |
 | E4 | Paste a passphrase with Ctrl+V. | Works; the passphrase is not shown in clear text. | |
 
 ## F. Failure situations
@@ -103,8 +108,19 @@ Result column: ✅ pass · ❌ fail (write the bug id) · ➖ not applicable.
 | # | Step | Expected | Result |
 |---|---|---|---|
 | H1 | Run the exe from a path with spaces and from a non-admin account. | Starts and works; no admin prompt. | |
-| H2 | Check `%LOCALAPPDATA%\SecureFile\logs\securefile.log` after the failure tests. | Contains error types and times, never a passphrase or file content. | |
+| H2 | Check `%LOCALAPPDATA%\SecureFile\logs\securefile.log` after the failure tests. | Contains error types and times, never a passphrase, file content, folder or file name (`<path>` instead); a wrong password has no stack trace (Stage 9.0, #29). | |
 | H3 | Check that no leftover `.~*.securefile-tmp` (hidden) or other partial files remain next to the sources after all tests, including after a cancel and after closing the window during an operation. | None. | |
+
+## I. Exploratory session (30 minutes, T-44)
+
+Charter: "Try to make the app crash, lose a file, show a confusing message, or leak a passphrase." Take notes while
+working; one line per observation. Ideas: very long passphrase, passphrase with emoji, paths near 260 characters,
+file names with trailing dots or spaces, switching theme mid-operation, minimizing during encryption, sleeping the
+laptop during a long run, opening two app instances on the same file, changing the source while it is encrypted.
+
+| Time | What I tried | What happened | Bug id / note |
+|---|---|---|---|
+| | | | |
 
 ## J. Command-line version (`securefile`, any system)
 
@@ -123,17 +139,6 @@ Use the archive for your system from `artifacts/cli` (see `docs/CLI_README.md` f
 | J9 | `printf '%s\n' 'blue river coffee lamp' \| securefile encrypt <file> --password-stdin`, then without the flag in a pipe. | Works; without the flag it says how to pipe the password. | |
 | J10 | Lock a file on one system, copy it, unlock it on another (Windows ↔ macOS ↔ Linux). | Opens and is identical (same format everywhere). | |
 | J11 | Redirect output (`securefile encrypt f > out.txt 2> err.txt`). | `out.txt` has only the result line; the prompt, progress and errors are in `err.txt`. | |
-
-## I. Exploratory session (30 minutes, T-44)
-
-Charter: "Try to make the app crash, lose a file, show a confusing message, or leak a passphrase." Take notes while
-working; one line per observation. Ideas: very long passphrase, passphrase with emoji, paths near 260 characters,
-file names with trailing dots or spaces, switching theme mid-operation, minimizing during encryption, sleeping the
-laptop during a long run, opening two app instances on the same file, changing the source while it is encrypted.
-
-| Time | What I tried | What happened | Bug id / note |
-|---|---|---|---|
-| | | | |
 
 ## Bugs found
 

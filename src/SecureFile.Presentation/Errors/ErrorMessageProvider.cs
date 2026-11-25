@@ -1,4 +1,5 @@
 using SecureFile.Core.Cryptography;
+using SecureFile.Core.Files;
 
 namespace SecureFile.Presentation.Errors;
 
@@ -88,6 +89,7 @@ public static class ErrorMessageProvider
         return exception switch
         {
             NotSupportedException => "This item can't be opened as a file. Choose a regular file.",
+            PathIsFolderException => "This is a folder. SecureFile works on one file at a time: choose a file inside it.",
             FileNotFoundException or DirectoryNotFoundException => "The file or folder can't be found or opened.",
             UnauthorizedAccessException => "Access to this file or folder was denied. Choose another folder or check its permissions.",
             PathTooLongException => "The path is too long. Choose a shorter folder or name.",

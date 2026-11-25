@@ -786,7 +786,7 @@ What does a mutation score tell us that coverage does not?
 
 | Step | Goal | Status |
 |---|---|---|
-| 9.0 | Burn down the "fix now" backlog batch (triaged 2026-11-25 against the code): C14, C16, #29, #24, C17, #9, #17/#31, #12, #16/#33, #15, #11/#30, #7, #25, C15, C18, B5, B6. "If time": #18, #19, #21, #22, #28, #34, B3 code part. | ⬜ |
+| 9.0 | Burn down the "fix now" backlog batch (triaged 2026-11-25 against the code): C14, C16, #29, #24, C17, #9, #17/#31, #12, #16/#33, #15, #11/#30, #7, #25, C15, C18, B5, B6. "If time": #18, #19, #21, #22, #28, #34, B3 code part. | 🟡 2026-11-25: all 17 "fix now" items done, one commit each, 646 tests green on Windows (was 608). Waiting on the user: TESTPLAN rows B8-B10, E2-E6, H2 by hand (WPF has no unit tests), and the Ubuntu/macOS CI run of `FileIdentityTests` (C14). "If time" items not started; they stay in the backlog. |
 | 9.1 | Final review against the Definition of Done (below). | ⬜ |
 | 9.2 | `docs/FINAL_GUIDE.md` — the detailed explanation document (§14.1). | ⬜ |
 | 9.3 | Team Lead presentation (`.pptx`) (§14.2) + Q&A preparation. | ⬜ |
@@ -922,24 +922,29 @@ we test them anyway.
 
 ### 11.1 The flow (one window, top to bottom)
 
-1. **Drop zone:** "Drop a file here or **Browse…**" (large target, also accepts keyboard).
-2. **File card:** icon, **name**, **extension**, **size** (`1.5 MB`; tooltip with exact bytes like Explorer: `1.5 KB (1,536 bytes)`), last modified. "Change file" link.
+*Updated in Stage 9.0 (backlog B6) to describe the app as built; the first plan had a mode switch and a "Change…" button.*
+
+1. **Drop zone:** "Drop a file here or **Browse…**" (Browse button, Ctrl+O; ⌘O on macOS). An accent border shows while a
+   file is dragged over it; a dropped folder says it is a folder, several dropped files say only the first is used, and
+   while an operation runs the cursor says "not allowed".
+2. **File card:** one line, **name** (**extension**) · **size** (`1.5 MB`). Its tooltip has the full name, the folder, the
+   last-modified time and the exact size in bytes. To change the file, Browse or drop again (no separate link).
    Reading the details runs off the UI thread (it can take seconds on an unavailable network drive).
-3. **Mode:** Encrypt / Decrypt — preselected automatically from the file header; the user can switch. For a `.enc`
-   file a hint says *"This is a SecureFile encrypted file — enter its password to decrypt it."* (a `.enc` file has no
-   icon or double-click action, so users need this hint).
-4. **Password:** field with show/hide; *Confirm password* (encrypt only); Caps Lock warning. Spaces are never trimmed;
-   the wrong-password message adds "Check Caps Lock, the keyboard language and spaces at the start or end." (Review Board 1.3, R13).
-   Warning text: **"If you forget this password, the file cannot be recovered. Nobody can reset it."**
-   *Could (time-boxed):* strength meter and "Generate strong password". If generation is built, the app shows the
-   password with *"Save this password somewhere safe now (for example in a password manager)"*, and any Copy button
-   clears the clipboard after 30 seconds (clipboard history and cloud sync could otherwise keep it).
-5. **Output:** suggested name and folder (same folder as the input; `name.ext.enc` or `.enc` removed), **Change…** opens the Save dialog (R5). Overwrite asks for confirmation.
-6. **Primary button:** "Encrypt file" / "Decrypt file" — disabled until inputs are valid, with a hint why.
-7. **Progress:** bar + % + MB/s + time left + **Cancel**. Inputs locked while working.
-8. **Result:** success message with **Open folder**; or an error saying *what happened* and *what to do*.
-   After encryption the message is explicit: **"Encrypted copy saved. Your original file was not changed."** —
-   so nobody assumes the original is now protected.
+3. **Mode:** no switch. The file's content decides (the SecureFile signature): Encrypt and Decrypt are both shown, and the
+   one that does not fit is disabled with a tooltip saying why. For an encrypted file the hint reads *"Enter the password
+   that was used to encrypt this file."*; a `.enc` name with foreign content says it may be damaged and still allows Decrypt.
+4. **Password:** field with **Show password**; *Confirm password* (encrypt only); Caps Lock warning (WPF). Spaces are never
+   trimmed; the wrong-password message adds "Check Caps Lock, the keyboard language and spaces at the start or end."
+   (Review Board 1.3, R13). Enter in the first box moves to Confirm while it is still needed. Warning text:
+   **"If you forget this password, the file cannot be recovered. Nobody can reset it."** A strength meter is built; a
+   password generator is not (see `docs/SUGGESTIONS.md`).
+5. **Output:** Encrypt or Decrypt opens the Save dialog with a suggested name in the input's folder (`name.ext.enc`, or
+   `.enc` removed). The dialog asks before replacing a file; the input itself is refused. No separate "Change…" button.
+6. **Primary buttons:** "Encrypt file" / "Decrypt file", disabled until the inputs are valid; the guidance line says why.
+7. **Progress:** bar + % + MB/s + time left + **Cancel** (focused while working; Esc too). Inputs locked while working.
+8. **Result:** a green or red banner. Success names the result and its folder, with **Open folder**. After encryption it
+   adds that **the unencrypted original is still there**, so nobody assumes the original is now protected. An error says
+   *what happened* and *what to do*.
 
 ### 11.2 Visual and interaction rules
 

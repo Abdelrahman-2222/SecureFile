@@ -1,6 +1,7 @@
 using System.Globalization;
 using SecureFile.Core.Cryptography;
 using SecureFile.Core.Files;
+using SecureFile.Core.Passwords;
 using SecureFile.Presentation.Main;
 
 namespace SecureFile.Presentation.Tests.Main;
@@ -18,6 +19,7 @@ public sealed class MainViewModelTests
 
     private readonly FakeFileEncryptionService _encryption = new();
     private readonly FakeFileDialogService _dialogs = new();
+    private readonly ManualTimeProvider _clock = new();
     private readonly FakeFileDetailsReader _detailsReader = new();
     private readonly FakeErrorLog _errorLog = new();
     private readonly FakeFolderOpener _folderOpener = new();
@@ -35,6 +37,10 @@ public sealed class MainViewModelTests
         Assert.True(viewModel.BrowseCommand.CanExecute(null));
         Assert.False(viewModel.EncryptCommand.CanExecute(null));
         Assert.False(viewModel.DecryptCommand.CanExecute(null));
+
+        // The status adds something instead of repeating the drop zone and the file card (review item 17).
+        Assert.Equal(MainViewModel.NoFileGuidance, viewModel.StatusMessage);
+        Assert.DoesNotContain("Choose a file", viewModel.StatusMessage, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -92,7 +98,7 @@ public sealed class MainViewModelTests
         Assert.Equal(output, _dialogs.SuggestedSavePath);
         Assert.Equal([("Encrypt", InputPath, output, ValidPassword, true)], _encryption.Calls);
         Assert.Equal(MainViewState.Succeeded, viewModel.State);
-        Assert.Equal("Encrypted copy saved as \"report.pdf.enc\". Your original file was not changed.", viewModel.StatusMessage);
+        Assert.Equal(MainViewModel.SuccessMessage(encrypt: true, "report.pdf", output), viewModel.StatusMessage);
     }
 
     [Fact]
@@ -284,7 +290,7 @@ public sealed class MainViewModelTests
 
         Assert.Equal(Path.Combine(Path.GetTempPath(), expectedName), _dialogs.SuggestedSavePath);
         Assert.Equal("Decrypt", Assert.Single(_encryption.Calls).Operation);
-        Assert.Equal("Decrypted file saved as \"out.pdf\".", viewModel.StatusMessage);
+        Assert.Equal(MainViewModel.SuccessMessage(encrypt: false, inputName, Path.Combine(Path.GetTempPath(), "out.pdf")), viewModel.StatusMessage);
     }
 
     [Fact]
@@ -443,6 +449,125 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public void SuccessMessage_NamesTheFolderAndSaysTheUnencryptedOriginalIsStillThere()
+    {
+        string output = Path.Combine(Path.GetTempPath(), "Taxes", "report.pdf.enc");
+
+        Assert.Equal(
+            "Encrypted copy saved as \"report.pdf.enc\" in the folder \"Taxes\". The unencrypted original \"report.pdf\" is still there: delete it yourself if only the encrypted copy should remain.",
+            MainViewModel.SuccessMessage(encrypt: true, "report.pdf", output));
+        Assert.Equal(
+            "Decrypted file saved as \"report.pdf.enc\" in the folder \"Taxes\".",
+            MainViewModel.SuccessMessage(encrypt: false, "report.pdf.enc", output));
+    }
+
+    [Fact]
+    public void SuccessMessage_FileAtTheTopOfADrive_NamesTheDrive()
+    {
+        string root = Path.GetPathRoot(Path.GetTempPath())!;
+
+        Assert.EndsWith($"in the folder \"{root}\".", MainViewModel.SuccessMessage(encrypt: false, "a.enc", Path.Combine(root, "a")), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Guidance_WeakButMatchingPassword_SaysItIsWeakAndThatEncryptIsStillAllowed()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+
+        string weakPassword = string.Concat("Password", "1234"); // a common word and digits; built so the secrets scan sees no literal
+        viewModel.Password = weakPassword;
+        viewModel.ConfirmPassword = weakPassword;
+
+        Assert.Equal(PasswordStrength.Weak, viewModel.Strength);
+        Assert.True(viewModel.EncryptCommand.CanExecute(null)); // advice only: the minimum length is the one rule
+        Assert.StartsWith("The password is weak. You can still choose Encrypt file", viewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task EnterMovesToConfirm_OnlyWhileANewPasswordStillNeedsItsConfirmation()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        viewModel.ConfirmPassword = string.Empty;
+        Assert.True(viewModel.EnterMovesToConfirm); // review items 11 and 30
+
+        viewModel.ConfirmPassword = ValidPassword;
+        Assert.False(viewModel.EnterMovesToConfirm); // both match: Enter encrypts
+
+        _detailsReader.IsEncryptedOverride = true;
+        MainViewModel decrypting = await CreateWithFileAsync(InputPath + ".enc");
+        decrypting.ConfirmPassword = string.Empty;
+        Assert.False(decrypting.EnterMovesToConfirm); // no confirmation when decrypting
+    }
+
+    [Fact]
+    public void DescribeFile_GivesNameFolderDateAndExactSize()
+    {
+        string folder = Path.Combine(Path.GetTempPath(), "Taxes");
+        var modified = new DateTime(2026, 11, 25, 8, 30, 0, DateTimeKind.Utc);
+        var file = new FileDetails(Path.Combine(folder, "a very long name that the card cuts.pdf"), "a very long name that the card cuts.pdf", ".pdf", 1_234_567, modified);
+
+        string text = MainViewModel.DescribeFile(file, CultureInfo.InvariantCulture);
+
+        string expectedDate = modified.ToLocalTime().ToString("g", CultureInfo.InvariantCulture);
+        Assert.Equal(
+            $"a very long name that the card cuts.pdf\nFolder: {folder}\nModified: {expectedDate}\nSize: 1,234,567 bytes (1.18 MB)",
+            text);
+    }
+
+    [Fact]
+    public async Task FileCardToolTip_OnlyWhileAFileIsChosen()
+    {
+        MainViewModel viewModel = CreateViewModel();
+        Assert.Null(viewModel.FileCardToolTip);
+
+        await viewModel.OpenFileCommand.ExecuteAsync(InputPath);
+
+        Assert.StartsWith(Path.GetFileName(InputPath), viewModel.FileCardToolTip, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OpenFiles_DroppedFolder_SaysItIsAFolderAndLogsItAsExpected()
+    {
+        MainViewModel viewModel = CreateViewModel();
+        string folder = Path.Combine(Path.GetTempPath(), "Holiday photos");
+        _detailsReader.ExceptionToThrow = new PathIsFolderException("folder", folder);
+
+        await viewModel.OpenFilesCommand.ExecuteAsync([folder]);
+
+        Assert.Equal(MainViewState.Failed, viewModel.State);
+        Assert.Contains("This is a folder.", viewModel.StatusMessage, StringComparison.Ordinal);
+        Assert.Equal(1, _errorLog.ExpectedCount); // no stack trace for it in the log (review item 29)
+    }
+
+    [Fact]
+    public async Task OpenFiles_SeveralDropped_UsesTheFirstAndSaysSo()
+    {
+        MainViewModel viewModel = CreateViewModel();
+        string second = Path.Combine(Path.GetTempPath(), "second.txt");
+
+        await viewModel.OpenFilesCommand.ExecuteAsync([InputPath, second, second]);
+
+        Assert.Equal(InputPath, viewModel.SelectedFile?.FullPath);
+        Assert.StartsWith(
+            $"You dropped 3 files. SecureFile works on one file at a time, so only \"{Path.GetFileName(InputPath)}\" is used.",
+            viewModel.StatusMessage,
+            StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task OpenFiles_NothingOrOneFile_BehavesLikeOpenFile()
+    {
+        MainViewModel viewModel = CreateViewModel();
+
+        await viewModel.OpenFilesCommand.ExecuteAsync([]);
+        Assert.Equal(MainViewState.NoFile, viewModel.State);
+
+        await viewModel.OpenFilesCommand.ExecuteAsync([InputPath]);
+        Assert.Equal(InputPath, viewModel.SelectedFile?.FullPath);
+        Assert.DoesNotContain("You dropped", viewModel.StatusMessage, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Browse_FileChosenAfterAFailure_ShowsGuidanceAndKeepsThePasswords()
     {
         MainViewModel viewModel = await CreateWithFileAsync(InputPath);
@@ -528,18 +653,87 @@ public sealed class MainViewModelTests
         Task running = viewModel.EncryptCommand.ExecuteAsync(null);
 
         viewModel.OnProgress(5);
-        viewModel.OnProgress(6); // normally less than 100 ms later: skipped
+        viewModel.OnProgress(6); // no time has passed on the test clock: skipped
         viewModel.OnProgress(7);
-        // Wall-clock based, so only what holds on a slow machine too: the first report shows, nothing goes backwards
-        // and nothing beyond what was reported appears (the exact 100 ms boundary needs an injectable clock: backlog C18).
-        Assert.InRange(viewModel.ProgressPercentage, 5, 7);
-        Assert.NotEqual(0, viewModel.ProgressPercentage);
+        Assert.Equal(5, viewModel.ProgressPercentage);
 
         viewModel.OnProgress(100); // the end is never skipped
         Assert.Equal(100, viewModel.ProgressPercentage);
 
         release.SetResult();
         await running;
+    }
+
+    [Fact]
+    public async Task Progress_At99And100Milliseconds_SkipsBeforeTheBoundaryAndShowsAtIt()
+    {
+        (MainViewModel viewModel, TaskCompletionSource release, Task running) = await StartEncryptionAsync();
+
+        viewModel.OnProgress(10);
+        _clock.Advance(TimeSpan.FromMilliseconds(99));
+        viewModel.OnProgress(20);
+        Assert.Equal(10, viewModel.ProgressPercentage); // 99 ms: still inside the 100 ms window (backlog C18)
+
+        _clock.Advance(TimeSpan.FromMilliseconds(1));
+        viewModel.OnProgress(30);
+        Assert.Equal(30, viewModel.ProgressPercentage); // exactly 100 ms: shown
+
+        release.SetResult();
+        await running;
+    }
+
+    [Fact]
+    public async Task Progress_SecondOperation_ShowsItsFirstReportAtOnce()
+    {
+        (MainViewModel viewModel, TaskCompletionSource release, Task running) = await StartEncryptionAsync();
+        viewModel.OnProgress(50);
+        release.SetResult();
+        await running;
+
+        // The second run starts within the first run's 100 ms window; its first report must not be throttled away.
+        (viewModel, release, running) = await StartEncryptionAsync(viewModel);
+        viewModel.OnProgress(3);
+
+        Assert.Equal(3, viewModel.ProgressPercentage);
+        release.SetResult();
+        await running;
+    }
+
+    [Fact]
+    public async Task Progress_LateReportAfterTheOperationEnded_IsIgnored()
+    {
+        (MainViewModel viewModel, TaskCompletionSource release, Task running) = await StartEncryptionAsync();
+        release.SetResult();
+        await running;
+
+        _clock.Advance(TimeSpan.FromSeconds(1));
+        viewModel.OnProgress(80); // a Progress<T> callback queued before the end can arrive after it
+
+        Assert.Equal(0, viewModel.ProgressPercentage);
+        Assert.Equal(string.Empty, viewModel.ProgressText);
+    }
+
+    /// <summary>Starts an encryption that waits until the returned source is completed, so progress can be reported into it.</summary>
+    /// <param name="viewModel">A ViewModel to reuse for a second operation, or <see langword="null"/> for a new one.</param>
+    private async Task<(MainViewModel ViewModel, TaskCompletionSource Release, Task Running)> StartEncryptionAsync(MainViewModel? viewModel = null)
+    {
+        if (viewModel is null)
+        {
+            viewModel = await CreateWithFileAsync(InputPath);
+        }
+        else
+        {
+            _dialogs.OpenResult = InputPath;
+            await viewModel.BrowseCommand.ExecuteAsync(null);
+            viewModel.Password = ValidPassword;
+            viewModel.ConfirmPassword = ValidPassword;
+        }
+
+        _dialogs.SaveResult = InputPath + ".enc";
+        var release = new TaskCompletionSource();
+        _encryption.WaitFor = release.Task;
+        Task running = viewModel.EncryptCommand.ExecuteAsync(null);
+        return (viewModel, release, running);
     }
 
     // ---- Cancel, Open folder, locked inputs (Step 3.5) -------------------------------------------------------------
@@ -584,6 +778,7 @@ public sealed class MainViewModelTests
         Assert.False(viewModel.CanEditInputs);
         Assert.False(viewModel.BrowseCommand.CanExecute(null));
         Assert.False(viewModel.OpenFileCommand.CanExecute(InputPath));
+        Assert.False(viewModel.OpenFilesCommand.CanExecute(null)); // the windows show no copy cursor while busy (item 12)
         Assert.False(viewModel.DecryptCommand.CanExecute(null));
         viewModel.Password = "x"; // a dialog that does not block the window (Linux portal) let the user type
 
@@ -833,7 +1028,7 @@ public sealed class MainViewModelTests
 
     private MainViewModel CreateViewModel()
     {
-        return new MainViewModel(_encryption, _detailsReader, _dialogs, _errorLog, _folderOpener);
+        return new MainViewModel(_encryption, _detailsReader, _dialogs, _errorLog, _folderOpener, _clock);
     }
 
     /// <summary>A ViewModel with <paramref name="path"/> chosen and a valid password typed twice.</summary>

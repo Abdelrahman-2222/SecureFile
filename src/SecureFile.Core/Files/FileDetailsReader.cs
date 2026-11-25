@@ -18,11 +18,13 @@ public sealed class FileDetailsReader : IFileDetailsReader
 
         FileInfo selectedFile = new(filePath);
 
-        // FileInfo.Exists is false for folders as well as for missing files,
-        // so a folder path is rejected here too.
+        // FileInfo.Exists is false for folders as well as for missing files; a folder gets its own type, so the window
+        // can say "this is a folder" instead of "can't be found" (review item 12).
         if (!selectedFile.Exists)
         {
-            throw new FileNotFoundException("No file exists at the given path.", filePath);
+            throw Directory.Exists(filePath)
+                ? new PathIsFolderException(PathIsFolderException.DefaultMessage, filePath)
+                : new FileNotFoundException("No file exists at the given path.", filePath);
         }
 
         // For a symbolic link, the size and change time must come from the file it points to

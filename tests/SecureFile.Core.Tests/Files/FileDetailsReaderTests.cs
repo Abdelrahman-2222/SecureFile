@@ -223,9 +223,22 @@ public sealed class FileDetailsReaderTests : IDisposable
     }
 
     [Fact]
-    public void Read_FolderInsteadOfFile_ThrowsFileNotFoundException()
+    public void Read_FolderInsteadOfFile_ThrowsPathIsFolderExceptionWhichIsAFileNotFoundException()
     {
-        Assert.Throws<FileNotFoundException>(() => _reader.Read(_temporaryFolder.FullName));
+        PathIsFolderException thrown = Assert.Throws<PathIsFolderException>(() => _reader.Read(_temporaryFolder.FullName));
+
+        Assert.IsAssignableFrom<FileNotFoundException>(thrown); // older callers still catch it (review item 12)
+        Assert.Equal(_temporaryFolder.FullName, thrown.FileName);
+    }
+
+    [Fact]
+    public void PathIsFolderException_StandardConstructors_KeepMessageAndCause()
+    {
+        IOException cause = new("disk error");
+
+        Assert.Equal(PathIsFolderException.DefaultMessage, new PathIsFolderException().Message);
+        Assert.Equal("folder", new PathIsFolderException("folder").Message);
+        Assert.Same(cause, new PathIsFolderException("folder", cause).InnerException);
     }
 
     // The ParamName checks prove that OUR guard clause rejected the input (FileInfo would report "fileName"/"path").

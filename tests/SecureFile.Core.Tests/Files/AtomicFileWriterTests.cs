@@ -128,6 +128,28 @@ public sealed class AtomicFileWriterTests : IDisposable
         Assert.Equal(UnixFileMode.UserRead | UnixFileMode.UserWrite, File.GetUnixFileMode(output));
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")] // for the analyzer (CA1416); the skip below keeps it on Windows
+    public async Task WriteAsync_SensitiveOnWindows_TempAndResultHaveAnOwnerOnlyAcl(bool isSensitive)
+    {
+        // Backlog C16: a sensitive file must not inherit the folder's rights, so other accounts cannot read it.
+        Assert.SkipUnless(OperatingSystem.IsWindows(), "Access control lists are checked on Windows; Unix uses the file mode.");
+        string output = PathInFolder("result.txt");
+        bool tempWasOwnerOnly = false;
+
+        await AtomicFileWriter.WriteAsync(output, overwriteExisting: false, isSensitive, _ =>
+        {
+            tempWasOwnerOnly = IsOwnerOnly(_folder.GetFiles().Single());
+            return Task.CompletedTask;
+        });
+
+        Assert.Equal(isSensitive, tempWasOwnerOnly);
+        Assert.Equal(isSensitive, IsOwnerOnly(new FileInfo(output)));
+        Assert.Empty(await File.ReadAllBytesAsync(output, Ct)); // the owner can still read it
+    }
+
     [Fact]
     public async Task WriteAsync_WriterFailsAndTheTempFileCannotBeDeleted_LeavesItEmpty()
     {
@@ -284,8 +306,56 @@ public sealed class AtomicFileWriterTests : IDisposable
         Assert.True(File.Exists(path));
     }
 
+    [Fact]
+    public void TryDeleteFile_FailsTwiceThenSucceeds_TriesThreeTimesWithGrowingPauses()
+    {
+        // Deterministic, unlike the timed lock above (backlog C15): the attempts and pauses are counted exactly.
+        int attempts = 0;
+        var pauses = new List<TimeSpan>();
+
+        bool deleted = AtomicFileWriter.TryDeleteFile("any", _ => ++attempts == 3, pauses.Add);
+
+        Assert.True(deleted);
+        Assert.Equal(3, attempts);
+        Assert.Equal([TimeSpan.FromMilliseconds(40), TimeSpan.FromMilliseconds(80)], pauses);
+    }
+
+    [Fact]
+    public void TryDeleteFile_AlwaysFails_GivesUpAfterFiveTriesWithoutAPauseAfterTheLast()
+    {
+        int attempts = 0;
+        var pauses = new List<TimeSpan>();
+
+        bool deleted = AtomicFileWriter.TryDeleteFile("any", _ => { attempts++; return false; }, pauses.Add);
+
+        Assert.False(deleted);
+        Assert.Equal(5, attempts);
+        Assert.Equal([40, 80, 120, 160], pauses.Select(pause => pause.TotalMilliseconds));
+    }
+
+    [Fact]
+    public void TryDeleteFile_FirstTrySucceeds_NeverPauses()
+    {
+        var pauses = new List<TimeSpan>();
+
+        Assert.True(AtomicFileWriter.TryDeleteFile("any", _ => true, pauses.Add));
+        Assert.Empty(pauses);
+    }
+
     /// <summary>The test run's token (xUnit1051).</summary>
     private static CancellationToken Ct => TestContext.Current.CancellationToken;
+
+    /// <summary>Whether the file inherits nothing and grants rights to the current user only.</summary>
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    private static bool IsOwnerOnly(FileInfo file)
+    {
+        using var identity = System.Security.Principal.WindowsIdentity.GetCurrent();
+        System.Security.AccessControl.FileSecurity security = file.GetAccessControl();
+        var rules = security.GetAccessRules(true, true, typeof(System.Security.Principal.SecurityIdentifier))
+            .Cast<System.Security.AccessControl.FileSystemAccessRule>()
+            .ToList();
+        return security.AreAccessRulesProtected && rules.Count > 0 && rules.TrueForAll(rule => rule.IdentityReference.Equals(identity.User));
+    }
 
     private string PathInFolder(string name)
     {

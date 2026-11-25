@@ -25,14 +25,13 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 ## B. Open: from the review (grouped; do in this order)
 
 ### B1. Do first: small, visible, low risk
-- **9** Mnemonics `_Password` and `Co_nfirm` still target the collapsed password boxes when "Show password" is on (the F clash is fixed).
-- **12 (rest)** A dropped folder says "can't be found or opened" (should say it is a folder);
-  several dropped files silently use the first; dropping while busy shows a copy cursor; only the dashed zone is a drop target.
-- **17 / 31** Drop-zone text "Drop a file here or Browse…" and a drag-over highlight; the first-run text is repeated three times.
-- **16 / 33** File card: a long name hides extension and size; add a tooltip, the folder, the date and the exact size (plan §11.1 promised them).
-- **8 / 11 / 30** Show-password toggle moves focus off the checkbox; Enter in the first box should move to Confirm; newline-paste difference between box types.
-- **7** Cancel is not focused while working; focus after a cancel; check that Esc still cancels when the focused box has just been disabled.
-- **15** Error dialogs do not say where the log file is (`FileErrorLog.LogFilePath` exists) and have no owner window.
+- **9** **DONE (Stage 9.0):** the `_Password` and `Co_nfirm` labels now target the visible boxes while "Show password" is on (WPF; Avalonia has one box per field). The F clash was fixed earlier.
+- **12 (rest)** **DONE (Stage 9.0):** a dropped folder says "This is a folder" (PathIsFolderException); several dropped files use the first and say so (OpenFilesCommand); no copy cursor while busy. Open: only the dashed zone is a drop target.
+- **17 / 31** **DONE (Stage 9.0):** the drop zone reads "Drop a file here or Browse…", gets an accent border while a file is dragged over it, and the first-run status line adds information instead of repeating the drop zone (WPF and Avalonia).
+- **16 / 33** **DONE (Stage 9.0):** the file card has a tooltip with the full name, folder, last-modified time and exact size (`FileCardToolTip`, WPF and Avalonia). Open: the card line itself still cuts a long name (and a mixed-direction name may reorder).
+- **8 / 11 / 30** **11 and 30 DONE (Stage 9.0):** Enter in the first box moves to Confirm while a new password still needs it (`EnterMovesToConfirm`, WPF and Avalonia). Open (8): the Show-password toggle moves focus off the checkbox; newline-paste difference between box types.
+- **7** **DONE (Stage 9.0):** Cancel takes the focus while an operation runs (so Esc and Space both cancel); after a cancelled operation or a cancelled Save dialog the focus returns to the password box (WPF and Avalonia).
+- **15** **DONE (Stage 9.0):** both safety-net dialogs name the log file (`SafetyNetMessages`, `FileErrorLog.LogFilePath`); in WPF they are owned by the main window (Avalonia already was).
 - **5 (rest)** The Save suggestion for a damaged `x.enc` becomes `x.enc.enc`.
 
 ### B2. Wording and small behaviour
@@ -41,10 +40,10 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
   `.lnk` differs between Browse and drop; the Open dialog has no filter; the read-only-target message does not name the file.
 - **21** File facts (size, encrypted or not) are read once when the file is chosen.
 - **22 (rest)** Progress text: estimate includes key derivation, "0.0 MB/s", mixed culture formats, whole-percent steps.
-- **24** Show password stays ticked for the next file; the visible box keeps an undo stack (`UndoLimit=0`); no clipboard clearing.
-- **25** Success text does not say the unencrypted original is still on disk, or the folder.
+- **24** **DONE (Stage 9.0):** Show password is unticked for each new file, and the visible boxes keep no undo history (WPF `UndoLimit=0`, Avalonia `IsUndoEnabled=False`). Open: no clipboard clearing (with 38).
+- **25** **DONE (Stage 9.0):** the success text names the folder and, after encryption, says the unencrypted original is still there (`SuccessMessage`, shared by WPF and Avalonia). The CLI keeps its own shorter line.
 - **28** USABILITY.md says "lock/unlock"; "Wrong password," is blunt; one vague message covers a deleted file, a folder and a broken link.
-- **29** The error log keeps full paths and a stack trace for every wrong password; rotates once.
+- **29** **DONE (Stage 9.0):** the log replaces every path by `<path>` and writes no stack trace for an expected failure (`LogEntryFormatter`, `IErrorLog.WriteExpected`); crashes keep theirs. Open: it still rotates once (`.1`).
 - **36 / 37 / 38** Single-instance warning; offer to delete or secure the original after encryption; clear the clipboard after a manager paste.
 
 ### B3. Accessibility and layout (need a person with a screen reader and different displays)
@@ -65,12 +64,11 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 - VM: (done in Step 5.6, see A2)
   operation; a file chosen after a failure; passwords surviving a file change. `RunPrimary_ChoosesTheOperationFromTheFileName` is misnamed.
 - (`ProgressTextFormatter` tests done in Step 5.6.) Open: the Save filter (`BuildSaveFilter`). Close during an operation.
-- A "Cli is free of UI and network assemblies" rule in `SecureFile.Architecture.Tests` (the Cli project is not covered).
+- **DONE (Stage 9.0):** `Cli_DoesNotReferenceUserInterfaceOrNetworkAssemblies` in `SecureFile.Architecture.Tests` covers the Cli project.
 
 ### B6. Documents still out of line
-- PROJECT_PLAN §11.1 describes a mode switch, a "Change…" output button, a file-card tooltip and date, and "Drop a file here or Browse…"
-  that do not exist (update the plan or build them). `FileErrorLog.LogFilePath` says the dialog shows the path (it does not).
-- TESTPLAN: rows for Alt mnemonics, a dropped folder, several dropped files, Esc with no operation; section J sits before I.
+- **DONE (Stage 9.0):** PROJECT_PLAN §11.1 now describes the app as built (no mode switch, no "Change…" button; the drop wording and the file-card tooltip were built); `FileErrorLog.LogFilePath` is shown by the safety-net dialogs, as its remarks say.
+- **DONE (Stage 9.0):** TESTPLAN has rows for Alt mnemonics (B8), focus while working and after a cancelled Save (B9), Esc with no operation (B10), a dropped folder and several files (E2, E3), the drag highlight (E5), the file-card tooltip (E6) and a log without paths (H2); section I now comes before J.
 
 ## C. Open: found after the review
 
@@ -88,16 +86,17 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 | C10 | **DONE (Step 5.3):** Presentation coverage measured: 95.8 % lines, about 91 % branches (target >= 85 %) | See `docs/QUALITY_REPORT.md` |
 | C11 | CLI: ~~`tar.gz` archives built on Windows may not carry the executable bit~~ (**fixed in Stage 7**: `scripts/lib/TarGz.ps1` stores 0755); no `--quiet`/`--json` mode; no folder or multi-file support | CLI polish |
 | C12 | Original findings that stay as documented limits: no secure delete (SSDs cannot guarantee it); AES-CBC+HMAC format v1 only | See `docs/SUGGESTIONS.md` |
-| C14 | On Linux/macOS a directory symlink or case alias of the input can pass the same-file check and the rename replaces the input (Windows is safe) | Security review R2; needs a file-identity comparison (platform code) |
-| C15 | No deterministic test of `AtomicFileWriter.TryDeleteFile` retry; no Core test of the same-file branch of `ThrowIfOutputPathIsUnusable` | Security review R4 |
-| C16 | **Half done (Stage 6):** WPF manifest now states `asInvoker`. Open: Windows temp file and result inherit the folder ACL (owner-only ACL not set) | Security review R5, row 20 |
-| C17 | **Half done (Stage 7 review):** the CLI now reads `--password-stdin` as UTF-8 on every system. Open: Windows PowerShell 5.1 itself may turn non-ASCII into `?` before piping (its `$OutputEncoding`), so the file is locked with a password nobody can retype | Security review R6: document it in `docs/CLI_README.md` (not there yet) and suggest PowerShell 7 or `$OutputEncoding = [Text.UTF8Encoding]::new()` |
-| C18 | `MainViewModel` progress throttle is not testable at its 100 ms boundary (`Stopwatch` is not injectable); Stryker is not run on Presentation | Second review R4 |
+| C14 | **DONE (Stage 9.0):** the same-file check now follows every link in the input path and the output's folders and ignores case and Unicode normalisation (`FileIdentity.AreSameFile`), so a folder link or case alias of the input is refused before any work | Security review R2. Hard links need no check (the rename replaces only that name); bind mounts are not detected. Tests in `FileIdentityTests` run on the Ubuntu and macOS CI |
+| C15 | **DONE (Stage 9.0):** the retry loop takes its delete and pause as parameters, so `TryDeleteFile_FailsTwiceThenSucceeds_...`, `..._AlwaysFails_...` and `..._FirstTrySucceeds_...` count attempts and pauses exactly; the same-file branch has Core tests (`EncryptAsync_OutputIsTheInputWithDifferentCase_...`, `FileIdentityTests`) | Security review R4. `TryEmpty` failing on a healthy file stays untestable (Stryker comment kept) |
+| C16 | **DONE (Stage 9.0):** WPF manifest states `asInvoker` (Stage 6); a decrypted temp file on Windows is now created with an owner-only ACL that inherits nothing, and the rename keeps it for the result (`AtomicFileWriter.CreateOwnerOnlyWindowsFile`) | Security review R5, row 20 |
+| C17 | **DONE (Stage 9.0):** the CLI reads `--password-stdin` as UTF-8 on every system (Stage 7), and `docs/CLI_README.md` now warns that Windows PowerShell 5.1 may pipe non-ASCII as `?` and recommends `pwsh` or `$OutputEncoding = [Text.UTF8Encoding]::new()` | Security review R6. The program cannot detect the `?` itself: it is a valid character |
+| C18 | **Code part DONE (Stage 9.0):** `MainViewModel` takes an optional `TimeProvider`; tests check the 99/100 ms boundary, a second operation and a late report exactly (`Progress_At99And100Milliseconds_...`, `Progress_SecondOperation_...`, `Progress_LateReport...`). Open: Stryker on Presentation (plan 9.2) | Second review R4 |
 | C13 | Encrypt/decrypt do not overlap CPU work with the final disk flush: 100 MB takes about CPU time + disk time (1.4 s) instead of the larger of the two (about 0.9 s on the HDD) | Measured in Step 5.1; fix means a write-behind or periodic flush in the crash-safe path, so it needs its own design and tests |
 | C19 | **Half done (Stage 7 review):** a Save dialog that does not block the window (Linux portal) could let the user change the checked password or start a second operation. Fixed: inputs and actions are locked while the dialog is open (`IsChoosingOutput`) and the operation uses the password checked before it. Open: Avalonia's `ShowOverwritePrompt` may not be honoured by every Linux portal backend, so an existing file could be replaced without asking | Check on a real Linux desktop (checklist); if no prompt appears, ask in `AvaloniaFileDialogService` when the file exists |
 | C20 | Avalonia window gaps versus WPF: no Caps Lock warning (Avalonia has no API to read the Caps Lock state); Open folder opens the folder but cannot select the file (no `/select` equivalent in the launcher); the macOS app bundle has no icon (`.icns` not made) | Stage 7; documented in the window's code |
 | C21 | Avalonia window has no automated UI test on a real (non-headless) desktop and no screen-reader check; the headless test covers bindings, clipboard guard and one encrypt/decrypt round trip | Stage 7; manual checklist in `docs/NEXT_STEP_PROMPT.md` |
 | C22 | Stryker (mutation testing) has never run on the CLI's pure logic (argument parser, password and path resolvers) | Recorded in Stage 8; Core has 100 %, Presentation is C18 |
+| C23 | Stage 9.0 review, low: `FileIdentity` collapses `..` inside a link target as text (a target like `sub/../x` where `sub` is a link can be missed); WPF drop highlight may flicker when the pointer crosses a child of the drop zone; no headless test of Enter-to-Confirm in Avalonia | Contrived or cosmetic; add the Avalonia key test in 9.1 |
 
 ## D. How to burn this down
 
@@ -117,5 +116,5 @@ mutants are disabled). Answered or recorded:
 | # | Sev | Finding | Decision |
 |---|---|---|---|
 | R2 | Low | Cancelling Save reset the state even after a success | Fixed: only a `Failed` state is reset (after a success the file is cleared, so the case cannot be reached from the screen) |
-| R4 | Low | The throttle test covers the first report, skipped reports and the 100 % bypass, not the 100 ms boundary, a second operation or a late report; `Stopwatch` is not injectable and Stryker runs only on Core | **Open (C18):** inject a `TimeProvider` into `MainViewModel`, add the three tests, consider Stryker on Presentation |
+| R4 | Low | The throttle test covers the first report, skipped reports and the 100 % bypass, not the 100 ms boundary, a second operation or a late report; `Stopwatch` is not injectable and Stryker runs only on Core | **Fixed (Stage 9.0, C18):** `TimeProvider` injected, the three tests added. Open: Stryker on Presentation (plan 9.2) |
 | R5 | Info | The bar can lag a few percent during a long final flush | Accepted (cosmetic; 100 % is always shown) |
