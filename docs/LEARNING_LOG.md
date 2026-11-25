@@ -1913,3 +1913,18 @@ Gotcha: `powershell -File script.ps1 -Runtimes a,b` passes `a,b` as ONE string; 
 
 Waiting for the user: try the macOS and Linux archives on real systems (no Mac, no WSL distribution here), Native AOT size.
 Gotcha: inside `namespace SecureFile.Avalonia`, `Avalonia.Media.X` resolves to `SecureFile.Avalonia.Media`; use `global::`.
+
+## Stage 8: Stakeholder suggestions (2026-11-25)
+
+- **What:** `docs/SUGGESTIONS.md` rewritten for non-technical readers: what is built, the decisions made on purpose, and 36
+  new suggestions in four tables (security, everyday use, platforms, process), each with MoSCoW priority, S/M/L effort and
+  the backlog item it comes from, so every line can be traced.
+- **Why grep, not memory:** checking each "built" claim found three stale points in the old draft and backlog:
+  Windows Arm64 was marked "not built" but is built and never run (amber), C17 is half fixed (the CLI already reads stdin as UTF-8; only
+  Windows PowerShell 5.1's own pipe encoding is left), and C8 (no macOS/Linux window) was done in Stage 7.
+- **Argon2id honesty:** .NET has no built-in Argon2 and the task requires the built-in crypto APIs, so it moved from
+  "Should" to "Could, after the course" with that reason written next to it.
+- **Amber vs green:** anything only CI has exercised (CLI on Linux/macOS, the Avalonia windows) is marked 🟡, because a
+  headless test server is not a real desktop with a real keyboard and file dialog.
+- **One reviewer pass** caught missing backlog references (C17, C19, C21), a size figure taken from the wrong row, and
+  Stryker on the CLI tracked nowhere (now C22).
