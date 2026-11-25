@@ -36,7 +36,7 @@ public sealed class MainWindowTests : IDisposable
     }
 
     [Fact]
-    public Task WeakPassword_ColoursTheStrengthBarRed_AndStrongTurnsItGreen()
+    public Task TooShortPassword_ColoursTheStrengthBarRed_AndStrongTurnsItGreen()
     {
         return TestApplication.RunOnUiThreadAsync(StrengthColourAsync);
     }
