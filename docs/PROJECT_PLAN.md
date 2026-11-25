@@ -788,9 +788,9 @@ What does a mutation score tell us that coverage does not?
 |---|---|---|
 | 9.0 | Burn down the "fix now" backlog batch (triaged 2026-11-25 against the code): C14, C16, #29, #24, C17, #9, #17/#31, #12, #16/#33, #15, #11/#30, #7, #25, C15, C18, B5, B6. "If time": #18, #19, #21, #22, #28, #34, B3 code part. | 🟡 2026-11-25: all 17 "fix now" items done, one commit each, 646 tests green on Windows (was 608). Waiting on the user: TESTPLAN rows B8-B10, E2-E6, H2 by hand (WPF has no unit tests), and the Ubuntu/macOS CI run of `FileIdentityTests` (C14). "If time" items not started; they stay in the backlog. |
 | 9.0b | Production gaps, done after 9.1-9.3 (which started first): C24 refuse common passwords (encrypt only, all front ends), ADR-15 decision, clean-machine (Windows Sandbox) + open TESTPLAN rows + screenshots run by the user and recorded. Prompt A in `docs/NEXT_STEP_PROMPT.md`. | ⬜ |
-| 9.1 | Final review against the Definition of Done (below). | ⬜ |
-| 9.2 | `docs/FINAL_GUIDE.md` — the detailed explanation document (§14.1). | ⬜ |
-| 9.3 | Team Lead presentation (`.pptx`) (§14.2) + Q&A preparation. | ⬜ |
+| 9.1 | Final review against the Definition of Done (below). | 🟡 2026-11-25: 34 findings (none High), 31 fixed one commit each, 3 recorded (REVIEW_BACKLOG §F); Stryker Presentation and CLI logic 100 %; 711 tests green on Windows. Waiting on the user: Narrator check of the status announcement, UI-3 manual row, and the Ubuntu/macOS + FlaUI CI run of this PR. |
+| 9.2 | `docs/FINAL_GUIDE.md` — the detailed explanation document (§14.1). | ✅ 2026-11-25: written, final test counts and mutation scores in. |
+| 9.3 | Team Lead presentation (`.pptx`) (§14.2) + Q&A preparation. | 🟡 2026-11-25: `docs/SecureFile_TeamLead.pptx`, 17 slides, Q&A in the speaker notes, v2 roadmap. Waiting on the user: demo screenshots and one rehearsal. |
 | 9.4 | 2-minute demo video as a backup for the live demo. | ⬜ |
 
 ### Definition of Done (whole project)

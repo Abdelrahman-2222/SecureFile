@@ -16,6 +16,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Stage 9.0: the file card has a tooltip with the full name, folder, last-modified time and exact size (#16, #33).
 - Stage 9.0: architecture rule that the command line references no UI or network assemblies (B5); deterministic tests of
   the temp-file delete retry (C15) and of the progress throttle's 100 ms boundary through an injected `TimeProvider` (C18).
+- Stage 9.1: CLI `--` ends the options (a file may start with `-`); `encrypt --help` shows help; the WPF status line is
+  announced to screen readers when it changes.
+- Stage 9.1: Stryker configs for Presentation and the CLI's pure logic; both now at 100 % (`docs/QUALITY_REPORT.md` §9.1).
+- Stage 9.1: CI runs the WPF FlaUI end-to-end tests; every job has a 30-minute timeout.
+- Stage 9.2: `docs/FINAL_GUIDE.md`, the full explanation of design, format, threat model, ADRs and tests.
+- Stage 9.3: `docs/SecureFile_TeamLead.pptx`, the Team Lead presentation with Q&A notes and a v2 roadmap.
 
 ### Security
 
@@ -24,6 +30,12 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Stage 9.0: a decrypted file on Windows gets an owner-only ACL instead of the folder's (C16).
 - Stage 9.0: the error log no longer holds folder or file names, and expected failures (wrong password, tampered file)
   are logged without a stack trace (#29).
+- Stage 9.1: the CLI and the ViewModel use the same link-aware same-file check as Core, so an output that is the input
+  through a folder link is refused instead of crashing or replacing it.
+- Stage 9.1: an input that grows past its stated length (a device such as `/dev/zero`) stops with an error instead of
+  filling the disk.
+- Stage 9.1: `--password-stdin` is refused when nothing is piped in, so the password is never typed visibly.
+- Stage 9.1: look-alike common passwords with trailing digits or symbols (`P@ssw0rd2024`) are rated Weak.
 
 ### Fixed
 
@@ -34,6 +46,11 @@ and the project uses [Semantic Versioning](https://semver.org/).
   main window as owner (#15); the success message names the folder and says the unencrypted original is still there (#25).
 - Stage 9.0 (user feedback): a weak password is shown in amber, not red (red now means only "blocks", too short), and the
   status line says "The password is weak. You can still choose Encrypt file…" instead of a plain "Ready".
+- Stage 9.1: a second Ctrl+C ends the CLI; a failure message after a progress line starts on its own line; a repeated
+  `-o` or an option as the output name is refused.
+- Stage 9.1: the inputs and actions are locked while the Open dialog is open too, not only the Save dialog; closing the
+  WPF window just as an operation ends no longer asks twice; the Open button is re-checked with the others.
+- Stage 9.1: the pre-push hook refuses a push with uncommitted changes; the Core coverage gate measures Core's own tests.
 
 ### Changed
 
