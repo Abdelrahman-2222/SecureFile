@@ -24,3 +24,4 @@ Each one gets its own file (using [0000-template.md](0000-template.md)) when the
 | [ADR-13](0013-exception-handling.md) | Exception handling in three layers (Core throws, ViewModel handles expected, global safety nets) | Accepted | Steps 1.7, 2.6, 3.1 |
 | ADR-14 | Code organised by feature; interface next to its implementation | Accepted | All |
 | [ADR-15](0015-installer-and-code-signing.md) | Zip + SHA-256 delivery, no installer; sign with Azure Artifact Signing for a public release | **Proposed** (user decides) | Step 6.3 |
+| [ADR-16](0016-async-ui-service-interfaces.md) | Dialog and folder-opener interfaces are asynchronous (Avalonia's dialogs are) | Accepted | Steps 7.1, 7.2 |

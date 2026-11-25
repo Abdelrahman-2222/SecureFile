@@ -577,8 +577,8 @@ public sealed class MainViewModelTests
         _folderOpener.Result = false;
         await viewModel.EncryptCommand.ExecuteAsync(null);
 
-        viewModel.OpenFolderCommand.Execute(null);
-        viewModel.OpenFolderCommand.Execute(null); // twice: the hint is not appended twice
+        await viewModel.OpenFolderCommand.ExecuteAsync(null);
+        await viewModel.OpenFolderCommand.ExecuteAsync(null); // twice: the hint is not appended twice
 
         Assert.True(viewModel.IsSucceeded);
         Assert.StartsWith("Encrypted copy saved as", viewModel.StatusMessage, StringComparison.Ordinal);

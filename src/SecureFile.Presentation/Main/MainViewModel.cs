@@ -230,7 +230,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <returns>A task that completes when the details are shown.</returns>
     private async Task BrowseCoreAsync()
     {
-        string? path = _fileDialogs.ShowOpenFileDialog();
+        string? path = await _fileDialogs.ShowOpenFileDialogAsync().ConfigureAwait(true);
         if (path is not null)
         {
             await LoadFileAsync(path).ConfigureAwait(true);
@@ -392,13 +392,15 @@ public sealed partial class MainViewModel : ObservableObject
     }
 
     /// <summary>Shows the last result in the file manager; if that fails, says how to find it.</summary>
+    /// <returns>A task that completes when the file manager was asked to open.</returns>
+    /// <remarks>"File manager", not "File Explorer": the same ViewModel runs on Windows, macOS (Finder) and Linux.</remarks>
     [RelayCommand(CanExecute = nameof(CanOpenFolder))]
-    private void OpenFolder()
+    private async Task OpenFolderAsync()
     {
-        if (!_folderOpener.OpenContainingFolder(_lastOutputPath!))
+        if (!await _folderOpener.OpenContainingFolderAsync(_lastOutputPath!).ConfigureAwait(true))
         {
             // Appended to the success message (not replacing it): the operation did succeed, only showing it failed.
-            StatusMessage = $"{_lastSuccessMessage} The folder couldn't be opened. Open it yourself in File Explorer.";
+            StatusMessage = $"{_lastSuccessMessage} The folder couldn't be opened. Open it yourself in your file manager.";
         }
     }
 
@@ -544,7 +546,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <returns>A task that completes when the operation has ended.</returns>
     /// <remarks>
     /// <c>overwriteExisting: true</c> is safe because the Save dialog has already asked the user before returning an
-    /// existing file (<see cref="IFileDialogService.ShowSaveFileDialog"/> contract). The input-equals-output check
+    /// existing file (<see cref="IFileDialogService.ShowSaveFileDialogAsync"/> contract). The input-equals-output check
     /// repeats the Core rule on purpose: Core enforces it with an <see cref="ArgumentException"/> (a programming
     /// error), while here the user gets a message and can choose again.
     /// </remarks>
@@ -556,7 +558,7 @@ public sealed partial class MainViewModel : ObservableObject
         }
 
         string inputPath = SelectedFile!.FullPath;
-        string? outputPath = AskForOutputPath(encrypt, inputPath);
+        string? outputPath = await AskForOutputPathAsync(encrypt, inputPath).ConfigureAwait(true);
         if (outputPath is null)
         {
             return;
@@ -728,9 +730,9 @@ public sealed partial class MainViewModel : ObservableObject
     /// <param name="encrypt">Whether the operation is encryption (decides the suggested name).</param>
     /// <param name="inputPath">The chosen file.</param>
     /// <returns>The output path, or <see langword="null"/> when the user cancelled or chose the input.</returns>
-    private string? AskForOutputPath(bool encrypt, string inputPath)
+    private async Task<string?> AskForOutputPathAsync(bool encrypt, string inputPath)
     {
-        string? outputPath = _fileDialogs.ShowSaveFileDialog(encrypt ? SuggestEncryptedPath(inputPath) : SuggestDecryptedPath(inputPath));
+        string? outputPath = await _fileDialogs.ShowSaveFileDialogAsync(encrypt ? SuggestEncryptedPath(inputPath) : SuggestDecryptedPath(inputPath)).ConfigureAwait(true);
         if (outputPath is not null && IsSameFile(inputPath, outputPath))
         {
             State = MainViewState.Failed;

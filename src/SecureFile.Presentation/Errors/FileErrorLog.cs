@@ -1,8 +1,6 @@
 using System.Diagnostics;
-using System.IO;
-using SecureFile.Presentation.Errors;
 
-namespace SecureFile.Wpf.Services;
+namespace SecureFile.Presentation.Errors;
 
 /// <summary>
 /// Writes handled and unexpected errors to a text file under the user's local application data folder (ADR-13).
@@ -17,8 +15,12 @@ namespace SecureFile.Wpf.Services;
 /// <b>Never throws:</b> a failing log must not turn a handled error into a crash. If the file cannot be written, a
 /// warning goes to <see cref="Trace"/> and the error is dropped.
 /// </para>
+/// <para>
+/// <b>Why in Presentation:</b> it is plain file I/O with no UI framework in it, and both desktop apps (WPF and Avalonia)
+/// need exactly the same log, so it lives next to <see cref="IErrorLog"/> instead of being copied (moved here in Stage 7).
+/// </para>
 /// </remarks>
-internal sealed class FileErrorLog : IErrorLog
+public sealed class FileErrorLog : IErrorLog
 {
     /// <summary>The log is moved to <c>.1</c> and restarted above this size, so it cannot grow without bound (1 MB).</summary>
     private const long MaxLogBytes = 1_000_000;
@@ -26,7 +28,10 @@ internal sealed class FileErrorLog : IErrorLog
     private readonly object _lock = new();
     private readonly string _logFilePath;
 
-    /// <summary>Creates a log that writes to <c>%LOCALAPPDATA%\SecureFile\logs\securefile.log</c>.</summary>
+    /// <summary>
+    /// Creates a log that writes to <c>SecureFile/logs/securefile.log</c> in the user's local application data folder:
+    /// <c>%LOCALAPPDATA%</c> on Windows, <c>~/Library/Application Support</c> on macOS, <c>~/.local/share</c> on Linux.
+    /// </summary>
     public FileErrorLog()
         : this(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "SecureFile", "logs", "securefile.log"))
     {
