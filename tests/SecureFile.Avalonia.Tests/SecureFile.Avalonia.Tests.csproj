@@ -4,6 +4,9 @@
     The Avalonia window's end-to-end test (Stage 7): the real window, the real ViewModel and the real Core on a
     temporary file, rendered by Avalonia's headless platform. No screen is needed, so it runs on Windows, Ubuntu and
     macOS in CI. Only the dialogs and the folder opener are fakes (a person would have to click them).
+    testconfig.json limits code coverage (dotnet test - -coverage, used by scripts/verify.ps1) to Core and Presentation:
+    instrumenting Avalonia's XAML-compiled code crashes the coverage collector when it writes its XML report (a generated
+    name contains the control character 0x01). The gate measures Core only, so nothing it checks is lost.
   -->
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
