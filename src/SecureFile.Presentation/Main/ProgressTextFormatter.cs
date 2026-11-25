@@ -50,6 +50,12 @@ public static class ProgressTextFormatter
     private static string FormatRemaining(TimeSpan remaining)
     {
         int seconds = (int)Math.Ceiling(remaining.TotalSeconds);
+        if (seconds >= 3600)
+        {
+            // From one hour on, seconds are noise: "2 h 5 min", not "125 min 5 s" (backlog B2 item 22, part).
+            return string.Create(CultureInfo.InvariantCulture, $"{seconds / 3600} h {seconds % 3600 / 60} min");
+        }
+
         return seconds < 60
             ? string.Create(CultureInfo.InvariantCulture, $"{seconds} s")
             : string.Create(CultureInfo.InvariantCulture, $"{seconds / 60} min {seconds % 60} s");

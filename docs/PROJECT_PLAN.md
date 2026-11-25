@@ -745,12 +745,12 @@ responsive during a 4 GB encryption? Why do sizes/spacing follow a 4/8 px grid?
 
 | Step | Goal | Done when | Status |
 |---|---|---|---|
-| 5.1 | BenchmarkDotNet: throughput by file size, KDF time (p50/p95), allocations. | Numbers in `QUALITY_REPORT.md`. | ⬜ |
-| 5.2 | Visual Studio Performance Profiler (Alt+F2): startup, CPU, memory, UI thread. | Targets in §8 met or explained. | ⬜ |
-| 5.3 | VS Code Metrics, VS Code Coverage, Stryker.NET mutation score. | Targets in §8 met. | ⬜ |
-| 5.4 | Security: analyzers, NuGet audit, SonarQube for IDE, CodeQL (if GitHub), gitleaks, threat model (STRIDE). | 0 open high issues; threat table written. | ⬜ |
-| 5.5 | Write `QUALITY_REPORT.md` (numbers + screenshots). | Done. | ⬜ |
-| 5.6 | Burn down `docs/REVIEW_BACKLOG.md` (items found by the independent review and afterwards, time-boxed: sections B1, B5, C1, C3 first), then re-run an independent review. | Fixed items ticked in the backlog and report; new findings recorded. | ⬜ |
+| 5.1 | BenchmarkDotNet: throughput by file size, KDF time (p50/p95), allocations. | Numbers in `QUALITY_REPORT.md`. | 🟡 done 2026-11-24: suite + numbers in QUALITY_REPORT; KDF 363 ms, no per-chunk buffer; throughput target (70 % of a plain copy) not met and explained (backlog C13) |
+| 5.2 | Visual Studio Performance Profiler (Alt+F2): startup, CPU, memory, UI thread. | Targets in §8 met or explained. | 🟡 measured by script (startup 0.64-0.71 s warm, memory flat 28 MB, progress throttled to 10 per s); waiting on the user: cold start after reboot and the VS profiler run (checklist in QUALITY_REPORT) |
+| 5.3 | VS Code Metrics, VS Code Coverage, Stryker.NET mutation score. | Targets in §8 met. | 🟡 coverage Core 98.7 %/98.6 %, Presentation 95.8 %, mutation 100 %, complexity and MI within limits; waiting on the user: class coupling from VS Code Metrics |
+| 5.4 | Security: analyzers, NuGet audit, SonarQube for IDE, CodeQL (if GitHub), gitleaks, threat model (STRIDE). | 0 open high issues; threat table written. | 🟡 THREAT_MODEL.md (20 threats), 0 vulnerable packages, security review done (R1-R8 fixed or recorded); waiting on the user: SonarQube for IDE; CodeQL needs a public repo |
+| 5.5 | Write `QUALITY_REPORT.md` (numbers + screenshots). | Done. | 🟡 report complete with summary table and user checklist; screenshots are listed, not invented |
+| 5.6 | Burn down `docs/REVIEW_BACKLOG.md` (items found by the independent review and afterwards, time-boxed: sections B1, B5, C1, C3 first), then re-run an independent review. | Fixed items ticked in the backlog and report; new findings recorded. | 🟡 fixed B1 items 20 and 12 (part), B5 VM and formatter tests, C3 look-alikes, C1 measured, plus review R3; B1 WPF items, B3/B4, C2/C6/C8 stay listed; second review appended to the backlog |
 
 **Checkpoint 5:** What is p95 and why report it instead of only the average? Why does memory stay flat?
 What does a mutation score tell us that coverage does not?

@@ -19,7 +19,7 @@ internal static class PasswordPatterns
     private const double SequenceShare = 0.5;
 
     /// <summary>Very common passwords and password bases, compared ignoring case, with everything but letters removed.</summary>
-    private static readonly HashSet<string> CommonWords = new(StringComparer.OrdinalIgnoreCase)
+    internal static readonly HashSet<string> CommonWords = new(StringComparer.OrdinalIgnoreCase)
     {
         "password", "passw", "pass", "qwerty", "qwertyuiop", "azerty", "azertyuiop", "asdfghjkl", "zxcvbnm", "letmein",
         "welcome", "admin", "administrator", "iloveyou", "monkey", "dragon", "football", "baseball", "basketball",
@@ -75,12 +75,43 @@ internal static class PasswordPatterns
         return longest;
     }
 
-    /// <summary>Checks the letters of the password (lower case, digits and symbols removed) against the common list.</summary>
+    /// <summary>Checks the letters of the password against the common list, as typed and with look-alike characters read as letters.</summary>
     /// <param name="password">The password.</param>
-    /// <returns><see langword="true"/> for <c>Password1234</c> and <c>PASSWORD!!</c>; not for <c>P@ssword1</c> (the "@" is not a letter, so it reads "pssword").</returns>
+    /// <returns>
+    /// <see langword="true"/> for <c>Password1234</c>, <c>PASSWORD!!</c> and <c>P@ssw0rd</c> (the "@" and "0" read as "a"
+    /// and "o"); not for a word with other letters added, such as <c>Passw0rd-Tx9q</c>.
+    /// </returns>
+    /// <remarks>
+    /// Both readings are checked because a digit can be a real digit: <c>pass1234</c> must still match as "pass", which
+    /// only the plain reading gives. Backlog C3: the look-alike reading closes the best-known gap.
+    /// </remarks>
     private static bool IsCommonWord(string password)
     {
-        string letters = new(password.Where(char.IsLetter).ToArray());
-        return CommonWords.Contains(letters);
+        return CommonWords.Contains(LettersOf(password)) || CommonWords.Contains(LettersOf(ReadLookAlikes(password)));
+    }
+
+    /// <summary>Keeps only the letters of a text.</summary>
+    /// <param name="text">Any text.</param>
+    /// <returns>The letters, in order.</returns>
+    private static string LettersOf(string text)
+    {
+        return new string(text.Where(char.IsLetter).ToArray());
+    }
+
+    /// <summary>Replaces the look-alike digits and symbols people use instead of letters (<c>@</c> for a, <c>0</c> for o ...).</summary>
+    /// <param name="password">The password as typed.</param>
+    /// <returns>The password with those characters turned into the letters they imitate.</returns>
+    private static string ReadLookAlikes(string password)
+    {
+        return new string(password.Select(character => character switch
+        {
+            '@' or '4' => 'a',
+            '3' => 'e',
+            '1' => 'i',
+            '0' => 'o',
+            '$' or '5' => 's',
+            '7' => 't',
+            _ => character,
+        }).ToArray());
     }
 }

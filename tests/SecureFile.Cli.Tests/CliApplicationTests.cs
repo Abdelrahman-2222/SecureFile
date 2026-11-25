@@ -136,6 +136,33 @@ public sealed class CliApplicationTests : IDisposable
     }
 
     [Fact]
+    public async Task Encrypt_OutputIsAFolderOrInvalidName_IsReportedWithoutACrash()
+    {
+        string original = Write("a.txt", "x");
+        string folder = Path.GetDirectoryName(original)!;
+
+        RunResult toFolder = await RunAsync(["encrypt", original, "-o", folder, "--force", "--password-stdin"], stdin: Phrase + "\n");
+        RunResult missingFolder = await RunAsync(["encrypt", original, "-o", Path.Combine(folder, "missing") + Path.DirectorySeparatorChar, "--password-stdin"], stdin: Phrase + "\n");
+
+        Assert.Equal(ExitCodes.Failure, toFolder.Code);
+        Assert.Contains("--output", toFolder.Err, StringComparison.Ordinal);
+        Assert.Equal(ExitCodes.Failure, missingFolder.Code); // a trailing separator means "a folder": there is no file name
+        Assert.Contains("not a valid file name", missingFolder.Err, StringComparison.Ordinal);
+
+        // "|" is an invalid file-name character on Windows only (Linux and macOS accept it, and a NUL cannot even be passed
+        // as an argument there), so the invalid-name case runs on Windows alone.
+        if (OperatingSystem.IsWindows())
+        {
+            string badPath = Path.Combine(folder, "bad|name");
+            RunResult badName = await RunAsync(["encrypt", original, "-o", badPath, "--password-stdin"], stdin: Phrase + "\n");
+
+            Assert.Equal(ExitCodes.Failure, badName.Code);
+            Assert.Contains("not a valid file name", badName.Err, StringComparison.Ordinal);
+            Assert.False(File.Exists(badPath)); // nothing was created
+        }
+    }
+
+    [Fact]
     public async Task Encrypt_MissingFileOrFolder_IsReported()
     {
         RunResult missing = await RunAsync(["encrypt", Path.Combine(_folder, "nope.txt"), "--password-stdin"], stdin: Phrase + "\n");

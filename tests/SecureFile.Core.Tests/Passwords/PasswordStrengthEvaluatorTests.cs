@@ -23,6 +23,31 @@ public sealed class PasswordStrengthEvaluatorTests
         Assert.Equal(expected, PasswordStrengthEvaluator.Evaluate(password));
     }
 
+    // Mutation tests (Step 5.3): exactly three kinds count as variety, each kind is told apart from the others, and a
+    // kind that appears twice is still counted once.
+    [Theory]
+    [InlineData("aB3kqzvm")]    // lower (6, an even count), upper, digit: exactly three kinds
+    [InlineData("kq!zvm3x")]    // lower, symbol, digit
+    [InlineData("kqZ!vmxy")]    // lower, upper, symbol
+    public void Evaluate_ExactlyThreeKindsAndShort_IsFair(string password)
+    {
+        Assert.Equal(PasswordStrength.Fair, PasswordStrengthEvaluator.Evaluate(password));
+    }
+
+    [Fact]
+    public void Evaluate_RunCoversExactlyHalf_IsPredictable()
+    {
+        // "abcde" is 5 of 10 characters after a step that is not a run: half is already predictable.
+        Assert.Equal(PasswordStrength.Weak, PasswordStrengthEvaluator.Evaluate("kqabcdeQ7z"));
+    }
+
+    [Fact]
+    public void Evaluate_ZigZagOverFiveLetters_IsNotARun()
+    {
+        // Up four, down four, up four, down three: every step is +/-1, but the direction changes, so no run is long.
+        Assert.Equal(PasswordStrength.Strong, PasswordStrengthEvaluator.Evaluate("abcdedcbabcdedcb"));
+    }
+
     [Theory]
     [InlineData("aaaaaaaaaaaaaaaa")]    // repeat
     [InlineData("abababababababab")]    // two characters repeated
@@ -42,7 +67,7 @@ public sealed class PasswordStrengthEvaluatorTests
     }
 
     [Theory]
-    [InlineData("Passw0rd-Tx9q")]       // not caught: look-alike letters are not decoded (documented limit)
+    [InlineData("Passw0rd-Tx9q")]       // the look-alike reading gives "passwordtxq": other letters were added, so it is not the common word
     [InlineData("correct horse battery staple")]
     [InlineData("blue river coffee lamp")]
     public void Evaluate_ReasonablePassphrases_AreNotPunished(string password)

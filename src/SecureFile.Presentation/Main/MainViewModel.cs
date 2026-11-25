@@ -39,6 +39,18 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly IFolderOpener _folderOpener;
     private readonly Stopwatch _operationClock = new();
 
+    /// <summary>The shortest time between two screen updates of the progress bar (10 per second).</summary>
+    private static readonly TimeSpan MinimumProgressInterval = TimeSpan.FromMilliseconds(100);
+
+    /// <summary>The percentage at which the throttle never skips an update.</summary>
+    private const int ProgressComplete = 100;
+
+    /// <summary>When (on <see cref="_operationClock"/>) the progress was last shown; used by the throttle.</summary>
+    private TimeSpan _lastProgressUpdate;
+
+    /// <summary>The name of the file being read by Browse or drop; <see langword="null"/> when no read is running.</summary>
+    private string? _loadingFileName;
+
     /// <summary>Lets Cancel stop the running operation; <see langword="null"/> when none is running (a file read is not cancellable).</summary>
     private CancellationTokenSource? _operationCts;
 
@@ -211,7 +223,7 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanBrowse))]
     private Task BrowseAsync()
     {
-        return RunGuardedAsync(BrowseCoreAsync, clearSelectionOnFailure: true);
+        return RunGuardedAsync(BrowseCoreAsync);
     }
 
     /// <summary>The Browse work itself, without the error handling around it.</summary>
@@ -233,7 +245,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         return string.IsNullOrEmpty(path)
             ? Task.CompletedTask
-            : RunGuardedAsync(() => LoadFileAsync(path), clearSelectionOnFailure: true);
+            : RunGuardedAsync(() => LoadFileAsync(path));
     }
 
     /// <summary>
@@ -262,7 +274,9 @@ public sealed partial class MainViewModel : ObservableObject
         ClearProgress();
         State = MainViewState.Working;
         StatusMessage = "Reading the file details…";
+        _loadingFileName = Path.GetFileName(path);
         SelectedFile = await Task.Run(() => _fileDetailsReader.Read(path)).ConfigureAwait(true);
+        _loadingFileName = null;
         State = MainViewState.FileSelected;
         StatusMessage = GuidanceMessage();
     }
@@ -400,7 +414,7 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanEncrypt))]
     private Task EncryptAsync()
     {
-        return RunGuardedAsync(() => RunFileOperationAsync(encrypt: true), clearSelectionOnFailure: false);
+        return RunGuardedAsync(() => RunFileOperationAsync(encrypt: true));
     }
 
     /// <summary>Decrypts the chosen file to a location the user picks (suggested: same folder, name without <c>.enc</c>).</summary>
@@ -408,7 +422,7 @@ public sealed partial class MainViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanRunFileOperation))]
     private Task DecryptAsync()
     {
-        return RunGuardedAsync(() => RunFileOperationAsync(encrypt: false), clearSelectionOnFailure: false);
+        return RunGuardedAsync(() => RunFileOperationAsync(encrypt: false));
     }
 
     /// <summary>
@@ -440,7 +454,6 @@ public sealed partial class MainViewModel : ObservableObject
     /// Runs a user action and handles the <b>expected</b> failures (ADR-13, Layer 2): log the details, show a plain message.
     /// </summary>
     /// <param name="action">The Browse or Encrypt/Decrypt work.</param>
-    /// <param name="clearSelectionOnFailure">Whether a failure also forgets the chosen file (true for Browse, whose file could not be read).</param>
     /// <returns>A task that completes when the action has ended, successfully or with a handled failure.</returns>
     /// <remarks>
     /// Only the specific types Core and the file system document are caught. <see cref="ArgumentException"/> (a
@@ -448,7 +461,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <see cref="FileNotFoundException"/>, <see cref="DirectoryNotFoundException"/> and the like are covered by
     /// <see cref="IOException"/>.
     /// </remarks>
-    private async Task RunGuardedAsync(Func<Task> action, bool clearSelectionOnFailure)
+    private async Task RunGuardedAsync(Func<Task> action)
     {
         try
         {
@@ -460,22 +473,25 @@ public sealed partial class MainViewModel : ObservableObject
         }
         catch (SecureFileException exception)
         {
-            Fail(exception, clearSelectionOnFailure);
+            Fail(exception);
         }
         catch (IOException exception)
         {
-            Fail(exception, clearSelectionOnFailure);
+            Fail(exception);
         }
         catch (UnauthorizedAccessException exception)
         {
-            Fail(exception, clearSelectionOnFailure);
+            Fail(exception);
         }
         catch (NotSupportedException exception)
         {
-            Fail(exception, clearSelectionOnFailure);
+            Fail(exception);
         }
         finally
         {
+            // A read that ended in an exception nobody here catches must not leave its file name behind for the next failure.
+            _loadingFileName = null;
+
             // An unexpected exception (not caught above) ends the action while State is still Working; the global safety
             // net shows the dialog, and here the window is made usable again, because the operation is over.
             if (State == MainViewState.Working)
@@ -506,18 +522,21 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Logs a handled exception and shows its plain message.</summary>
     /// <param name="exception">The expected exception.</param>
-    /// <param name="clearSelection">Whether to forget the chosen file.</param>
-    private void Fail(Exception exception, bool clearSelection)
+    /// <remarks>
+    /// The chosen file is kept: a bad drop or Browse leaves the previous good selection in place (backlog B1 item 12), and
+    /// a failed operation keeps its file so the user can fix the password and try again.
+    /// </remarks>
+    private void Fail(Exception exception)
     {
         _errorLog.Write(exception);
         ClearProgress();
-        if (clearSelection)
-        {
-            SelectedFile = null;
-        }
-
         State = MainViewState.Failed;
-        StatusMessage = ErrorMessageProvider.GetMessage(exception);
+        string message = ErrorMessageProvider.GetMessage(exception);
+
+        // A failed Browse or drop leaves the previous file selected, so the message must name the file that failed
+        // (second review R1): otherwise the old card beside an unnamed error looks like the new file.
+        StatusMessage = _loadingFileName is null ? message : $"Couldn't open \"{_loadingFileName}\". {message}";
+        _loadingFileName = null;
     }
 
     /// <summary>The shared flow of Encrypt and Decrypt: ask where to save, run the operation, report the result.</summary>
@@ -592,6 +611,7 @@ public sealed partial class MainViewModel : ObservableObject
         _operationCts = cancellation;
         CancelCommand.NotifyCanExecuteChanged();
         _operationClock.Restart();
+        _lastProgressUpdate = TimeSpan.FromMilliseconds(-1) - MinimumProgressInterval; // the first report always shows
         State = MainViewState.Working;
         ProgressPercentage = 0;
         ProgressText = string.Empty;
@@ -609,13 +629,24 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Shows the percentage, speed and time left; a late report that arrives after the end is ignored.</summary>
     /// <param name="percentage">How much is done, 0–100.</param>
-    private void OnProgress(int percentage)
+    /// <remarks>
+    /// The engine reports every whole percent, which on a fast disk is about 70 per second for a 100 MB file. The screen
+    /// is updated at most once per <see cref="MinimumProgressInterval"/> (10 per second, plan §8.2); 100 % always shows.
+    /// </remarks>
+    internal void OnProgress(int percentage)
     {
         if (_operationCts is null)
         {
             return;
         }
 
+        TimeSpan now = _operationClock.Elapsed;
+        if (percentage < ProgressComplete && now - _lastProgressUpdate < MinimumProgressInterval)
+        {
+            return;
+        }
+
+        _lastProgressUpdate = now;
         ProgressPercentage = percentage;
         ProgressText = ProgressTextFormatter.Format(percentage, SelectedFile?.SizeInBytes ?? 0, _operationClock.Elapsed, CultureInfo.CurrentCulture);
     }
@@ -705,6 +736,14 @@ public sealed partial class MainViewModel : ObservableObject
             State = MainViewState.Failed;
             StatusMessage = "Choose a different name: the result can't replace the file you selected.";
             return null;
+        }
+
+        if (outputPath is null && State == MainViewState.Failed)
+        {
+            // Cancelling the Save dialog is the user's choice, not an error: an old red message from an earlier try must go
+            // (backlog B1 item 20); the password and the file stay so a second try is one click.
+            State = MainViewState.FileSelected;
+            StatusMessage = GuidanceMessage();
         }
 
         return outputPath;

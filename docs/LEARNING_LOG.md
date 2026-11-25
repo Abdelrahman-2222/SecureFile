@@ -1818,3 +1818,54 @@ output folder), then fill in the row above.
 1. Why is the peak working set a valid proof that the file is streamed? (A loading version needs at least the file size.)
 2. Why is a 4.5 GiB file used and not 4 GiB? (More than 2^32 bytes, so any 32-bit size or offset breaks.)
 3. Why do we not raise the memory limit or skip the case silently when it cannot run?
+
+---
+
+## Stage 5 — Quality: measure, harden, burn down (2026-11-24)
+
+**What was built.** A BenchmarkDotNet project (`benchmarks/SecureFile.Benchmarks`) and three scripts
+(`run-benchmarks.ps1`, `measure-startup.ps1`, `measure-memory.ps1`); `docs/QUALITY_REPORT.md` with every number and its
+verdict; `docs/THREAT_MODEL.md` (STRIDE, 20 threats); a progress throttle (10 updates per second); a CLI fix; look-alike
+reading in the strength check; and 13 new tests that took the Core mutation score from 95.34 % to 100 %.
+
+**Key decisions.**
+- *Report misses, do not hide them.* Three targets were not met (throughput vs copy, warm start, cold start) and are marked
+  "Not met" with the reason; a limit was never raised.
+- *Compare with the right baseline.* A plain `CopyTo` finishes in RAM (1.9 GB/s); the fair baseline is a copy that is
+  forced to disk like our atomic writer. Encrypt costs CPU time plus disk time because the two do not overlap (backlog C13).
+- *Do not touch the crash-safe path late.* The overlap fix needs its own design and tests, so it is recorded, not rushed.
+- *Disable a mutant only with a written reason.* 6 new `// Stryker disable` comments; the headline score says how many
+  mutants are excluded.
+- *The threat model is checked by a second pair of eyes.* The reviewer found that the table claimed "verified before any
+  plaintext is written", which the code does not do (verify-then-commit); the document was wrong, not the code.
+
+**Review table (security review, then product-owner/tester review).**
+
+| Review | Finding | Result |
+|---|---|---|
+| Security R1 | Threat table claimed the tag is checked before plaintext is written | Doc fixed (verify-then-commit) |
+| Security R2 | Same-file check is path-text only; on Linux/macOS a symlink alias can replace the input | Recorded C14 |
+| Security R3 | CLI crashed on `--output <folder>` | Fixed, test |
+| Security R4-R8 | Wrong temp-name text, ACL on Windows temp file, PowerShell 5.1 `?` password, log size, replay | Fixed or recorded C15-C17 |
+| Second review R1 | A failed drop kept the old file beside an unnamed error | Fixed: message names the file |
+| Second review R2, R3 | Cancel after success; trailing separator in `--output` | Fixed |
+| Second review R4 | Throttle boundary untestable (`Stopwatch`) | Recorded C18 |
+
+**Gate table.**
+
+| Gate | Result |
+|---|---|
+| Build, warnings as errors | 0 warnings, 0 errors |
+| Tests | 604 total, 596 passed, 8 skipped (large files, UI tests that need a desktop), 0 failed |
+| Core coverage | 98.7 % lines, 98.6 % branches |
+| Presentation coverage | 95.8 % lines |
+| Mutation score (Core) | 100 % of 379 tested mutants (207 disabled with reasons) |
+| Vulnerable packages | 0 |
+| Throughput / warm start / cold start | not met, explained |
+
+**Self-check questions.**
+1. Why is a plain file copy a misleading baseline for encryption speed, and what is a fairer one?
+2. Why does memory stay at about 28 MB for 1 MB and 1 GiB files alike?
+3. What does a mutation score of 100 % not prove, and why must a disabled mutant carry a reason?
+4. Why can a wrong password and a damaged file give the same error without weakening the design? (Hint: padding oracle.)
+5. Why was the threat table's "verified before any plaintext is written" wrong, and what is verify-then-commit?

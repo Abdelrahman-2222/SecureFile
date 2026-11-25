@@ -159,8 +159,10 @@ internal static class AtomicFileWriter
             // Stryker disable once Boolean : the caller discards the result (like TryDeleteFile's in WriteAsync); equivalent mutant
             return true;
         }
+        // Stryker disable once Block : the caller discards the result; reaching it needs SetLength to fail on a healthy file (backlog C15)
         catch (IOException)
         {
+            // Stryker disable once Boolean : same reason as the block above
             return false;
         }
     }
@@ -239,6 +241,7 @@ internal static class AtomicFileWriter
     /// </remarks>
     internal static bool TryDeleteFile(string path)
     {
+        // Stryker disable once Equality : one attempt more or fewer is only observable with a scanner that lets go at an exact moment (backlog C15)
         for (int attempt = 1; attempt <= DeleteAttempts; attempt++)
         {
             if (TryDeleteOnce(path))
@@ -246,6 +249,7 @@ internal static class AtomicFileWriter
                 return true;
             }
 
+            // Stryker disable once Equality : only skips or adds the last pause before giving up; not observable without a timed lock (backlog C15)
             if (attempt < DeleteAttempts)
             {
                 // Only on the failure path, and a few tenths of a second at most: a scanner usually lets go within that.

@@ -158,6 +158,14 @@ internal sealed class CliApplication
             return "The result can't replace the file you chose. Give a different name with --output.";
         }
 
+        // The engine rejects a folder or an invalid file name with ArgumentException, which is not an "expected failure"
+        // here (it would also hide programming errors), so these two user mistakes are caught up front (security review R3).
+        string fileName = Path.GetFileName(output);
+        if (Directory.Exists(output) || fileName.Length == 0 || fileName.AsSpan().IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        {
+            return $"\"{output}\" is a folder or not a valid file name. Use --output to choose a file name.";
+        }
+
         return File.Exists(output) && !options.Force
             ? $"\"{output}\" already exists. Use --force to replace it, or --output to choose another name."
             : null;

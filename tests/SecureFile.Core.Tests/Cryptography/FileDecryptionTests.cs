@@ -253,6 +253,7 @@ public sealed class FileDecryptionTests : IDisposable
         // Wrapped at the source (Step 1.7): one documented type for the caller, the runtime's error kept for the log.
         Assert.Equal(InvalidEncryptedFileReason.Damaged, thrown.Reason);
         Assert.IsAssignableFrom<CryptographicException>(thrown.InnerException);
+        Assert.Contains("invalid padding", thrown.Message, StringComparison.Ordinal);
         Assert.Equal([EncryptedName], FileNamesInFolder());
     }
 
