@@ -786,7 +786,7 @@ What does a mutation score tell us that coverage does not?
 
 | Step | Goal | Status |
 |---|---|---|
-| 9.0 | Burn down the "fix now" backlog batch (triaged 2026-11-25 against the code): C14, C16, #29, #24, C17, #9, #17/#31, #12, #16/#33, #15, #11/#30, #7, #25, C15, C18, B5, B6. "If time": #18, #19, #21, #22, #28, #34, B3 code part. | ⬜ |
+| 9.0 | Burn down the "fix now" backlog batch (triaged 2026-11-25 against the code): C14, C16, #29, #24, C17, #9, #17/#31, #12, #16/#33, #15, #11/#30, #7, #25, C15, C18, B5, B6. "If time": #18, #19, #21, #22, #28, #34, B3 code part. | 🟡 2026-11-25: all 17 "fix now" items done, one commit each, 646 tests green on Windows (was 608). Waiting on the user: TESTPLAN rows B8-B10, E2-E6, H2 by hand (WPF has no unit tests), and the Ubuntu/macOS CI run of `FileIdentityTests` (C14). "If time" items not started; they stay in the backlog. |
 | 9.1 | Final review against the Definition of Done (below). | ⬜ |
 | 9.2 | `docs/FINAL_GUIDE.md` — the detailed explanation document (§14.1). | ⬜ |
 | 9.3 | Team Lead presentation (`.pptx`) (§14.2) + Q&A preparation. | ⬜ |

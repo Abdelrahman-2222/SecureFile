@@ -12,12 +12,34 @@ and the project uses [Semantic Versioning](https://semver.org/).
   new suggestions with priority, effort and their backlog item. Backlog C8 and C17 updated to what Stage 7 already did;
   C22 (no mutation testing on the CLI) added.
 - Stage 9.0 hand-off: every open review and backlog item triaged against the code (plan row 9.0, `docs/NEXT_STEP_PROMPT.md`).
+- Stage 9.0: the drop zone reads "Drop a file here or Browse…" and is highlighted while a file is dragged over it (#17, #31).
+- Stage 9.0: the file card has a tooltip with the full name, folder, last-modified time and exact size (#16, #33).
+- Stage 9.0: architecture rule that the command line references no UI or network assemblies (B5); deterministic tests of
+  the temp-file delete retry (C15) and of the progress throttle's 100 ms boundary through an injected `TimeProvider` (C18).
+
+### Security
+
+- Stage 9.0: the same-file check follows folder and file links and ignores case and Unicode normalisation, so on Linux and
+  macOS an alias of the input can no longer make the final rename replace it (C14).
+- Stage 9.0: a decrypted file on Windows gets an owner-only ACL instead of the folder's (C16).
+- Stage 9.0: the error log no longer holds folder or file names, and expected failures (wrong password, tampered file)
+  are logged without a stack trace (#29).
+
+### Fixed
+
+- Stage 9.0: no undo history in the visible password boxes, and Show password resets for each new file (#24); Alt+P and
+  Alt+N reach the visible boxes (#9); a dropped folder says it is a folder, several dropped files say only the first is
+  used, no copy cursor while busy (#12); Enter in the first password box moves to Confirm, Cancel has the focus while
+  working, and the focus returns after a cancel (#11, #30, #7); the safety-net dialogs name the log file and have the
+  main window as owner (#15); the success message names the folder and says the unencrypted original is still there (#25).
 
 ### Changed
 
 - Documents brought in line with the published `v0.1.0-beta2` (README, RELEASING, CLI_README, BETA_README, SUGGESTIONS,
   plan row 7.4, backlog C8): the macOS and Linux windows were released as a **preview** for testers. The `0.1.0-beta2`
   section below, written on the release branch, is now on `main` too.
+- Stage 9.0: `docs/CLI_README.md` warns that Windows PowerShell 5.1 pipes non-ASCII passwords as `?` (C17); plan §11.1
+  and `docs/TESTPLAN.md` describe the app as built (B6).
 
 ## [0.1.0-beta2] - 2026-11-25
 
