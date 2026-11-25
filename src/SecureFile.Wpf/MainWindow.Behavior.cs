@@ -46,11 +46,22 @@ internal sealed partial class MainWindow
             MessageBoxButton.YesNo,
             MessageBoxImage.Question,
             MessageBoxResult.No);
-        if (answer == MessageBoxResult.Yes)
+        if (answer != MessageBoxResult.Yes)
         {
-            _closeWhenIdle = true;
-            _viewModel.CancelCommand.Execute(null);
+            return;
         }
+
+        // The question runs its own message loop, so the operation may have ended while it was open. Then there is
+        // nothing to cancel: close now. Waiting for "idle" would leave the window open and close it later, on the next
+        // state change, without asking (review UI-1; the Avalonia window already checks again).
+        if (!_viewModel.CancelCommand.CanExecute(null))
+        {
+            e.Cancel = false;
+            return;
+        }
+
+        _closeWhenIdle = true;
+        _viewModel.CancelCommand.Execute(null);
     }
 
     /// <summary>Reacts to a state change: finishes a pending close, or moves the focus to the next sensible control.</summary>
