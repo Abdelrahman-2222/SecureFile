@@ -63,7 +63,7 @@ checked: nothing leaves your computer.** Every suggestion below serves one of th
 |---|---|---|---|---|
 | ✅ Clearer drop zone: "Drop a file here or Browse…", a highlight while dragging, a plain message for a folder or several files (built in Stage 9.0) | People see at once what to do | Should | S | B1 (12, 17, 31) |
 | ✅ File card with folder, date, exact size and a tooltip for long names (built in Stage 9.0, as a tooltip) | Users can tell they picked the right file | Should | S | B1 (16, 33) |
-| Keyboard and focus fixes (Enter moves to Confirm, Cancel focused while working, shortcut keys with "Show password") | Keyboard users are not slowed down | Should | S | B1 (7, 8, 9, 11, 30) |
+| ✅ Keyboard and focus fixes (Enter moves to Confirm, Cancel focused while working, shortcut keys with "Show password"; built in Stage 9.0) | Keyboard users are not slowed down | Should | S | B1 (7, 8, 9, 11, 30) |
 | ✅ Error dialogs say where the log file is (built in Stage 9.0) | Faster help when something goes wrong | Should | S | B1 (15) |
 | Screen-reader announcements, high-contrast check, small screens and high scaling | Usable by everyone; needs a person with a screen reader | Should | M | B3 |
 | **Passphrase generator** ("blue river coffee lamp"), local word list, secure random, clipboard cleared after 30 s | Memorable and strong passwords | Should | S | B2 (24, 38) |

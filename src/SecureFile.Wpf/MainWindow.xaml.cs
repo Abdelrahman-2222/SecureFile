@@ -208,6 +208,10 @@ internal sealed partial class MainWindow : Window
         {
             OnStateChanged();
         }
+        else if (e.PropertyName == nameof(MainViewModel.IsChoosingOutput))
+        {
+            OnChoosingOutputChanged();
+        }
         else if (e.PropertyName == nameof(MainViewModel.SelectedFile))
         {
             // A new file (or none, after a success) starts hidden again, so the next password is never typed in plain

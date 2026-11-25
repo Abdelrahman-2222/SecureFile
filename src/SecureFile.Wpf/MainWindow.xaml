@@ -59,21 +59,13 @@
                              AutomationProperties.Name="Password"
                              MinHeight="32" FontSize="14" VerticalContentAlignment="Center"
                              IsEnabled="{Binding CanEditInputs}"
-                             MaxLength="1024" PasswordChanged="OnPasswordChanged">
-                    <PasswordBox.InputBindings>
-                        <KeyBinding Key="Return" Command="{Binding RunPrimaryCommand}" />
-                    </PasswordBox.InputBindings>
-                </PasswordBox>
+                             MaxLength="1024" PasswordChanged="OnPasswordChanged" PreviewKeyDown="OnFirstPasswordKeyDown" />
                 <TextBox x:Name="PasswordVisibleInput" AutomationProperties.AutomationId="PasswordVisibleInput"
                          AutomationProperties.Name="Password (visible)"
                          Visibility="Collapsed" UndoLimit="0"
                          MinHeight="32" FontSize="14" VerticalContentAlignment="Center"
                          IsEnabled="{Binding CanEditInputs}"
-                         MaxLength="1024" TextChanged="OnVisiblePasswordChanged">
-                    <TextBox.InputBindings>
-                        <KeyBinding Key="Return" Command="{Binding RunPrimaryCommand}" />
-                    </TextBox.InputBindings>
-                </TextBox>
+                         MaxLength="1024" TextChanged="OnVisiblePasswordChanged" PreviewKeyDown="OnFirstPasswordKeyDown" />
             </Grid>
 
             <!-- Only when a password is being chosen (encrypting): strength advice and the confirmation box. Decrypting

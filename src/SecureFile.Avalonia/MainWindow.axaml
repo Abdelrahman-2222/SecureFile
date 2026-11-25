@@ -102,11 +102,7 @@
             <TextBox x:Name="PasswordInput" Classes="password" AutomationProperties.AutomationId="PasswordInput"
                      AutomationProperties.Name="Password"
                      Text="{Binding Password}" IsEnabled="{Binding CanEditInputs}"
-                     RevealPassword="{Binding #ShowPasswordCheck.IsChecked, FallbackValue=False}">
-                <TextBox.KeyBindings>
-                    <KeyBinding Gesture="Enter" Command="{Binding RunPrimaryCommand}" />
-                </TextBox.KeyBindings>
-            </TextBox>
+                     RevealPassword="{Binding #ShowPasswordCheck.IsChecked, FallbackValue=False}" />
 
             <!-- Only when a password is being chosen (encrypting): strength advice and the confirmation box. -->
             <StackPanel IsVisible="{Binding IsEncrypting}">
@@ -167,7 +163,7 @@
                                  IsIndeterminate="{Binding IsProgressIndeterminate, Mode=OneWay}" />
                     <TextBlock AutomationProperties.AutomationId="ProgressText" Text="{Binding ProgressText}" Margin="0,8,0,0" />
                 </StackPanel>
-                <Button Grid.Column="1" AutomationProperties.AutomationId="CancelButton" AutomationProperties.Name="Cancel"
+                <Button x:Name="CancelButton" Grid.Column="1" AutomationProperties.AutomationId="CancelButton" AutomationProperties.Name="Cancel"
                         Content="Cancel" ToolTip.Tip="Cancel (Esc)" Command="{Binding CancelCommand}" Margin="16,0,0,0" />
             </Grid>
 

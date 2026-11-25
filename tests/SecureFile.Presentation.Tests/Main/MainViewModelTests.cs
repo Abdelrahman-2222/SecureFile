@@ -447,6 +447,22 @@ public sealed class MainViewModelTests
     }
 
     [Fact]
+    public async Task EnterMovesToConfirm_OnlyWhileANewPasswordStillNeedsItsConfirmation()
+    {
+        MainViewModel viewModel = await CreateWithFileAsync(InputPath);
+        viewModel.ConfirmPassword = string.Empty;
+        Assert.True(viewModel.EnterMovesToConfirm); // review items 11 and 30
+
+        viewModel.ConfirmPassword = ValidPassword;
+        Assert.False(viewModel.EnterMovesToConfirm); // both match: Enter encrypts
+
+        _detailsReader.IsEncryptedOverride = true;
+        MainViewModel decrypting = await CreateWithFileAsync(InputPath + ".enc");
+        decrypting.ConfirmPassword = string.Empty;
+        Assert.False(decrypting.EnterMovesToConfirm); // no confirmation when decrypting
+    }
+
+    [Fact]
     public void DescribeFile_GivesNameFolderDateAndExactSize()
     {
         string folder = Path.Combine(Path.GetTempPath(), "Taxes");

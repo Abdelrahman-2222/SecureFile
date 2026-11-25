@@ -47,6 +47,7 @@ internal sealed partial class MainWindow : Window
         AboutButton.Click += (_, _) => ShowAbout();
         KeyDown += OnWindowKeyDown;
         Opened += (_, _) => BrowseButton.Focus(); // a keyboard user starts on the first action
+        PasswordInput.KeyDown += OnFirstPasswordKeyDown;
         foreach (TextBox box in new[] { PasswordInput, ConfirmInput })
         {
             box.CopyingToClipboard += BlockClipboard;
@@ -147,6 +148,9 @@ internal sealed partial class MainWindow : Window
                 break;
             case nameof(MainViewModel.State):
                 OnStateChanged();
+                break;
+            case nameof(MainViewModel.IsChoosingOutput):
+                OnChoosingOutputChanged();
                 break;
         }
     }
