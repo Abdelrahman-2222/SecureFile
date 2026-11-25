@@ -19,7 +19,7 @@ yourself, see "Build it" below).
 |---|---|
 | Windows 10 or 11, normal PC (64-bit) | `SecureFile-<version>-win-x64.zip` |
 | Windows 11 on an ARM PC (Surface Pro X, Copilot+ PC) | `SecureFile-<version>-win-arm64.zip` (built but not yet tried on real ARM hardware) |
-| Command line (Windows, Linux, macOS) | `securefile-<version>-<system>.zip` or `.tar.gz`, see [docs/CLI_README.md](docs/CLI_README.md) |
+| Command line (Windows, Linux, macOS) | `securefile-cli-<version>-<system>.zip` or `.tar.gz`, see [docs/CLI_README.md](docs/CLI_README.md) |
 
 ## Verify the download (SHA-256)
 

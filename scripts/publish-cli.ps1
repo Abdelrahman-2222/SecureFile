@@ -30,7 +30,8 @@ New-Item -ItemType Directory -Path $root | Out-Null
 $sums = @()
 foreach ($rid in $Runtimes) {
     $targetIsWindows = $rid.StartsWith('win')
-    $name = "securefile-$version-$Label-$rid"
+    # "-cli-" keeps the name different from the window's SecureFile-...zip: GitHub treats asset names as case-insensitive.
+    $name = "securefile-cli-$version-$Label-$rid"
     $folder = Join-Path $root $name
 
     # Self-contained + single file + trimmed: a small download that needs nothing installed.

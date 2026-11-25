@@ -18,6 +18,9 @@ and the project uses [Semantic Versioning](https://semver.org/).
   zip + SHA-256, no installer, Azure Artifact Signing for a public release. Status **Proposed**: the user decides.
 - Step 6.4: user-facing `README.md` (what it is, which download, verify the SHA-256, SmartScreen note, limits, forgotten
   password = lost). Screenshots are **not included**: `docs/SCREENSHOTS_NEEDED.md` lists them for the author to supply.
+- Step 6.5: `docs/RELEASING.md` has the release-candidate procedure (nothing is published or uploaded without asking). CLI
+  archives are now named `securefile-cli-<v>-<label>-<rid>` so they cannot clash with the window's `SecureFile-...` zip on
+  GitHub (asset names are case-insensitive).
 - Stage 5 quality work: BenchmarkDotNet suite (`benchmarks/SecureFile.Benchmarks`, `scripts/run-benchmarks.ps1`),
   `scripts/measure-startup.ps1` and `scripts/measure-memory.ps1`, `docs/QUALITY_REPORT.md` with the raw numbers under
   `docs/quality/`, and `docs/THREAT_MODEL.md` (STRIDE, 20 threats) with the independent security review; `SECURITY.md`

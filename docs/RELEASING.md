@@ -22,14 +22,35 @@ pwsh scripts/publish-cli.ps1                   # command line for win-x64, win-a
 
 | System | Window | Command line |
 |---|---|---|
-| Windows 10/11 x64 | `SecureFile-<v>-<label>-win-x64.zip` | `securefile-<v>-<label>-win-x64.zip` |
-| Windows 11 ARM64 | `SecureFile-<v>-<label>-win-arm64.zip` (**built, never run**) | `securefile-<v>-<label>-win-arm64.zip` (**built, never run**) |
+| Windows 10/11 x64 | `SecureFile-<v>-<label>-win-x64.zip` | `securefile-cli-<v>-<label>-win-x64.zip` |
+| Windows 11 ARM64 | `SecureFile-<v>-<label>-win-arm64.zip` (**built, never run**) | `securefile-cli-<v>-<label>-win-arm64.zip` (**built, never run**) |
 | Linux x64 and arm64 | not built yet (Avalonia, plan Step 7.1) | built, **held back from releases** until the window exists (Steps 7.1 and 7.2) |
 | macOS Apple silicon and Intel | not built yet (Avalonia, plan Step 7.1) | built, **held back from releases** until the window exists (Steps 7.1 and 7.2) |
 
-Each script prints SHA-256 hashes (`artifacts/cli/SHA256SUMS.txt`, `artifacts/beta/*.sha256`). Send them with the files.
+Each script prints SHA-256 hashes (`artifacts/cli/SHA256SUMS.txt`, `artifacts/beta/SHA256SUMS.txt`, `artifacts/beta/*.sha256`).
+Send them with the files.
 None of the programs is code-signed or notarized yet, so Windows SmartScreen and macOS Gatekeeper warn; the READMEs inside
-the archives explain the one-time steps.
+the archives explain the one-time steps. The signing decision is ADR-15 (proposed, waiting for the user).
+
+Run the scripts from **PowerShell** (not Git Bash: Git's `tar` cannot read `D:` paths) and, if the execution policy blocks
+unsigned scripts, as `powershell -ExecutionPolicy Bypass -File scripts/publish-beta.ps1`. A virus scanner that kills
+programs writing many large files can break a build or a test run: exclude the repository folder instead of turning it off.
+
+**win-arm64 is built but has never been run** (there is no ARM machine here; the exe header was checked as ARM64). Say so in
+every release note until someone has started it on a real ARM PC. Sizes of the last build (0.1.0-beta1): WPF zip 56.2 MB
+x64 and 52.0 MB arm64; CLI zips 5.3 to 5.9 MB each.
+
+## Release candidate (what to do for `-rc1`)
+
+1. All checks below are done on the commit to be released; the Windows Sandbox test (`docs/SANDBOX_TEST.md`) is run on the
+   x64 zip and its table is filled in.
+2. `pwsh scripts/publish-beta.ps1 -Label rc1` and `pwsh scripts/publish-cli.ps1 -Label rc1` (the label is only in the file
+   names; the version comes from `Directory.Build.props`).
+3. Collect `artifacts/beta/SHA256SUMS.txt` and `artifacts/cli/SHA256SUMS.txt`, check one zip by hand with `Get-FileHash`,
+   and put the hashes in the release notes.
+4. **Ask the owner before anything outward-facing**: pushing the branch or tag, creating the GitHub Release, uploading the
+   zips, sending links to testers. The scripts never upload anything. `artifacts/` is git-ignored; never commit a zip.
+5. Attach to the release only what is ready (today: the Windows zips; macOS and Linux stay held back, see above).
 
 ## Checklist before cutting a release branch
 
