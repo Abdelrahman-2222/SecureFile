@@ -11,11 +11,11 @@
 .PARAMETER Label
   The pre-release label in the file names (default: beta1). The version number comes from Directory.Build.props.
 .PARAMETER Runtimes
-  The .NET runtime identifiers to build (default: win-x64, linux-x64, linux-arm64, osx-arm64, osx-x64).
+  The .NET runtime identifiers to build (default: win-x64, win-arm64, linux-x64, linux-arm64, osx-arm64, osx-x64).
 #>
 param(
     [string]$Label = 'beta1',
-    [string[]]$Runtimes = @('win-x64', 'linux-x64', 'linux-arm64', 'osx-arm64', 'osx-x64')
+    [string[]]$Runtimes = @('win-x64', 'win-arm64', 'linux-x64', 'linux-arm64', 'osx-arm64', 'osx-x64')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -30,7 +30,8 @@ New-Item -ItemType Directory -Path $root | Out-Null
 $sums = @()
 foreach ($rid in $Runtimes) {
     $targetIsWindows = $rid.StartsWith('win')
-    $name = "securefile-$version-$Label-$rid"
+    # "-cli-" keeps the name different from the window's SecureFile-...zip: GitHub treats asset names as case-insensitive.
+    $name = "securefile-cli-$version-$Label-$rid"
     $folder = Join-Path $root $name
 
     # Self-contained + single file + trimmed: a small download that needs nothing installed.

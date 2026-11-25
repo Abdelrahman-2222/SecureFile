@@ -16,11 +16,11 @@ it works completely on your computer and needs no internet. There is nothing to 
 
 ## Get it running
 
-**Linux** (`securefile-…-linux-x64.tar.gz` for most PCs, `linux-arm64` for Raspberry Pi and ARM servers)
+**Linux** (`securefile-cli-…-linux-x64.tar.gz` for most PCs, `linux-arm64` for Raspberry Pi and ARM servers)
 
 ```bash
-tar -xzf securefile-0.1.0-beta1-linux-x64.tar.gz
-cd securefile-0.1.0-beta1-linux-x64
+tar -xzf securefile-cli-0.1.0-beta1-linux-x64.tar.gz
+cd securefile-cli-0.1.0-beta1-linux-x64
 chmod +x securefile            # one time: mark it as a program
 ./securefile --version
 ```
@@ -28,8 +28,8 @@ chmod +x securefile            # one time: mark it as a program
 **macOS** (`osx-arm64` for Apple-silicon Macs M1 and newer, `osx-x64` for Intel Macs)
 
 ```bash
-tar -xzf securefile-0.1.0-beta1-osx-arm64.tar.gz
-cd securefile-0.1.0-beta1-osx-arm64
+tar -xzf securefile-cli-0.1.0-beta1-osx-arm64.tar.gz
+cd securefile-cli-0.1.0-beta1-osx-arm64
 chmod +x securefile
 xattr -d com.apple.quarantine securefile   # one time: tell macOS you trust this download
 ./securefile --version
@@ -38,7 +38,7 @@ xattr -d com.apple.quarantine securefile   # one time: tell macOS you trust this
 If macOS still says it "cannot be opened because the developer cannot be verified", open **System Settings → Privacy &
 Security** and choose **Open Anyway** next to the message, then run it again.
 
-**Windows** (`win-x64`): unzip, open PowerShell in the folder, run `.\securefile.exe --version`. If SmartScreen says
+**Windows** (`win-x64`; `win-arm64` for ARM PCs such as Surface Pro X, built but not yet run on real ARM hardware): unzip, open PowerShell in the folder, run `.\securefile.exe --version`. If SmartScreen says
 "Windows protected your PC", choose **More info → Run anyway**.
 
 **Check the download** (any system): compare the archive's SHA-256 with the line in `SHA256SUMS.txt`:

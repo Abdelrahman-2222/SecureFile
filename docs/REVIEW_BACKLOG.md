@@ -90,7 +90,7 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 | C12 | Original findings that stay as documented limits: no secure delete (SSDs cannot guarantee it); AES-CBC+HMAC format v1 only | See `docs/SUGGESTIONS.md` |
 | C14 | On Linux/macOS a directory symlink or case alias of the input can pass the same-file check and the rename replaces the input (Windows is safe) | Security review R2; needs a file-identity comparison (platform code) |
 | C15 | No deterministic test of `AtomicFileWriter.TryDeleteFile` retry; no Core test of the same-file branch of `ThrowIfOutputPathIsUnusable` | Security review R4 |
-| C16 | Windows temp file and result inherit the folder ACL; manifest does not state `requestedExecutionLevel asInvoker` | Security review R5, row 20 |
+| C16 | **Half done (Stage 6):** WPF manifest now states `asInvoker`. Open: Windows temp file and result inherit the folder ACL (owner-only ACL not set) | Security review R5, row 20 |
 | C17 | `--password-stdin` from Windows PowerShell 5.1 turns non-ASCII into `?`; the file is locked with a password nobody can retype | Security review R6: read stdin as UTF-8 bytes and document |
 | C18 | `MainViewModel` progress throttle is not testable at its 100 ms boundary (`Stopwatch` is not injectable); Stryker is not run on Presentation | Second review R4 |
 | C13 | Encrypt/decrypt do not overlap CPU work with the final disk flush: 100 MB takes about CPU time + disk time (1.4 s) instead of the larger of the two (about 0.9 s on the HDD) | Measured in Step 5.1; fix means a write-behind or periodic flush in the crash-safe path, so it needs its own design and tests |

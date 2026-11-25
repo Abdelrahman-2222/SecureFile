@@ -1869,3 +1869,25 @@ reading in the strength check; and 13 new tests that took the Core mutation scor
 3. What does a mutation score of 100 % not prove, and why must a disabled mutant carry a reason?
 4. Why can a wrong password and a damaged file give the same error without weakening the design? (Hint: padding oracle.)
 5. Why was the threat table's "verified before any plaintext is written" wrong, and what is verify-then-commit?
+
+---
+
+## Stage 6: Publishing (2026-11-25)
+
+What was built: the publish scripts now build `win-arm64` next to `win-x64` (WPF and CLI), a Windows Sandbox config and click list,
+ADR-15 (installer and signing, **proposed**), a user-facing README, and a release-candidate procedure in `docs/RELEASING.md`.
+
+Why these choices:
+- **win-arm64 is cross-compiled**: .NET can target another CPU from an x64 PC because a self-contained build only needs the
+  matching runtime pack. Building proves it compiles and links (the exe header says ARM64, machine type 0xAA64); it does **not**
+  prove it runs. The docs say "built, never run" everywhere.
+- **No installer (proposed)**: a portable zip needs no admin rights and leaves nothing behind. An installer is also flagged by
+  SmartScreen unless signed, so it adds work without removing the warning. Signing costs money and identity checks: the user decides.
+- **Sandbox**: a throw-away clean Windows is the closest thing to a friend's PC. It is not enabled here (admin and reboot), so the
+  click list in `docs/SANDBOX_TEST.md` is a user task.
+- **CLI archive names** now start `securefile-cli-` because GitHub compares asset names without case, and `SecureFile-...zip`
+  would collide with `securefile-...zip`.
+- **`asInvoker`** in the WPF manifest states that the app never asks for administrator rights (half of backlog C16).
+
+Waiting for the user: run the Sandbox test, decide ADR-15, supply screenshots (`docs/SCREENSHOTS_NEEDED.md`), nothing published.
+Gotcha: `powershell -File script.ps1 -Runtimes a,b` passes `a,b` as ONE string; use one runtime, or call it from inside PowerShell.

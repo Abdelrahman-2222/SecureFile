@@ -759,10 +759,11 @@ What does a mutation score tell us that coverage does not?
 
 | Step | Goal | Done when | Status |
 |---|---|---|---|
-| 6.1 | Publish profiles: `win-x64`, `win-arm64`, self-contained, single-file, ReadyToRun. | One `.exe` per architecture. | 🟡 `win-x64` self-contained single-file beta zip via `scripts/publish-beta.ps1` (2026-11-24); `win-arm64`, installer and signing not done |
-| 6.2 | Test in **Windows Sandbox** (clean Windows, nothing installed) with a `.wsb` config. | Full flow works on first run. | ⬜ |
-| 6.3 | Decide on installer (Velopack/MSIX) and code signing (Azure Artifact Signing). | Decision recorded (ADR). | ⬜ |
-| 6.4 | `README.md` "Try it in 60 seconds" with screenshots/GIF; SHA-256 checksums; release zip. | A non-technical person can follow it. | 🟡 `docs/BETA_README.md` for friends done; the project README "Try it in 60 seconds" and screenshots still open |
+| 6.1 | Publish profiles: `win-x64`, `win-arm64`, self-contained, single-file, ReadyToRun. | One `.exe` per architecture. | 🟡 win-x64 and win-arm64 zips (WPF and CLI) build via the publish scripts (2026-11-25). **win-arm64 never run** (no ARM machine). ReadyToRun not used (it would add size; start time is measured in QUALITY_REPORT) |
+| 6.2 | Test in **Windows Sandbox** (clean Windows, nothing installed) with a `.wsb` config. | Full flow works on first run. | 🟡 `scripts/sandbox-test.wsb` + `docs/SANDBOX_TEST.md` written; **not run**, Windows Sandbox is not enabled (admin + reboot): user task |
+| 6.3 | Decide on installer (Velopack/MSIX) and code signing (Azure Artifact Signing). | Decision recorded (ADR). | 🟡 ADR-15 written and **Proposed** (zip + SHA-256, no installer, Azure Artifact Signing for a public release); the user decides |
+| 6.4 | `README.md` "Try it in 60 seconds" with screenshots/GIF; SHA-256 checksums; release zip. | A non-technical person can follow it. | 🟡 README written (60 seconds, SHA-256, SmartScreen, limits); **screenshots missing**, listed in `docs/SCREENSHOTS_NEEDED.md` for the user |
+| 6.5 | Release candidate: publish scripts produce the archives, `docs/RELEASING.md` has the procedure. | Archives and hashes build; nothing uploaded without asking. | 🟡 scripts and procedure done (2026-11-25); no release published; the Sandbox run and the signing decision come first |
 
 ### Stage 7 — Bonus: cross-platform (Phase 5, presented in Phase 6) · ~1 day after the required track
 

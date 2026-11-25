@@ -8,6 +8,21 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `.gitguardian.yaml`: GitGuardian flagged the made-up passwords in `PasswordPatternsTests.cs` as "Generic Password"; that one
+  test file is now ignored by path (all detectors stay on). The old incidents are dismissed on the GitGuardian dashboard as "test credential".
+- Stage 6 (publishing), step 6.1: `scripts/publish-beta.ps1` and `scripts/publish-cli.ps1` also build `win-arm64`
+  (cross-compiled on x64; PE header checked as ARM64; **never run**, there is no ARM machine here). Sizes of this
+  build: WPF zip x64 56.2 MB / arm64 52.0 MB (exe 133.6 / 144.0 MB); CLI zip 5.6 / 5.5 MB (exe 12.6 / 13.0 MB).
+  `publish-beta.ps1` now writes a `SHA256SUMS.txt` next to the zips.
+- Step 6.2: `scripts/sandbox-test.wsb` (read-only mapped folder, no network) and `docs/SANDBOX_TEST.md` (setup and click
+  list). **Not run**: Windows Sandbox is not enabled on the development PC (needs admin and a reboot); waiting for the user.
+- Step 6.3: `docs/adr/0015-installer-and-code-signing.md` compares zip, MSIX, Inno/WiX and the signing options; proposes
+  zip + SHA-256, no installer, Azure Artifact Signing for a public release. Status **Proposed**: the user decides.
+- Step 6.4: user-facing `README.md` (what it is, which download, verify the SHA-256, SmartScreen note, limits, forgotten
+  password = lost). Screenshots are **not included**: `docs/SCREENSHOTS_NEEDED.md` lists them for the author to supply.
+- Step 6.5: `docs/RELEASING.md` has the release-candidate procedure (nothing is published or uploaded without asking). CLI
+  archives are now named `securefile-cli-<v>-<label>-<rid>` so they cannot clash with the window's `SecureFile-...` zip on
+  GitHub (asset names are case-insensitive).
 - Stage 5 quality work: BenchmarkDotNet suite (`benchmarks/SecureFile.Benchmarks`, `scripts/run-benchmarks.ps1`),
   `scripts/measure-startup.ps1` and `scripts/measure-memory.ps1`, `docs/QUALITY_REPORT.md` with the raw numbers under
   `docs/quality/`, and `docs/THREAT_MODEL.md` (STRIDE, 20 threats) with the independent security review; `SECURITY.md`
