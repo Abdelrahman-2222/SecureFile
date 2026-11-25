@@ -1,8 +1,8 @@
 # Next step: copy-paste prompt for a new chat (Phase 6, Stage 8: stakeholder suggestions)
 
 Last finished (2026-11-25): Stage 7 (Avalonia windows for macOS and Linux), plan rows 7.1-7.5, on branch
-`feature/stage-7-avalonia` (PR against `main`). 7.1 and 7.2 are done; 7.3 is amber until the PR's CI is green on all three
-systems; 7.4 and 7.5 are amber because nobody has run the macOS/Linux windows on a real system and Native AOT was not
+`feature/stage-7-avalonia` (PR #6 against `main`). 7.1, 7.2 and 7.3 are done (PR CI green on Windows, Ubuntu and macOS,
+including the cross-OS golden files); 7.4 and 7.5 are amber because nobody has run the macOS/Linux windows on a real system and Native AOT was not
 measured. See `docs/RELEASING.md` (held back), `docs/QUALITY_REPORT.md` §7.5, `docs/DESKTOP_README.md`, ADR-16.
 
 ## Things only the user can do (Stage 7)
@@ -16,7 +16,7 @@ measured. See `docs/RELEASING.md` (held back), `docs/QUALITY_REPORT.md` §7.5, `
 - [ ] **Linux desktop (Ubuntu 24.04 or similar; or WSL: `wsl --install -d Ubuntu`, then WSLg shows windows):** same list
   with `linux-x64`; also note whether the Save dialog keeps the main window blocked (backlog C19) and whether the
   replace prompt appears (GTK or portal).
-- [ ] Mark plan rows 7.3 (after CI is green), 7.4 and 7.5 green or record what failed; then decide whether macOS/Linux go
+- [ ] Mark plan rows 7.4 and 7.5 green or record what failed; then decide whether macOS/Linux go
   into a release (`docs/RELEASING.md`).
 - [ ] Optional: Native AOT size (`docs/QUALITY_REPORT.md`, "Things only the user can do").
 - [ ] Still open from Stage 6: Sandbox run (`docs/SANDBOX_TEST.md`), ADR-15 decision, screenshots, any GitHub release.
