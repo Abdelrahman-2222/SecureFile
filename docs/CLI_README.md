@@ -4,8 +4,9 @@ Locks a file with a password and unlocks it again, on **Windows, macOS and Linux
 SecureFile Windows app (AES-256 with an integrity check), so a file locked on one system opens on another. Nothing is uploaded:
 it works completely on your computer and needs no internet. There is nothing to install; the program is one file.
 
-**This is an early test version. Please read the safety notes first.** Public releases so far attach only the Windows
-build; the Linux and macOS builds are made with `scripts/publish-cli.ps1` and have only been run by the automated tests.
+**This is an early test version. Please read the safety notes first.** Since `v0.1.0-beta3` the release attaches
+the command line for Windows, Linux (x64, arm64) and macOS (Apple chip, Intel). The Linux and macOS ones are a **preview**:
+the automated tests run them on Ubuntu and macOS in CI, but no person has used them on those systems yet.
 
 ## Safety notes
 

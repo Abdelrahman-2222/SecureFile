@@ -81,7 +81,7 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 | C5 | The 4.5 GiB large-file run (T-27) is blocked: the antivirus kills the test program | Only 1 GiB is measured (96 / 100 MB/s, 46 MB peak) |
 | C6 | `docs/TESTPLAN.md` (A to J) has not been run by a person on the current build; the usability check with friends (`docs/USABILITY.md`) has not happened | Plan Steps 4.3 and 4.4 |
 | C7 | Programs are not code-signed or notarized | SmartScreen and Gatekeeper warnings; plan Step 6.3 |
-| C8 | **Built (Stage 7):** macOS and Linux have an Avalonia window, tested headless in CI; not yet run on a real Mac or Linux desktop | Attached to `v0.1.0-beta2` as a **preview for testers**; the label stays until the real-system check (C21, plan 7.4) |
+| C8 | **Built (Stage 7):** macOS and Linux have an Avalonia window, tested headless in CI; not yet run on a real Mac or Linux desktop | Attached to `v0.1.0-beta2` and `v0.1.0-beta3` (beta3 adds the macOS/Linux command line) as a **preview for testers**; the label stays until the real-system check (C21, plan 7.4) |
 | C9 | GitHub branch and tag protection is unavailable on a private free repository | The release branch can be deleted on the website; make the repository public or upgrade the plan (see `docs/RELEASING.md`) |
 | C10 | **DONE (Step 5.3):** Presentation coverage measured: 95.8 % lines, about 91 % branches (target >= 85 %) | See `docs/QUALITY_REPORT.md` |
 | C11 | CLI: ~~`tar.gz` archives built on Windows may not carry the executable bit~~ (**fixed in Stage 7**: `scripts/lib/TarGz.ps1` stores 0755); no `--quiet`/`--json` mode; no folder or multi-file support | CLI polish |
@@ -153,3 +153,9 @@ touched, HKDF key split, bounded iteration count, wiped key buffers) was confirm
 | CI-6 | Low | No job timeouts (6 h default) | **Fixed:** 30 minutes per job |
 | CI-7 | Nit | A failed format check did not say which file | **Fixed** |
 | DOC-1..7 | Med/Low | TESTPLAN A15 said red for Weak; A19-A22 on one line; ADR-06 named CryptoStream; ADR files promise; beta2 ARM zip; Enter key; README "every change" | **Fixed**, one commit per document |
+
+### F2. Found after the final review (user report, 2026-11-25)
+
+| Id | Severity | Finding | Decision |
+|---|---|---|---|
+| USR-1 | High | WPF: every keystroke rewrote all four password boxes, including the `PasswordBox` being typed in, which moves its caret to the start; after leaving the box and clicking back, new characters went in front, hidden behind the dots. Present since `v0.1.0-beta1`; Avalonia and the CLI were not affected. | **Fixed** before `v0.1.0-beta3`: only a box whose text differs is written. FlaUI regression test `HiddenPassword_TypingAfterLeavingAndClickingBackAtTheEnd_AddsToTheEnd` failed before the fix. Lesson: the WPF unit-test gap (no unit tests by design) let it through; the UI suite now covers typing, not only `SetValue`. |

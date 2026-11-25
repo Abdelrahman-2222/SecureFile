@@ -23,7 +23,7 @@ checked: nothing leaves your computer.** Every suggestion below serves one of th
 | Password rules done right: length (8+), confirm box, strength bar, Caps Lock warning (Windows), copy blocked | Fewer lost files and weak passwords | ✅ |
 | **Windows app** (the required deliverable), as a single program with a published checksum | Nothing to install; the download can be verified | ✅ |
 | **Command-line version** (encrypt / decrypt, hidden password typing, password from a pipe) for Windows, Linux and macOS | Automation and power users; same engine | ✅ Windows · 🟡 Linux/macOS run only by the automated tests |
-| **macOS and Linux windows** (bonus), the same screen logic as Windows | Same tool for every team member; proves the layers are clean | 🟡 automated tests pass on all three systems; released as a **preview** in 0.1.0-beta2; nobody has reported using them on a real Mac or Linux desktop yet |
+| **macOS and Linux windows** (bonus), the same screen logic as Windows | Same tool for every team member; proves the layers are clean | 🟡 automated tests pass on all three systems; released as a **preview** in 0.1.0-beta2 and 0.1.0-beta3 (beta3 adds their command line); nobody has reported using them on a real Mac or Linux desktop yet |
 | **Cross-system files**: every build server encrypts a sample, every other one decrypts it | A file made on Windows opens on a Mac and on Linux, proven on each change | ✅ |
 | **Size comparison**: Windows app 134 MB versus the trimmed macOS/Linux window 38 MB (35-40 MB on Linux and macOS) (downloads 58 versus 16 MB) | An informed choice for smaller downloads | ✅ (Native AOT size not measured) |
 | Windows on ARM (Snapdragon) build | Newer laptops | 🟡 built, never run on an ARM machine |

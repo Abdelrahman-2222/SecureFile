@@ -4,7 +4,7 @@ The one document to read before defending the project. It explains what the app 
 important decision was made (with the alternatives), how it is tested and measured, and what it does **not** do.
 Each section points to the file where the detail lives, so any line can be traced back to code or a test.
 
-Version: 0.1.0-beta2 + Stage 9.1 fixes · Written 2026-11-25 (Stage 9.2) · Plan §14.1
+Version: 0.1.0-beta3 · Written 2026-11-25 (Stage 9.2), updated for the beta3 release · Plan §14.1
 
 ---
 
@@ -51,8 +51,8 @@ not in the repository yet.
 
 ## 2. How to run it and how to build it
 
-**End user (Windows):** download `SecureFile-0.1.0-beta2-win-x64.zip` from the GitHub release, check its SHA-256 against
-the `.sha256` file (`Get-FileHash`), unzip, double-click `SecureFile.exe`. Nothing to install (self-contained single
+**End user (Windows):** download `SecureFile-0.1.0-beta3-win-x64.zip` from the GitHub release, check its SHA-256 against
+the line in `SHA256SUMS.txt` (`Get-FileHash`), unzip, double-click `SecureFile.exe`. Nothing to install (self-contained single
 file, ADR-11). The binaries are not code-signed, so SmartScreen warns once ("More info" → "Run anyway"); see
 `docs/BETA_README.md`. Command line: `docs/CLI_README.md`.
 
@@ -323,8 +323,8 @@ Full STRIDE table (20 threats, each with mitigation, test and residual risk): `d
 | `SecureFile.Integration.Tests` | 10 | Real temp folders through the real engine and ViewModel (file-system scenarios, a ViewModel round trip); large files with flat memory (1 GiB and 4.5 GiB, opt-in). |
 | `SecureFile.Architecture.Tests` | 6 | The dependency rule (Core, Presentation and CLI reference no UI framework and no network assembly), Core uses no UI namespace, Core's classes are sealed. |
 | `SecureFile.Avalonia.Tests` | 3 | The Avalonia window headless: end-to-end encrypt/decrypt, password boxes hide the text and refuse copy, strength colours. |
-| `SecureFile.Wpf.UiTests` | 4 | FlaUI drives the real WPF exe: encrypt then decrypt restores the bytes, wrong password message, accessible names, About. Run in CI (Stage 9.1) and locally with `SECUREFILE_UI_TESTS=1`. |
-| **Total** | **711** | 9 are skipped on a normal Windows run: 4 UI tests need `SECUREFILE_UI_TESTS=1`, 2 large-file runs are opt-in, 3 run only on Linux or macOS (CI). |
+| `SecureFile.Wpf.UiTests` | 5 | FlaUI drives the real WPF exe: encrypt then decrypt restores the bytes, wrong password message, accessible names, About, and typing in the hidden password box keeps the caret (regression test for a late user report). Run in CI (Stage 9.1) and locally with `SECUREFILE_UI_TESTS=1`. |
+| **Total** | **712** | 10 are skipped on a normal Windows run: 5 UI tests need `SECUREFILE_UI_TESTS=1`, 2 large-file runs are opt-in, 3 run only on Linux or macOS (CI). |
 
 Requirements traceability (plan §15): every R1–R6 and D1–D7 has at least one passing test (T-xx IDs in the plan's §9
 catalog). Cross-OS golden files: CI encrypts a sample on Windows, Ubuntu and macOS and decrypts every one on every system.
@@ -370,7 +370,7 @@ SHA-256; CI on three systems; a final review with every finding fixed or recorde
 
 - No code signing (ADR-15 proposed; costs money) → SmartScreen/Gatekeeper warnings.
 - macOS/Linux windows and CLI were run only by CI, never by a person on a real machine (preview label).
-- Windows on ARM build exists but was never run on ARM hardware (held back from beta2).
+- Windows on ARM build exists but was never run on ARM hardware (still held back in beta3).
 - Throughput and warm-start targets missed (explained above).
 - Not yet done by a person: screen-reader check, high contrast and small screens (B3), cold start after reboot, UI
   thread profile (< 50 ms blocks), usability session with real users.
