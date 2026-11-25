@@ -2,19 +2,21 @@
 
 SecureFile encrypts files with AES-256-CBC and authenticates them with HMAC-SHA256 (encrypt-then-MAC), using keys
 derived from a password with PBKDF2-HMAC-SHA256 and HKDF. The design and its reasons are in
-[docs/PROJECT_PLAN.md](docs/PROJECT_PLAN.md) (file format §5, ADRs).
+[docs/FINAL_GUIDE.md](docs/FINAL_GUIDE.md) and the [architecture decision records](docs/adr/README.md).
 
 ## Supported versions
 
 | Version | Supported |
 |---|---|
-| Latest commit on `main` | ✅ |
-| Anything older | ❌ |
+| `0.1.0-beta3` (latest pre-release) and `main` | ✅ |
+| `0.1.0-beta2`, `0.1.0-beta1` | ❌ (kept for the record; please update) |
 
 ## Reporting a vulnerability
 
-Please **do not** open a public issue for a security problem. Contact the maintainer privately through their
-GitHub profile ([@Abdelrahman-2222](https://github.com/Abdelrahman-2222)) and include:
+Please **do not** open a public issue for a security problem. Report it privately with GitHub's
+**[Report a vulnerability](https://github.com/Abdelrahman-2222/SecureFile/security/advisories/new)** form (Security tab),
+or contact the maintainer through their GitHub profile ([@Abdelrahman-2222](https://github.com/Abdelrahman-2222)).
+Include:
 
 - what you found and where (file, line, or file-format field),
 - how to reproduce it (a small sample file or steps),
@@ -36,7 +38,8 @@ These are stated limits, not hidden ones; the full STRIDE table gives the mitiga
 - The password also exists briefly as a .NET string, which cannot be wiped; a memory dump or crash dump while the app
   runs can reveal it. Keys and the byte copies of the password are zeroed.
 - Plaintext is written to a hidden temp file in the output folder and renamed on success. After a hard crash a hidden
-  `.SECUREFILE-TMP.tmp` file can remain, and an antivirus program may keep its own copy. There is no secure delete
+  `.~<name>.<8 hex>.securefile-tmp` file can remain, and an antivirus program may keep its own copy (an upper-case
+  `...SECUREFILE-TMP.tmp`). There is no secure delete
   (SSDs cannot guarantee it); the original file is never deleted for you.
 - The output folder must be trusted: another program with write rights there can create or replace files.
 - Programs are not code-signed yet. Compare the SHA-256 shown with each release before running it.
