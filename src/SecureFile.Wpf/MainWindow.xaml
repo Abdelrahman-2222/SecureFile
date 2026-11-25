@@ -52,7 +52,7 @@
             </Border>
 
             <!-- 4. Password -->
-            <Label Content="_Password" Target="{Binding ElementName=PasswordInput}" Margin="0,16,0,4" Padding="0" FontSize="14" />
+            <Label x:Name="PasswordLabel" Content="_Password" Target="{Binding ElementName=PasswordInput}" Margin="0,16,0,4" Padding="0" FontSize="14" />
             <!-- The PasswordBox and the plain TextBox share one cell; "Show password" swaps which one is visible. -->
             <Grid>
                 <PasswordBox x:Name="PasswordInput" AutomationProperties.AutomationId="PasswordInput"
@@ -128,7 +128,7 @@
                     </TextBlock.Style>
                 </TextBlock>
 
-                <Label Content="Co_nfirm password" Target="{Binding ElementName=ConfirmInput}" Margin="0,12,0,4" Padding="0" FontSize="14" />
+                <Label x:Name="ConfirmLabel" Content="Co_nfirm password" Target="{Binding ElementName=ConfirmInput}" Margin="0,12,0,4" Padding="0" FontSize="14" />
                 <Grid>
                     <PasswordBox x:Name="ConfirmInput" AutomationProperties.AutomationId="ConfirmInput"
                                  AutomationProperties.Name="Confirm password"

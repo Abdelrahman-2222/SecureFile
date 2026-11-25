@@ -146,6 +146,10 @@ internal sealed partial class MainWindow : Window
         SetBoxes(_viewModel.Password, _viewModel.ConfirmPassword);
         SwapVisibility(PasswordInput, PasswordVisibleInput, show);
         SwapVisibility(ConfirmInput, ConfirmVisibleInput, show);
+
+        // Alt+P and Alt+N must reach the box that is shown; a collapsed target cannot take the focus (review item 9).
+        PasswordLabel.Target = show ? PasswordVisibleInput : PasswordInput;
+        ConfirmLabel.Target = show ? ConfirmVisibleInput : ConfirmInput;
         (show ? PasswordVisibleInput : (System.Windows.Controls.Control)PasswordInput).Focus();
     }
 

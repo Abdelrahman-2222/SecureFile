@@ -25,7 +25,7 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 ## B. Open: from the review (grouped; do in this order)
 
 ### B1. Do first: small, visible, low risk
-- **9** Mnemonics `_Password` and `Co_nfirm` still target the collapsed password boxes when "Show password" is on (the F clash is fixed).
+- **9** **DONE (Stage 9.0):** the `_Password` and `Co_nfirm` labels now target the visible boxes while "Show password" is on (WPF; Avalonia has one box per field). The F clash was fixed earlier.
 - **12 (rest)** A dropped folder says "can't be found or opened" (should say it is a folder);
   several dropped files silently use the first; dropping while busy shows a copy cursor; only the dashed zone is a drop target.
 - **17 / 31** Drop-zone text "Drop a file here or Browse…" and a drag-over highlight; the first-run text is repeated three times.
