@@ -104,9 +104,9 @@ public sealed class PasswordResolverTests : IDisposable
     [Fact]
     public void NewPassword_Strong_GetsNoAdvice()
     {
-        const string Strong = "blue river coffee lamp";
+        const string strong = "blue river coffee lamp";
 
-        Resolver(new RecordingPrompt(Strong, Strong)).Resolve(Options(CliCommand.Encrypt));
+        Resolver(new RecordingPrompt(strong, strong)).Resolve(Options(CliCommand.Encrypt));
 
         Assert.Equal(string.Empty, _error.ToString());
     }
