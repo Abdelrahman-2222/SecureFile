@@ -31,7 +31,7 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 - **16 / 33** **DONE (Stage 9.0):** the file card has a tooltip with the full name, folder, last-modified time and exact size (`FileCardToolTip`, WPF and Avalonia). Open: the card line itself still cuts a long name (and a mixed-direction name may reorder).
 - **8 / 11 / 30** Show-password toggle moves focus off the checkbox; Enter in the first box should move to Confirm; newline-paste difference between box types.
 - **7** Cancel is not focused while working; focus after a cancel; check that Esc still cancels when the focused box has just been disabled.
-- **15** Error dialogs do not say where the log file is (`FileErrorLog.LogFilePath` exists) and have no owner window.
+- **15** **DONE (Stage 9.0):** both safety-net dialogs name the log file (`SafetyNetMessages`, `FileErrorLog.LogFilePath`); in WPF they are owned by the main window (Avalonia already was).
 - **5 (rest)** The Save suggestion for a damaged `x.enc` becomes `x.enc.enc`.
 
 ### B2. Wording and small behaviour

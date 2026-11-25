@@ -45,7 +45,7 @@ public sealed class FileErrorLog : IErrorLog
         _logFilePath = logFilePath;
     }
 
-    /// <summary>Gets the full path of the log file, so the friendly error dialog can tell the user where it is.</summary>
+    /// <summary>Gets the full path of the log file; the safety-net dialogs show it (<see cref="SafetyNetMessages"/>, review item 15).</summary>
     public string LogFilePath => _logFilePath;
 
     /// <inheritdoc />

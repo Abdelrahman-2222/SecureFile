@@ -92,10 +92,7 @@ internal sealed partial class App : Application
         }
 
         _viewModel?.ResetAfterUnexpectedError();
-        MessageDialog.ShowInformation(
-            _mainWindow,
-            "Something unexpected went wrong. Your files were not changed. Details were saved to the log.",
-            onClosed: null);
+        MessageDialog.ShowInformation(_mainWindow, SafetyNetMessages.Recovered(_errorLog?.LogFilePath ?? string.Empty), onClosed: null);
     }
 
     /// <summary>Tells the user the app must close, then exits with code 1 when the message is dismissed.</summary>
@@ -104,7 +101,7 @@ internal sealed partial class App : Application
         _closing = true;
         MessageDialog.ShowInformation(
             _mainWindow,
-            "SecureFile hit a serious problem and must close. Your files were not changed. Details were saved to the log.",
+            SafetyNetMessages.MustClose(_errorLog?.LogFilePath ?? string.Empty),
             () => (ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown(1));
     }
 

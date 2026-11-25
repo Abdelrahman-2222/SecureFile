@@ -60,27 +60,46 @@ internal sealed partial class App : Application
         _errorLog?.Write(e.Exception);
         e.Handled = true;
 
-        DateTime now = DateTime.UtcNow;
-        bool mustClose = IsFatal(e.Exception) || now - _lastUnexpectedErrorUtc < RepeatedErrorWindow;
-        _lastUnexpectedErrorUtc = now;
-
-        if (mustClose)
+        string logFilePath = _errorLog?.LogFilePath ?? string.Empty;
+        if (MustClose(e.Exception))
         {
-            MessageBox.Show(
-                "SecureFile hit a serious problem and must close. Your files were not changed. Details were saved to the log.",
-                "SecureFile",
-                MessageBoxButton.OK,
-                MessageBoxImage.Error);
+            ShowSafetyNetMessage(SafetyNetMessages.MustClose(logFilePath), MessageBoxImage.Error);
             Shutdown(1);
             return;
         }
 
         _viewModel?.ResetAfterUnexpectedError();
-        MessageBox.Show(
-            "Something unexpected went wrong. Your files were not changed. Details were saved to the log.",
-            "SecureFile",
-            MessageBoxButton.OK,
-            MessageBoxImage.Warning);
+        ShowSafetyNetMessage(SafetyNetMessages.Recovered(logFilePath), MessageBoxImage.Warning);
+    }
+
+    /// <summary>Decides whether the app must close: a fatal error, or a second one within <see cref="RepeatedErrorWindow"/>.</summary>
+    /// <param name="exception">The unexpected error.</param>
+    /// <returns><see langword="true"/> when continuing would not be safe.</returns>
+    private bool MustClose(Exception exception)
+    {
+        DateTime now = DateTime.UtcNow;
+        bool mustClose = IsFatal(exception) || now - _lastUnexpectedErrorUtc < RepeatedErrorWindow;
+        _lastUnexpectedErrorUtc = now;
+        return mustClose;
+    }
+
+    /// <summary>Shows a safety-net message, owned by the main window while it is open (review item 15).</summary>
+    /// <param name="text">The message, which names the log file.</param>
+    /// <param name="icon">Warning when the app keeps running, Error when it closes.</param>
+    /// <remarks>
+    /// With the main window as owner the message stays on top of it and is centred on it, instead of possibly opening
+    /// behind it, where the frozen-looking window would be all the user sees.
+    /// </remarks>
+    private void ShowSafetyNetMessage(string text, MessageBoxImage icon)
+    {
+        if (MainWindow is { IsLoaded: true } owner)
+        {
+            MessageBox.Show(owner, text, "SecureFile", MessageBoxButton.OK, icon);
+        }
+        else
+        {
+            MessageBox.Show(text, "SecureFile", MessageBoxButton.OK, icon);
+        }
     }
 
     /// <summary>An unexpected error on another thread: only log it, because the runtime closes the app anyway.</summary>
