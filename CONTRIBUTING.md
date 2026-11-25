@@ -36,7 +36,8 @@ dotnet test --solution SecureFile.slnx -c Release
    - **Windows UI:** a FlaUI test for a behaviour bug; run with `SECUREFILE_UI_TESTS=1`.
 4. Run `dotnet format SecureFile.slnx whitespace`, then the full gate: `pwsh -File scripts/verify.ps1`.
 5. Add a line to `CHANGELOG.md` under `[Unreleased]`.
-6. Open a pull request; the template asks what, why and how it was tested. CI must be green on Windows, Ubuntu and macOS.
+6. Open a pull request; the template asks what, why and how it was tested. CI must be green on Windows, Ubuntu and macOS
+   (a ruleset on `main` enforces it; direct pushes to `main` are refused).
 
 ## Code rules (the build enforces them)
 

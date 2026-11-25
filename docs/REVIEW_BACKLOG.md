@@ -82,7 +82,7 @@ TESTPLAN rows that could no longer be done · CHANGELOG contradictions.
 | C6 | `docs/TESTPLAN.md` (A to J) has not been run by a person on the current build; the usability check with friends (`docs/USABILITY.md`) has not happened | Plan Steps 4.3 and 4.4 |
 | C7 | Programs are not code-signed or notarized | SmartScreen and Gatekeeper warnings; plan Step 6.3 |
 | C8 | **Built (Stage 7):** macOS and Linux have an Avalonia window, tested headless in CI; not yet run on a real Mac or Linux desktop | Attached to `v0.1.0-beta2` and `v0.1.0-beta3` (beta3 adds the macOS/Linux command line) as a **preview for testers**; the label stays until the real-system check (C21, plan 7.4) |
-| C9 | GitHub branch and tag protection is unavailable on a private free repository | The release branch can be deleted on the website; make the repository public or upgrade the plan (see `docs/RELEASING.md`) |
+| C9 | GitHub branch and tag protection is unavailable on a private free repository | **Done 2026-11-25:** repository public; rulesets protect `main` (PR + CI checks), `release/**` and `v*` tags (no delete or move); see `docs/RELEASING.md` |
 | C10 | **DONE (Step 5.3):** Presentation coverage measured: 95.8 % lines, about 91 % branches (target >= 85 %) | See `docs/QUALITY_REPORT.md` |
 | C11 | CLI: ~~`tar.gz` archives built on Windows may not carry the executable bit~~ (**fixed in Stage 7**: `scripts/lib/TarGz.ps1` stores 0755); no `--quiet`/`--json` mode; no folder or multi-file support | CLI polish |
 | C12 | Original findings that stay as documented limits: no secure delete (SSDs cannot guarantee it); AES-CBC+HMAC format v1 only | See `docs/SUGGESTIONS.md` |
