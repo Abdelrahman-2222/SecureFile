@@ -51,6 +51,10 @@ and the project uses [Semantic Versioning](https://semver.org/).
 - Stage 9.1: the inputs and actions are locked while the Open dialog is open too, not only the Save dialog; closing the
   WPF window just as an operation ends no longer asks twice; the Open button is re-checked with the others.
 - Stage 9.1: the pre-push hook refuses a push with uncommitted changes; the Core coverage gate measures Core's own tests.
+- WPF (user report): typing in a hidden password box no longer jumps to the start. Every keystroke rewrote the box
+  being typed in, which moved its caret to the start, so after leaving the box and clicking back, new characters went in
+  front ("hello", then "asd", gave "asdhello"). Present since `0.1.0-beta1`; the Avalonia window and the CLI were not
+  affected. New FlaUI regression test.
 
 ### Changed
 
