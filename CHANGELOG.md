@@ -8,6 +8,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
 
 ### Added
 
+- `.gitguardian.yaml`: GitGuardian flagged the made-up passwords in `PasswordPatternsTests.cs` as "Generic Password"; that one
+  test file is now ignored by path (all detectors stay on). The old incidents are dismissed on the GitGuardian dashboard as "test credential".
 - Stage 6 (publishing), step 6.1: `scripts/publish-beta.ps1` and `scripts/publish-cli.ps1` also build `win-arm64`
   (cross-compiled on x64; PE header checked as ARM64; **never run**, there is no ARM machine here). Sizes of this
   build: WPF zip x64 56.2 MB / arm64 52.0 MB (exe 133.6 / 144.0 MB); CLI zip 5.6 / 5.5 MB (exe 12.6 / 13.0 MB).
