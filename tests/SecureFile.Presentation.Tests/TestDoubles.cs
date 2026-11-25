@@ -19,10 +19,13 @@ internal sealed class FakeFileDialogService : IFileDialogService
         return Task.FromResult(OpenResult);
     }
 
+    /// <summary>When set, the Save dialog stays "open" until this task completes (a non-modal dialog, as on Linux).</summary>
+    public Task<string?>? PendingSave { get; set; }
+
     public Task<string?> ShowSaveFileDialogAsync(string suggestedFilePath)
     {
         SuggestedSavePath = suggestedFilePath;
-        return Task.FromResult(SaveResult);
+        return PendingSave ?? Task.FromResult(SaveResult);
     }
 }
 

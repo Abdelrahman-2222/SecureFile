@@ -4,8 +4,8 @@ SecureFile encrypts and decrypts files on this computer with AES-256 and a passw
 **If you forget the password, the file cannot be recovered.** Files encrypted here open in the Windows app and in the
 command-line version, and the other way round.
 
-This is a **preview** build: it has passed automated tests on Windows, Ubuntu and macOS, but not every system has been
-tried by hand. Please report anything odd.
+This is a **preview** build: the window is tested automatically (without a screen) on Windows, Ubuntu and macOS in the
+project's CI, but it has not yet been tried by hand on a real Mac or Linux desktop. Please report anything odd.
 
 ## Check the download
 

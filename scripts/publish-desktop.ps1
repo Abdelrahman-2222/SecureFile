@@ -73,11 +73,11 @@ foreach ($rid in $Runtimes) {
         # An app bundle, so Finder shows one "SecureFile" icon that opens a window (a bare program opens Terminal).
         $contents = Join-Path $folder 'SecureFile.app/Contents'
         New-Item -ItemType Directory -Path (Join-Path $contents 'MacOS') -Force | Out-Null
-        Copy-Item (Join-Path $publish '*') (Join-Path $contents 'MacOS')
+        Copy-Item (Join-Path $publish '*') -Recurse (Join-Path $contents 'MacOS')
         Write-InfoPlist (Join-Path $contents 'Info.plist')
     }
     else {
-        Copy-Item (Join-Path $publish '*') $folder
+        Copy-Item (Join-Path $publish '*') -Recurse $folder
     }
     Copy-Item 'docs/DESKTOP_README.md' (Join-Path $folder 'README.md')
     Remove-Item $publish -Recurse -Force

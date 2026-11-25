@@ -20,6 +20,13 @@ and the project uses [Semantic Versioning](https://semver.org/).
   versus 16.4 MB). Native AOT not measured (no native linker installed).
 - ADR-16: the dialog and folder-opener interfaces are asynchronous.
 
+### Fixed
+
+- Stage 7 review: while the Save dialog is open the password, file and actions are locked, and the operation uses the
+  password checked before the dialog (a non-blocking Linux dialog could otherwise let a changed password through).
+- Stage 7 review: `securefile --password-stdin` reads piped input as UTF-8 on every system; on Windows it used the
+  console code page, so a non-ASCII password gave a different key than on Linux or macOS.
+
 - `.gitguardian.yaml`: GitGuardian flagged the made-up passwords in `PasswordPatternsTests.cs` as "Generic Password"; that one
   test file is now ignored by path (all detectors stay on). The old incidents are dismissed on the GitGuardian dashboard as "test credential".
 - Stage 6 (publishing), step 6.1: `scripts/publish-beta.ps1` and `scripts/publish-cli.ps1` also build `win-arm64`

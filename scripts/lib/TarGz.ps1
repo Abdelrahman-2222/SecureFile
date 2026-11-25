@@ -22,7 +22,7 @@ function New-TarGz {
     $gzip = [System.IO.Compression.GZipStream]::new($file, [System.IO.Compression.CompressionLevel]::Optimal)
     $writer = [System.Formats.Tar.TarWriter]::new($gzip, [System.Formats.Tar.TarEntryFormat]::Pax, $false)
     try {
-        $items = @(Get-Item $base) + @(Get-ChildItem $base -Recurse | Sort-Object FullName)
+        $items = @(Get-Item $base) + @(Get-ChildItem $base -Recurse -Force | Sort-Object FullName)
         foreach ($item in $items) {
             $relative = [System.IO.Path]::GetRelativePath($ParentFolder, $item.FullName).Replace('\', '/')
             if ($item.PSIsContainer) {

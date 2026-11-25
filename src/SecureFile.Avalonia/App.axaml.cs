@@ -32,6 +32,9 @@ internal sealed partial class App : Application
     private MainWindow? _mainWindow;
     private DateTime _lastUnexpectedErrorUtc = DateTime.MinValue;
 
+    /// <summary>True once the "must close" message is shown, so later errors do not stack more dialogs on top.</summary>
+    private bool _closing;
+
     /// <summary>Loads App.axaml (theme and colours).</summary>
     public override void Initialize()
     {
@@ -73,6 +76,10 @@ internal sealed partial class App : Application
     {
         _errorLog?.Write(e.Exception);
         e.Handled = true;
+        if (_closing)
+        {
+            return;
+        }
 
         DateTime now = DateTime.UtcNow;
         bool mustClose = IsFatal(e.Exception) || now - _lastUnexpectedErrorUtc < RepeatedErrorWindow;
@@ -80,10 +87,7 @@ internal sealed partial class App : Application
 
         if (mustClose)
         {
-            MessageDialog.ShowInformation(
-                _mainWindow,
-                "SecureFile hit a serious problem and must close. Your files were not changed. Details were saved to the log.",
-                () => (ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown(1));
+            CloseAfterFatalError();
             return;
         }
 
@@ -92,6 +96,16 @@ internal sealed partial class App : Application
             _mainWindow,
             "Something unexpected went wrong. Your files were not changed. Details were saved to the log.",
             onClosed: null);
+    }
+
+    /// <summary>Tells the user the app must close, then exits with code 1 when the message is dismissed.</summary>
+    private void CloseAfterFatalError()
+    {
+        _closing = true;
+        MessageDialog.ShowInformation(
+            _mainWindow,
+            "SecureFile hit a serious problem and must close. Your files were not changed. Details were saved to the log.",
+            () => (ApplicationLifetime as IClassicDesktopStyleApplicationLifetime)?.Shutdown(1));
     }
 
     /// <summary>An unexpected error on another thread: only log it, because the runtime closes the app anyway.</summary>
