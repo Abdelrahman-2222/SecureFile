@@ -1,0 +1,186 @@
+<Window x:Class="SecureFile.Avalonia.MainWindow"
+        x:ClassModifier="internal"
+        xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:SecureFile.Presentation.Main"
+        x:DataType="vm:MainViewModel"
+        Title="SecureFile"
+        Icon="/Assets/SecureFile.ico"
+        Width="800" SizeToContent="Height"
+        MinWidth="640" MinHeight="480"
+        WindowStartupLocation="CenterScreen">
+    <!-- The same layout, texts and order as the WPF window (PROJECT_PLAN §11.1), so both apps feel the same.
+         x:DataType makes every binding compiled: a wrong property name is a build error, and trimming keeps what is used. -->
+    <Window.KeyBindings>
+        <!-- Ctrl+O on Windows and Linux, Cmd+O (Meta) on macOS. Esc cancels. F1 (About) is handled in code. -->
+        <KeyBinding Gesture="Ctrl+O" Command="{Binding BrowseCommand}" />
+        <KeyBinding Gesture="Meta+O" Command="{Binding BrowseCommand}" />
+        <KeyBinding Gesture="Escape" Command="{Binding CancelCommand}" />
+    </Window.KeyBindings>
+
+    <Window.Styles>
+        <!-- 4/8 px grid; 14 px body text; 40 px high main actions (PROJECT_PLAN §11.2). -->
+        <Style Selector="Button">
+            <Setter Property="MinHeight" Value="40" />
+            <Setter Property="Padding" Value="16,6" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBlock">
+            <Setter Property="FontSize" Value="14" />
+        </Style>
+        <Style Selector="TextBox.password">
+            <Setter Property="MinHeight" Value="32" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="MaxLength" Value="1024" />
+            <Setter Property="PasswordChar" Value="•" />
+        </Style>
+        <!-- Status colours: the words carry the meaning too, colour is only an extra cue. -->
+        <Style Selector="TextBlock.critical">
+            <Setter Property="Foreground" Value="{DynamicResource CriticalBrush}" />
+        </Style>
+        <Style Selector="TextBlock.caution">
+            <Setter Property="Foreground" Value="{DynamicResource CautionBrush}" />
+        </Style>
+        <Style Selector="TextBlock.success">
+            <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
+        </Style>
+        <Style Selector="ProgressBar.critical">
+            <Setter Property="Foreground" Value="{DynamicResource CriticalBrush}" />
+        </Style>
+        <Style Selector="ProgressBar.caution">
+            <Setter Property="Foreground" Value="{DynamicResource CautionBrush}" />
+        </Style>
+        <Style Selector="ProgressBar.success">
+            <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
+        </Style>
+        <Style Selector="Border.banner.success">
+            <Setter Property="Background" Value="{DynamicResource SuccessBackgroundBrush}" />
+        </Style>
+        <Style Selector="Border.banner.failed">
+            <Setter Property="Background" Value="{DynamicResource CriticalBackgroundBrush}" />
+        </Style>
+        <Style Selector="Border.hint.caution">
+            <Setter Property="Background" Value="{DynamicResource CautionBackgroundBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource CautionBrush}" />
+        </Style>
+        <Style Selector="Border.hint.caution TextBlock#PasswordHintText">
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+    </Window.Styles>
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="24">
+
+            <!-- 1. Drop zone -->
+            <Border x:Name="DropZone" AutomationProperties.AutomationId="DropZone"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}" BorderThickness="2"
+                    CornerRadius="8" Padding="24" Background="Transparent" DragDrop.AllowDrop="True">
+                <StackPanel HorizontalAlignment="Center">
+                    <TextBlock Text="Choose a file to encrypt or decrypt" FontSize="18" HorizontalAlignment="Center" />
+                    <Button x:Name="BrowseButton" AutomationProperties.AutomationId="BrowseButton"
+                            AutomationProperties.Name="Browse for a file"
+                            Content="_Browse…" ToolTip.Tip="Browse (Ctrl+O, ⌘O on macOS)" Command="{Binding BrowseCommand}"
+                            HorizontalAlignment="Center" Margin="0,12,0,0" MinWidth="140" />
+                </StackPanel>
+            </Border>
+
+            <!-- 2. File card -->
+            <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1"
+                    CornerRadius="8" Padding="16" Margin="0,16,0,0">
+                <TextBlock AutomationProperties.AutomationId="FileSummary" Text="{Binding FileSummary}"
+                           FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+            </Border>
+
+            <!-- 4. Password. One TextBox per field: PasswordChar hides the text, RevealPassword shows it ("Show password").
+                 Avalonia allows Copy and Cut once the text is revealed, so the code blocks the clipboard events. -->
+            <Label Content="_Password" Target="{Binding #PasswordInput}" Margin="0,16,0,4" Padding="0" FontSize="14" />
+            <TextBox x:Name="PasswordInput" Classes="password" AutomationProperties.AutomationId="PasswordInput"
+                     AutomationProperties.Name="Password"
+                     Text="{Binding Password}" IsEnabled="{Binding CanEditInputs}"
+                     RevealPassword="{Binding #ShowPasswordCheck.IsChecked, FallbackValue=False}">
+                <TextBox.KeyBindings>
+                    <KeyBinding Gesture="Enter" Command="{Binding RunPrimaryCommand}" />
+                </TextBox.KeyBindings>
+            </TextBox>
+
+            <!-- Only when a password is being chosen (encrypting): strength advice and the confirmation box. -->
+            <StackPanel IsVisible="{Binding IsEncrypting}">
+                <ProgressBar x:Name="StrengthBar" AutomationProperties.AutomationId="PasswordStrengthBar"
+                             AutomationProperties.Name="Password strength"
+                             Value="{Binding StrengthPercent, Mode=OneWay}" Minimum="0" Maximum="100" Height="6"
+                             MinHeight="6" Margin="0,8,0,0" />
+                <TextBlock x:Name="StrengthLabel" AutomationProperties.AutomationId="PasswordStrengthText"
+                           Text="{Binding StrengthText}" TextWrapping="Wrap" Margin="0,4,0,0"
+                           IsVisible="{Binding StrengthText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+
+                <Label Content="Co_nfirm password" Target="{Binding #ConfirmInput}" Margin="0,12,0,4" Padding="0" FontSize="14" />
+                <TextBox x:Name="ConfirmInput" Classes="password" AutomationProperties.AutomationId="ConfirmInput"
+                         AutomationProperties.Name="Confirm password"
+                         Text="{Binding ConfirmPassword}" IsEnabled="{Binding CanEditInputs}"
+                         RevealPassword="{Binding #ShowPasswordCheck.IsChecked, FallbackValue=False}">
+                    <TextBox.KeyBindings>
+                        <KeyBinding Gesture="Enter" Command="{Binding RunPrimaryCommand}" />
+                    </TextBox.KeyBindings>
+                </TextBox>
+                <TextBlock AutomationProperties.AutomationId="PasswordMatchText" Text="{Binding PasswordMatchText}"
+                           TextWrapping="Wrap" Margin="0,4,0,0"
+                           Classes.success="{Binding PasswordsMatch}" Classes.critical="{Binding IsPasswordMismatch}"
+                           IsVisible="{Binding PasswordMatchText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            </StackPanel>
+
+            <CheckBox x:Name="ShowPasswordCheck" AutomationProperties.AutomationId="ShowPasswordCheck"
+                      Content="_Show password" Margin="0,8,0,0" />
+
+            <!-- Caution (amber, bold, with a symbol) while a password is chosen; a plain reminder while decrypting. -->
+            <Border Classes="hint" Classes.caution="{Binding IsEncrypting}" CornerRadius="8" Padding="12,8" Margin="0,8,0,0"
+                    BorderThickness="1" BorderBrush="Transparent" Background="Transparent"
+                    IsVisible="{Binding SelectedFile, Converter={x:Static ObjectConverters.IsNotNull}}">
+                <StackPanel Orientation="Horizontal" Spacing="10">
+                    <TextBlock Text="⚠" FontSize="18" VerticalAlignment="Center" IsVisible="{Binding IsEncrypting}" />
+                    <TextBlock x:Name="PasswordHintText" AutomationProperties.AutomationId="PasswordHint"
+                               Text="{Binding PasswordHint}" TextWrapping="Wrap" VerticalAlignment="Center" MaxWidth="680" />
+                </StackPanel>
+            </Border>
+
+            <!-- 6. Primary actions -->
+            <StackPanel Orientation="Horizontal" Margin="0,16,0,0" Spacing="8">
+                <Button x:Name="EncryptButton" AutomationProperties.AutomationId="EncryptButton"
+                        AutomationProperties.Name="Encrypt file"
+                        Content="Encrypt file" Command="{Binding EncryptCommand}" IsEnabled="{Binding IsEncryptOffered}"
+                        ToolTip.ShowOnDisabled="True" MinWidth="140" />
+                <Button x:Name="DecryptButton" AutomationProperties.AutomationId="DecryptButton"
+                        AutomationProperties.Name="Decrypt file"
+                        Content="Decrypt file" Command="{Binding DecryptCommand}" IsEnabled="{Binding IsDecryptOffered}"
+                        ToolTip.ShowOnDisabled="True" MinWidth="140" />
+            </StackPanel>
+
+            <!-- 7. Progress: shown only while an operation or a file read is running -->
+            <Grid Margin="0,16,0,0" ColumnDefinitions="*,Auto" IsVisible="{Binding IsBusy}">
+                <StackPanel>
+                    <ProgressBar AutomationProperties.AutomationId="OperationProgress" AutomationProperties.Name="Progress"
+                                 Value="{Binding ProgressPercentage, Mode=OneWay}" Minimum="0" Maximum="100" Height="12"
+                                 IsIndeterminate="{Binding IsProgressIndeterminate, Mode=OneWay}" />
+                    <TextBlock AutomationProperties.AutomationId="ProgressText" Text="{Binding ProgressText}" Margin="0,8,0,0" />
+                </StackPanel>
+                <Button Grid.Column="1" AutomationProperties.AutomationId="CancelButton" AutomationProperties.Name="Cancel"
+                        Content="Cancel" ToolTip.Tip="Cancel (Esc)" Command="{Binding CancelCommand}" Margin="16,0,0,0" />
+            </Grid>
+
+            <!-- 8. Result / status: green after success, red after failure, neutral otherwise. -->
+            <Border Classes="banner" Classes.success="{Binding IsSucceeded}" Classes.failed="{Binding IsFailed}"
+                    CornerRadius="8" Padding="16,12" Margin="0,16,0,0" BorderThickness="1"
+                    BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}">
+                <TextBlock AutomationProperties.AutomationId="StatusMessage" AutomationProperties.LiveSetting="Polite"
+                           Text="{Binding StatusMessage}" TextWrapping="Wrap" FontWeight="SemiBold" />
+            </Border>
+            <Button x:Name="OpenFolderButton" AutomationProperties.AutomationId="OpenFolderButton"
+                    AutomationProperties.Name="Open folder"
+                    Content="Open _folder" Command="{Binding OpenFolderCommand}" HorizontalAlignment="Left" Margin="0,12,0,0"
+                    IsVisible="{Binding IsSucceeded}" />
+
+            <Button x:Name="AboutButton" AutomationProperties.AutomationId="AboutButton"
+                    AutomationProperties.Name="About SecureFile"
+                    Content="_About" ToolTip.Tip="About (F1)" HorizontalAlignment="Right" Margin="0,24,0,0" />
+        </StackPanel>
+    </ScrollViewer>
+</Window>

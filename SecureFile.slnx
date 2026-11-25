@@ -1,6 +1,7 @@
 <Solution>
   <Folder Name="/src/">
     <Project Path="src/SecureFile.Core/SecureFile.Core.csproj" />
+    <Project Path="src/SecureFile.Avalonia/SecureFile.Avalonia.csproj" />
     <Project Path="src/SecureFile.Cli/SecureFile.Cli.csproj" />
     <Project Path="src/SecureFile.Presentation/SecureFile.Presentation.csproj" />
     <Project Path="src/SecureFile.Wpf/SecureFile.Wpf.csproj" />
@@ -8,6 +9,7 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/SecureFile.Architecture.Tests/SecureFile.Architecture.Tests.csproj" />
+    <Project Path="tests/SecureFile.Avalonia.Tests/SecureFile.Avalonia.Tests.csproj" />
     <Project Path="tests/SecureFile.Cli.Tests/SecureFile.Cli.Tests.csproj" />
     <Project Path="tests/SecureFile.Core.Tests/SecureFile.Core.Tests.csproj" />
     <Project Path="tests/SecureFile.Integration.Tests/SecureFile.Integration.Tests.csproj" />
