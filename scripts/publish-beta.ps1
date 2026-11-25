@@ -45,7 +45,7 @@ foreach ($rid in $Runtimes) {
     Compress-Archive -Path (Join-Path $out '*') -DestinationPath $zip -CompressionLevel Optimal
 
     $hash = (Get-FileHash $zip -Algorithm SHA256).Hash
-    "$hash  $name.zip" | Set-Content -Path "$zip.sha256" -Encoding ascii
+    "$($hash.ToLowerInvariant())  $name.zip" | Set-Content -Path "$zip.sha256" -Encoding ascii
     $sums += "$($hash.ToLowerInvariant())  $name.zip"
     $sizeMb = [math]::Round((Get-Item $zip).Length / 1MB, 1)
     $exeMb = [math]::Round((Get-Item (Join-Path $out 'SecureFile.exe')).Length / 1MB, 1)

@@ -17,9 +17,9 @@ yourself, see "Build it" below).
 
 | You have | Download |
 |---|---|
-| Windows 10 or 11, normal PC (64-bit) | `SecureFile-<version>-win-x64.zip` |
-| Windows 11 on an ARM PC (Surface Pro X, Copilot+ PC) | `SecureFile-<version>-win-arm64.zip` (built but not yet tried on real ARM hardware) |
-| Command line (Windows, Linux, macOS) | `securefile-cli-<version>-<system>.zip` or `.tar.gz`, see [docs/CLI_README.md](docs/CLI_README.md) |
+| Windows 10 or 11, normal PC (64-bit) | `SecureFile-<version>-<label>-win-x64.zip` (for example `SecureFile-0.1.0-beta1-win-x64.zip`) |
+| Windows 11 on an ARM PC (Surface Pro X, Copilot+ PC) | `SecureFile-<version>-<label>-win-arm64.zip` (built but not yet tried on real ARM hardware) |
+| Command line (Windows, Linux, macOS) | `securefile-cli-<version>-<label>-<system>.zip` or `.tar.gz`, see [docs/CLI_README.md](docs/CLI_README.md) |
 
 ## Verify the download (SHA-256)
 
@@ -60,7 +60,8 @@ it is. Do not switch the antivirus off.
 - There is no secure delete. SecureFile never deletes your original; deleting it for good is up to you, and on an SSD even a
   normal delete cannot be guaranteed to wipe the data.
 - While a file is being processed a hidden temporary file is written next to the output; after a crash it may stay behind
-  (`.SECUREFILE-TMP.tmp`), and an antivirus may keep a copy. Delete it by hand.
+  (a hidden file named like `.~yourfile.<8 hex>.securefile-tmp`), and an antivirus may keep its own copy (a `...SECUREFILE-TMP.tmp`
+  backup). Delete them by hand.
 - Malware on your computer (for example a keylogger) can see the password as you type it. See [SECURITY.md](SECURITY.md) and
   [docs/THREAT_MODEL.md](docs/THREAT_MODEL.md) for the full list.
 - Windows app: Windows 10/11 only. macOS and Linux have the command line today; windows for them are planned.

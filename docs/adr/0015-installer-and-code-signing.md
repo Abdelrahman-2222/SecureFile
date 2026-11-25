@@ -6,7 +6,7 @@
 ## Context
 
 SecureFile ships today as a self-contained single-file `SecureFile.exe` (134 MB, win-x64; 144 MB win-arm64) in a zip, with a
-SHA-256 file (ADR-11, plan Steps 6.1 and 6.5). Nothing is installed and nothing is written outside the app's own log folder.
+SHA-256 file (ADR-11, plan Steps 6.1 and 6.5). Nothing is installed; the app writes only the output files the user chooses, a hidden temp file next to them, its log folder, and the .NET runtime's self-extract cache under `%TEMP%`.
 The exe is **not signed**, so Windows SmartScreen says "Windows protected your PC" and some antivirus programs distrust it
 (it encrypts files, which ransomware also does). The audience is friends and a Team Lead now, possibly strangers later.
 Constraints: one developer, no budget approved, a private repository, no ARM test machine, no company legal entity known.
@@ -30,7 +30,7 @@ rules below are from memory of the vendors' public pages and change often: **ver
 |---|---|---|---|
 | **Azure Artifact Signing** (formerly Trusted Signing) | About US$10/month | Cheapest real signature; Microsoft-run, short-lived certificates, no hardware token; works in CI | Identity validation is required; availability was limited to some countries and to organizations or (in some regions) individuals, so **it may not be open to this user**; needs an Azure subscription and a signing step in `publish-*.ps1`; signing alone does not remove SmartScreen warnings on day one (reputation builds) |
 | **OV certificate** (Sectigo, DigiCert, SSL.com ...) | About US$100-250 per year | Works anywhere; removes the "Unknown publisher" wording | Since 2023 the private key must be on a hardware token or cloud HSM (more cost, postage, a USB token to guard); SmartScreen reputation still has to be earned |
-| **EV certificate** | About US$300-600 per year | Strongest identity check | Highest cost and paperwork; Microsoft no longer promises instant SmartScreen reputation for EV, so the main selling point has weakened; needs a registered organization |
+| **EV certificate** | About US$300-600 per year | Strongest identity check | Highest cost and paperwork; reportedly Microsoft no longer promises instant SmartScreen reputation for EV (verify), so the main selling point has weakened; needs a registered organization |
 | **Self-signed certificate** (tests only) | Free | Good to test the signing step in the scripts and the MSIX path | Not trusted on any other PC; SmartScreen still warns; must **never** be shipped to friends as "signed" |
 | **Unsigned + SHA-256 + docs** (today) | Free | Honest, simple | Warning on every new download until reputation exists; some antivirus programs may block |
 

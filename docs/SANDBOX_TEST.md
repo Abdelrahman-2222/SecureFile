@@ -25,7 +25,8 @@ Needs Windows 10/11 **Pro, Enterprise or Education** (this PC is Windows 11 Pro)
 
 1. `powershell -ExecutionPolicy Bypass -File scripts/publish-beta.ps1 -Runtimes win-x64` (from PowerShell, not Git Bash).
 2. Create `C:\SecureFileSandbox`, unzip `artifacts/beta/SecureFile-<version>-<label>-win-x64.zip` into it, so that
-   `C:\SecureFileSandbox\SecureFile.exe` exists. Put a small `hello.txt` there too (any text).
+   `C:\SecureFileSandbox\SecureFile.exe` exists. Put a small `hello.txt` there too (any text). For row 8, also unzip
+   `artifacts/cli/securefile-cli-<version>-<label>-win-x64.zip` into a subfolder `cli` of it.
 3. Compare the zip's hash with `artifacts/beta/SHA256SUMS.txt` (the sandbox also prints the exe's hash).
 
 ## Run it

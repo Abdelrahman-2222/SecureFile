@@ -8,7 +8,7 @@
 <Configuration>
   <VGpu>Default</VGpu>
   <Networking>Disable</Networking>
-  <ClipboardRedirection>Enable</ClipboardRedirection>
+  <ClipboardRedirection>Disable</ClipboardRedirection>
   <MemoryInMB>4096</MemoryInMB>
   <MappedFolders>
     <MappedFolder>
