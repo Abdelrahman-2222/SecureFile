@@ -1,4 +1,6 @@
 using System.Windows;
+using System.Windows.Automation.Peers;
+using System.Windows.Threading;
 using SecureFile.Presentation.Main;
 
 namespace SecureFile.Wpf;
@@ -218,6 +220,20 @@ internal sealed partial class MainWindow : Window
             // text by accident (review item 24). A failure keeps the file, so the choice stays for the retry.
             ShowPasswordCheck.IsChecked = false;
         }
+        else if (e.PropertyName == nameof(MainViewModel.StatusMessage))
+        {
+            Dispatcher.BeginInvoke(DispatcherPriority.Background, AnnounceStatus);
+        }
+    }
+
+    /// <summary>Tells a screen reader that the status line changed, so it reads the new message.</summary>
+    /// <remarks>
+    /// <c>AutomationProperties.LiveSetting</c> in the XAML only marks the text as a live region; WPF announces nothing until
+    /// code raises <c>LiveRegionChanged</c> (review UI-2). It runs after the binding has put the new text in place.
+    /// </remarks>
+    private void AnnounceStatus()
+    {
+        UIElementAutomationPeer.CreatePeerForElement(StatusText).RaiseAutomationEvent(AutomationEvents.LiveRegionChanged);
     }
 
     /// <summary>Tells whether any of the four boxes shows something other than the ViewModel's password or confirmation.</summary>
