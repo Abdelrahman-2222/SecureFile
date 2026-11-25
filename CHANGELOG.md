@@ -12,6 +12,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
   (cross-compiled on x64; PE header checked as ARM64; **never run**, there is no ARM machine here). Sizes of this
   build: WPF zip x64 56.2 MB / arm64 52.0 MB (exe 133.6 / 144.0 MB); CLI zip 5.6 / 5.5 MB (exe 12.6 / 13.0 MB).
   `publish-beta.ps1` now writes a `SHA256SUMS.txt` next to the zips.
+- Step 6.2: `scripts/sandbox-test.wsb` (read-only mapped folder, no network) and `docs/SANDBOX_TEST.md` (setup and click
+  list). **Not run**: Windows Sandbox is not enabled on the development PC (needs admin and a reboot); waiting for the user.
 - Stage 5 quality work: BenchmarkDotNet suite (`benchmarks/SecureFile.Benchmarks`, `scripts/run-benchmarks.ps1`),
   `scripts/measure-startup.ps1` and `scripts/measure-memory.ps1`, `docs/QUALITY_REPORT.md` with the raw numbers under
   `docs/quality/`, and `docs/THREAT_MODEL.md` (STRIDE, 20 threats) with the independent security review; `SECURITY.md`
