@@ -14,6 +14,8 @@ and the project uses [Semantic Versioning](https://semver.org/).
   `publish-beta.ps1` now writes a `SHA256SUMS.txt` next to the zips.
 - Step 6.2: `scripts/sandbox-test.wsb` (read-only mapped folder, no network) and `docs/SANDBOX_TEST.md` (setup and click
   list). **Not run**: Windows Sandbox is not enabled on the development PC (needs admin and a reboot); waiting for the user.
+- Step 6.3: `docs/adr/0015-installer-and-code-signing.md` compares zip, MSIX, Inno/WiX and the signing options; proposes
+  zip + SHA-256, no installer, Azure Artifact Signing for a public release. Status **Proposed**: the user decides.
 - Stage 5 quality work: BenchmarkDotNet suite (`benchmarks/SecureFile.Benchmarks`, `scripts/run-benchmarks.ps1`),
   `scripts/measure-startup.ps1` and `scripts/measure-memory.ps1`, `docs/QUALITY_REPORT.md` with the raw numbers under
   `docs/quality/`, and `docs/THREAT_MODEL.md` (STRIDE, 20 threats) with the independent security review; `SECURITY.md`
