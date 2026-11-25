@@ -23,7 +23,7 @@ checked: nothing leaves your computer.** Every suggestion below serves one of th
 | Password rules done right: length (8+), confirm box, strength bar, Caps Lock warning (Windows), copy blocked | Fewer lost files and weak passwords | ✅ |
 | **Windows app** (the required deliverable), as a single program with a published checksum | Nothing to install; the download can be verified | ✅ |
 | **Command-line version** (encrypt / decrypt, hidden password typing, password from a pipe) for Windows, Linux and macOS | Automation and power users; same engine | ✅ Windows · 🟡 Linux/macOS run only by the automated tests |
-| **macOS and Linux windows** (bonus), the same screen logic as Windows | Same tool for every team member; proves the layers are clean | 🟡 automated tests pass on all three systems; nobody has used them on a real Mac or Linux desktop yet |
+| **macOS and Linux windows** (bonus), the same screen logic as Windows | Same tool for every team member; proves the layers are clean | 🟡 automated tests pass on all three systems; released as a **preview** in 0.1.0-beta2; nobody has reported using them on a real Mac or Linux desktop yet |
 | **Cross-system files**: every build server encrypts a sample, every other one decrypts it | A file made on Windows opens on a Mac and on Linux, proven on each change | ✅ |
 | **Size comparison**: Windows app 134 MB versus the trimmed macOS/Linux window 38 MB (35-40 MB on Linux and macOS) (downloads 58 versus 16 MB) | An informed choice for smaller downloads | ✅ (Native AOT size not measured) |
 | Windows on ARM (Snapdragon) build | Newer laptops | 🟡 built, never run on an ARM machine |
@@ -93,7 +93,7 @@ checked: nothing leaves your computer.** Every suggestion below serves one of th
 | Suggestion | Why / benefit | Priority | Effort | Ref |
 |---|---|---|---|---|
 | A person runs the test plan and a short usability session with friends | So far only automated tests and the developer have used the app | Must (before a wider release) | S | C6 |
-| Try the macOS and Linux windows and command line on real machines | Real keyboards, dialogs and terminals differ from the test servers | Must (before a macOS/Linux release) | S | C2, C19, C21, 7.4 |
+| Try the macOS and Linux windows and command line on real machines | Real keyboards, dialogs and terminals differ from the test servers | Must (before the "preview" label is dropped) | S | C2, C19, C21, 7.4 |
 | Make the repository public (or upgrade the plan) | Enables free code scanning (CodeQL) and branch protection | Should | S | C9 |
 | Run the release check on a machine without this antivirus, or exclude the app's temp folder | About 1 full test run in 4 fails here because the antivirus copies temp files | Should | S | C4 |
 | Mutation testing on the command line and screen logic, as already done for the engine | Proves the tests catch mistakes there too | Could | S | C18, C22 |

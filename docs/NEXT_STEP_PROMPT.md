@@ -15,10 +15,11 @@ reverted on its own. Put the item id in the commit message, e.g. `fix(core): com
 - [ ] **Antivirus (C4):** add a Kaspersky exclusion for `%TEMP%\SecureFile*` (do not disable it). Stage 8's push failed
   3 times in a row on `...LeavesNothing`-style Core decryption tests because of its upper-case
   `.~OUTPUT.BIN.*.SECUREFILE-TMP.tmp` copies.
-- [ ] **Stage 7 real systems (plan 7.4):** macOS 14+ and a Linux desktop, checklist in `docs/DESKTOP_README.md` and backlog
-  C19/C21; then decide whether macOS/Linux go into a release (`docs/RELEASING.md`).
+- [ ] **Stage 7 real systems (plan 7.4):** the macOS/Linux windows are out as a preview in `v0.1.0-beta2`; collect tester
+  answers to the checklist in the release notes (or run it yourself on a Mac and a Linux desktop, backlog C19/C21), then
+  mark 7.4 and decide whether to drop the "preview" label (`docs/RELEASING.md`).
 - [ ] **Stage 6:** Windows Sandbox run (`docs/SANDBOX_TEST.md`), ADR-15 decision, screenshots
-  (`docs/SCREENSHOTS_NEEDED.md`), any GitHub release (`release/v0.1.0-beta2` has docs commit e71adc1 not on `main`).
+  (`docs/SCREENSHOTS_NEEDED.md`). The beta2 release notes are now also on `main` (CHANGELOG, RELEASING).
 - [ ] **Stage 5** (`docs/QUALITY_REPORT.md`, "Things only the user can do"): cold start, VS profiler, SonarQube, class
   coupling, decision C1 (compression 134 -> 65 MB), optional Native AOT size.
 - [ ] **Usability (C6):** a person runs `docs/TESTPLAN.md` and the friends session in `docs/USABILITY.md`.
@@ -61,11 +62,11 @@ FIX NOW (each with a test where it makes sense; order = risk first):
  9 #16/#33  file card: tooltip with full name, folder, last-modified date, exact size.
 10 #15  error dialogs name the log file (`FileErrorLog.LogFilePath`) and have the main window as owner.
 11 #11/#30, #7  Enter in the first password box moves to Confirm; Cancel focused while working; focus after a cancel.
-12 #25 (rest)  success message names the folder ("Your original file was not changed" is already there: update the report).
+12 #25 (rest)  success message names the folder and makes clear the unencrypted original is still there.
 13 C15  deterministic test of AtomicFileWriter.TryDeleteFile retry + Core test of the same-file branch.
 14 C18  inject TimeProvider into MainViewModel's progress throttle; add the 100 ms boundary, second-operation, late-report tests.
 15 B5   architecture rule: SecureFile.Cli references no UI or network assemblies.
-16 B6   PROJECT_PLAN §11.1 and FileErrorLog.LogFilePath remarks match the app; review-report statuses updated (#25 is stale).
+16 B6   PROJECT_PLAN §11.1 and FileErrorLog.LogFilePath remarks match the app; review-report statuses updated for every item fixed here.
 IF TIME: #18 (count text elements, not UTF-16 units, for the 8 minimum and 1,024 limit), #19, #21, #22, #28, #34 free-disk-space
 check, B3 code part (live-region announcements, automation names). LATER (do not do; keep in docs/SUGGESTIONS.md): #6/#34 format
 v2, Argon2id, #2 startup sweep, #35, #36-#38, C13, C19-C21, C2, C6, C1/C7/C9 decisions.
