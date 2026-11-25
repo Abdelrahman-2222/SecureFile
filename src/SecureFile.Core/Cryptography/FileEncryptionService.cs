@@ -465,6 +465,8 @@ public sealed class FileEncryptionService : IFileEncryptionService
     {
         // One pooled buffer: the first half receives the plaintext, the second half the ciphertext.
         byte[] buffer = ArrayPool<byte>.Shared.Rent(2 * ChunkLength);
+        long expectedLength = input.Length;
+        long totalRead = 0;
         try
         {
             int bytesRead;
@@ -472,6 +474,8 @@ public sealed class FileEncryptionService : IFileEncryptionService
             {
                 bytesRead = await input.ReadAtLeastAsync(
                     buffer.AsMemory(0, ChunkLength), ChunkLength, throwOnEndOfStream: false, cancellationToken).ConfigureAwait(false);
+                totalRead += bytesRead;
+                ThrowIfLongerThanExpected(totalRead, expectedLength);
                 await EncryptOneChunkAsync(buffer, bytesRead, output, encryptor, hmac, cancellationToken).ConfigureAwait(false);
                 progress.Advance(bytesRead);
             }
@@ -483,6 +487,23 @@ public sealed class FileEncryptionService : IFileEncryptionService
             // The buffer held the user's data: clear it before the next borrower gets it.
             // Stryker disable once Statement,Boolean : returning and clearing a pooled buffer is not observable by a test; checked by review (G9)
             ArrayPool<byte>.Shared.Return(buffer, clearArray: true);
+        }
+    }
+
+    /// <summary>Stops when the input gives more bytes than its length said when the encryption started.</summary>
+    /// <param name="totalRead">The bytes read so far.</param>
+    /// <param name="expectedLength">The input's length at the start.</param>
+    /// <exception cref="IOException">More bytes were read than expected.</exception>
+    /// <remarks>
+    /// On Linux and macOS a device such as <c>/dev/zero</c> passes as a file of length 0 and never ends, so the loop
+    /// would fill the disk; a file another program appends to would be encrypted without a defined end (review CORE-1).
+    /// The temp file is removed as for any other failure.
+    /// </remarks>
+    private static void ThrowIfLongerThanExpected(long totalRead, long expectedLength)
+    {
+        if (totalRead > expectedLength)
+        {
+            throw new IOException("The input grew while it was read, or it is a device rather than a regular file.");
         }
     }
 
