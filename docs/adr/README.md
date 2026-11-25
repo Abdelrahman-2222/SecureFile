@@ -5,7 +5,7 @@ what we chose, and what follows from it. They let anyone (including a Team Lead)
 the way it does.
 
 The decisions below are summarised in [PROJECT_PLAN.md §4](../PROJECT_PLAN.md#4-key-decisions-with-alternatives).
-Each one gets its own file (using [0000-template.md](0000-template.md)) when the step that implements it is built.
+ADR-01 to ADR-12 and ADR-14 are recorded there in full (options, verdict, consequences); the later decisions have a file of their own here, written with [0000-template.md](0000-template.md).
 
 | ADR | Decision | Status | Implemented in |
 |---|---|---|---|
@@ -14,7 +14,7 @@ Each one gets its own file (using [0000-template.md](0000-template.md)) when the
 | ADR-03 | PBKDF2-HMAC-SHA256, 600,000 iterations | Accepted | Stage 1.3 |
 | ADR-04 | AES-256-CBC + HMAC-SHA256 (encrypt-then-MAC) | Accepted | Stage 1.5–1.6 |
 | ADR-05 | PBKDF2 → master key → HKDF split into two keys | Accepted | Stage 1.3 |
-| ADR-06 | Streaming with CryptoStream and a reused buffer | Accepted | Stage 1.5 |
+| ADR-06 | Own streaming loop: one pooled buffer, `TransformBlock`; the final block only after the HMAC check (no `CryptoStream`) | Accepted | Stage 1.5 |
 | ADR-07 | Decrypt to a temp file, verify, then atomic move | Accepted | Stage 1.6 |
 | ADR-08 | CommunityToolkit.Mvvm for MVVM | Accepted | Stage 2 |
 | ADR-09 | Pure dependency injection in `App.OnStartup` | Accepted | Stage 0 / 3.1 |
