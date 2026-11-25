@@ -17,7 +17,14 @@ namespace SecureFile.Presentation.Errors;
 /// </remarks>
 public interface IErrorLog
 {
-    /// <summary>Writes the exception's type, message and stack trace to the log.</summary>
+    /// <summary>Writes an unexpected error (a crash): type, message and stack trace, without full paths.</summary>
     /// <param name="exception">The error to record.</param>
     void Write(Exception exception);
+
+    /// <summary>
+    /// Writes an expected failure the user was told about (wrong password, tampered file, disk full): type and message
+    /// only, without full paths and without a stack trace (review item 29).
+    /// </summary>
+    /// <param name="exception">The error to record.</param>
+    void WriteExpected(Exception exception);
 }

@@ -540,7 +540,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// </remarks>
     private void Fail(Exception exception)
     {
-        _errorLog.Write(exception);
+        _errorLog.WriteExpected(exception);
         ClearProgress();
         State = MainViewState.Failed;
         string message = ErrorMessageProvider.GetMessage(exception);

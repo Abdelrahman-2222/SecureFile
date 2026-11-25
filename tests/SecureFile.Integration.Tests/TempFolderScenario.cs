@@ -119,4 +119,13 @@ internal sealed class CollectingErrorLog : IErrorLog
     {
         Exceptions.Add(exception);
     }
+
+    public void WriteExpected(Exception exception)
+    {
+        Exceptions.Add(exception);
+        ExpectedCount++;
+    }
+
+    /// <summary>How many of <see cref="Exceptions"/> were logged as expected failures (no stack trace).</summary>
+    public int ExpectedCount { get; private set; }
 }

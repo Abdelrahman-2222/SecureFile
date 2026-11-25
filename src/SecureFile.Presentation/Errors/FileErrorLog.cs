@@ -7,9 +7,10 @@ namespace SecureFile.Presentation.Errors;
 /// </summary>
 /// <remarks>
 /// <para>
-/// <b>Why local only:</b> nothing is sent over the network (ADR-12). Only the exception's type, message and stack trace
-/// are written; Core messages never contain passwords, keys or file contents. A file-system exception can contain a
-/// full path (and so the user name); that is acceptable because the log never leaves the computer.
+/// <b>Why local only:</b> nothing is sent over the network (ADR-12). Only the exception's type and message are
+/// written, plus the stack trace for a crash; Core messages never contain passwords, keys or file contents. Paths are
+/// replaced by <c>&lt;path&gt;</c> (<see cref="LogEntryFormatter"/>), so neither the user name nor a telling file name
+/// such as "TaxReturn2025.pdf" reaches the plaintext log (review item 29).
 /// </para>
 /// <para>
 /// <b>Never throws:</b> a failing log must not turn a handled error into a crash. If the file cannot be written, a
@@ -50,7 +51,20 @@ public sealed class FileErrorLog : IErrorLog
     /// <inheritdoc />
     public void Write(Exception exception)
     {
-        string entry = $"{DateTimeOffset.Now:O} {exception}{Environment.NewLine}{Environment.NewLine}";
+        Append(LogEntryFormatter.Format(exception, includeStackTrace: true));
+    }
+
+    /// <inheritdoc />
+    public void WriteExpected(Exception exception)
+    {
+        Append(LogEntryFormatter.Format(exception, includeStackTrace: false));
+    }
+
+    /// <summary>Appends one entry with a time stamp, never throwing.</summary>
+    /// <param name="text">The entry text, already without paths.</param>
+    private void Append(string text)
+    {
+        string entry = $"{DateTimeOffset.Now:O} {text}{Environment.NewLine}{Environment.NewLine}";
         try
         {
             lock (_lock)
