@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.Globalization;
 using System.Text;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -43,7 +42,10 @@ public sealed partial class MainViewModel : ObservableObject
     private readonly IFileDialogService _fileDialogs;
     private readonly IErrorLog _errorLog;
     private readonly IFolderOpener _folderOpener;
-    private readonly Stopwatch _operationClock = new();
+    private readonly TimeProvider _timeProvider;
+
+    /// <summary>When the running operation started, as a <see cref="TimeProvider.GetTimestamp"/> value.</summary>
+    private long _operationStart;
 
     /// <summary>The shortest time between two screen updates of the progress bar (10 per second).</summary>
     private static readonly TimeSpan MinimumProgressInterval = TimeSpan.FromMilliseconds(100);
@@ -51,7 +53,7 @@ public sealed partial class MainViewModel : ObservableObject
     /// <summary>The percentage at which the throttle never skips an update.</summary>
     private const int ProgressComplete = 100;
 
-    /// <summary>When (on <see cref="_operationClock"/>) the progress was last shown; used by the throttle.</summary>
+    /// <summary>When (time since <see cref="_operationStart"/>) the progress was last shown; used by the throttle.</summary>
     private TimeSpan _lastProgressUpdate;
 
     /// <summary>The name of the file being read by Browse or drop; <see langword="null"/> when no read is running.</summary>
@@ -72,13 +74,18 @@ public sealed partial class MainViewModel : ObservableObject
     /// <param name="fileDialogs">Shows the Open and Save dialogs.</param>
     /// <param name="errorLog">Records the technical details of handled errors.</param>
     /// <param name="folderOpener">Shows the result in the file manager.</param>
+    /// <param name="timeProvider">
+    /// The clock for the progress throttle and speed; <see langword="null"/> for the system clock. Tests pass a fake one,
+    /// so the 100 ms boundary is checked exactly instead of with the wall clock (backlog C18).
+    /// </param>
     /// <exception cref="ArgumentNullException">A service is <see langword="null"/>.</exception>
     public MainViewModel(
         IFileEncryptionService encryptionService,
         IFileDetailsReader fileDetailsReader,
         IFileDialogService fileDialogs,
         IErrorLog errorLog,
-        IFolderOpener folderOpener)
+        IFolderOpener folderOpener,
+        TimeProvider? timeProvider = null)
     {
         ArgumentNullException.ThrowIfNull(encryptionService);
         ArgumentNullException.ThrowIfNull(fileDetailsReader);
@@ -87,6 +94,7 @@ public sealed partial class MainViewModel : ObservableObject
         ArgumentNullException.ThrowIfNull(folderOpener);
 
         _folderOpener = folderOpener;
+        _timeProvider = timeProvider ?? TimeProvider.System;
         _errorLog = errorLog;
         _encryptionService = encryptionService;
         _fileDetailsReader = fileDetailsReader;
@@ -633,7 +641,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         _operationCts = cancellation;
         CancelCommand.NotifyCanExecuteChanged();
-        _operationClock.Restart();
+        _operationStart = _timeProvider.GetTimestamp();
         _lastProgressUpdate = TimeSpan.FromMilliseconds(-1) - MinimumProgressInterval; // the first report always shows
         State = MainViewState.Working;
         ProgressPercentage = 0;
@@ -645,7 +653,6 @@ public sealed partial class MainViewModel : ObservableObject
     private void EndOperation()
     {
         _operationCts = null;
-        _operationClock.Stop();
         OnPropertyChanged(nameof(IsProgressIndeterminate));
         CancelCommand.NotifyCanExecuteChanged();
     }
@@ -663,7 +670,7 @@ public sealed partial class MainViewModel : ObservableObject
             return;
         }
 
-        TimeSpan now = _operationClock.Elapsed;
+        TimeSpan now = _timeProvider.GetElapsedTime(_operationStart);
         if (percentage < ProgressComplete && now - _lastProgressUpdate < MinimumProgressInterval)
         {
             return;
@@ -671,7 +678,7 @@ public sealed partial class MainViewModel : ObservableObject
 
         _lastProgressUpdate = now;
         ProgressPercentage = percentage;
-        ProgressText = ProgressTextFormatter.Format(percentage, SelectedFile?.SizeInBytes ?? 0, _operationClock.Elapsed, CultureInfo.CurrentCulture);
+        ProgressText = ProgressTextFormatter.Format(percentage, SelectedFile?.SizeInBytes ?? 0, now, CultureInfo.CurrentCulture);
     }
 
     /// <summary>Fails the action with a message when the password cannot be used.</summary>

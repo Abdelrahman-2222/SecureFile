@@ -18,6 +18,7 @@ public sealed class MainViewModelTests
 
     private readonly FakeFileEncryptionService _encryption = new();
     private readonly FakeFileDialogService _dialogs = new();
+    private readonly ManualTimeProvider _clock = new();
     private readonly FakeFileDetailsReader _detailsReader = new();
     private readonly FakeErrorLog _errorLog = new();
     private readonly FakeFolderOpener _folderOpener = new();
@@ -637,18 +638,87 @@ public sealed class MainViewModelTests
         Task running = viewModel.EncryptCommand.ExecuteAsync(null);
 
         viewModel.OnProgress(5);
-        viewModel.OnProgress(6); // normally less than 100 ms later: skipped
+        viewModel.OnProgress(6); // no time has passed on the test clock: skipped
         viewModel.OnProgress(7);
-        // Wall-clock based, so only what holds on a slow machine too: the first report shows, nothing goes backwards
-        // and nothing beyond what was reported appears (the exact 100 ms boundary needs an injectable clock: backlog C18).
-        Assert.InRange(viewModel.ProgressPercentage, 5, 7);
-        Assert.NotEqual(0, viewModel.ProgressPercentage);
+        Assert.Equal(5, viewModel.ProgressPercentage);
 
         viewModel.OnProgress(100); // the end is never skipped
         Assert.Equal(100, viewModel.ProgressPercentage);
 
         release.SetResult();
         await running;
+    }
+
+    [Fact]
+    public async Task Progress_At99And100Milliseconds_SkipsBeforeTheBoundaryAndShowsAtIt()
+    {
+        (MainViewModel viewModel, TaskCompletionSource release, Task running) = await StartEncryptionAsync();
+
+        viewModel.OnProgress(10);
+        _clock.Advance(TimeSpan.FromMilliseconds(99));
+        viewModel.OnProgress(20);
+        Assert.Equal(10, viewModel.ProgressPercentage); // 99 ms: still inside the 100 ms window (backlog C18)
+
+        _clock.Advance(TimeSpan.FromMilliseconds(1));
+        viewModel.OnProgress(30);
+        Assert.Equal(30, viewModel.ProgressPercentage); // exactly 100 ms: shown
+
+        release.SetResult();
+        await running;
+    }
+
+    [Fact]
+    public async Task Progress_SecondOperation_ShowsItsFirstReportAtOnce()
+    {
+        (MainViewModel viewModel, TaskCompletionSource release, Task running) = await StartEncryptionAsync();
+        viewModel.OnProgress(50);
+        release.SetResult();
+        await running;
+
+        // The second run starts within the first run's 100 ms window; its first report must not be throttled away.
+        (viewModel, release, running) = await StartEncryptionAsync(viewModel);
+        viewModel.OnProgress(3);
+
+        Assert.Equal(3, viewModel.ProgressPercentage);
+        release.SetResult();
+        await running;
+    }
+
+    [Fact]
+    public async Task Progress_LateReportAfterTheOperationEnded_IsIgnored()
+    {
+        (MainViewModel viewModel, TaskCompletionSource release, Task running) = await StartEncryptionAsync();
+        release.SetResult();
+        await running;
+
+        _clock.Advance(TimeSpan.FromSeconds(1));
+        viewModel.OnProgress(80); // a Progress<T> callback queued before the end can arrive after it
+
+        Assert.Equal(0, viewModel.ProgressPercentage);
+        Assert.Equal(string.Empty, viewModel.ProgressText);
+    }
+
+    /// <summary>Starts an encryption that waits until the returned source is completed, so progress can be reported into it.</summary>
+    /// <param name="viewModel">A ViewModel to reuse for a second operation, or <see langword="null"/> for a new one.</param>
+    private async Task<(MainViewModel ViewModel, TaskCompletionSource Release, Task Running)> StartEncryptionAsync(MainViewModel? viewModel = null)
+    {
+        if (viewModel is null)
+        {
+            viewModel = await CreateWithFileAsync(InputPath);
+        }
+        else
+        {
+            _dialogs.OpenResult = InputPath;
+            await viewModel.BrowseCommand.ExecuteAsync(null);
+            viewModel.Password = ValidPassword;
+            viewModel.ConfirmPassword = ValidPassword;
+        }
+
+        _dialogs.SaveResult = InputPath + ".enc";
+        var release = new TaskCompletionSource();
+        _encryption.WaitFor = release.Task;
+        Task running = viewModel.EncryptCommand.ExecuteAsync(null);
+        return (viewModel, release, running);
     }
 
     // ---- Cancel, Open folder, locked inputs (Step 3.5) -------------------------------------------------------------
@@ -943,7 +1013,7 @@ public sealed class MainViewModelTests
 
     private MainViewModel CreateViewModel()
     {
-        return new MainViewModel(_encryption, _detailsReader, _dialogs, _errorLog, _folderOpener);
+        return new MainViewModel(_encryption, _detailsReader, _dialogs, _errorLog, _folderOpener, _clock);
     }
 
     /// <summary>A ViewModel with <paramref name="path"/> chosen and a valid password typed twice.</summary>

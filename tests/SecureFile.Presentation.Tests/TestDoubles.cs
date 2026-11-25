@@ -119,3 +119,21 @@ internal sealed class FakeFileDetailsReader : IFileDetailsReader
         return new FileDetails(filePath, Path.GetFileName(filePath), Path.GetExtension(filePath), 1536, DateTime.UnixEpoch, encrypted);
     }
 }
+
+/// <summary>A clock that moves only when the test says so, for the progress throttle (backlog C18).</summary>
+internal sealed class ManualTimeProvider : TimeProvider
+{
+    private long _ticks;
+
+    public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+
+    public override long GetTimestamp()
+    {
+        return _ticks;
+    }
+
+    public void Advance(TimeSpan duration)
+    {
+        _ticks += duration.Ticks;
+    }
+}
