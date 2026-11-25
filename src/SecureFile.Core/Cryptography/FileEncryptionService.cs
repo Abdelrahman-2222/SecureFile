@@ -222,7 +222,7 @@ public sealed class FileEncryptionService : IFileEncryptionService
     /// <exception cref="ArgumentException">
     /// The output is a folder, has no file name, contains characters a file name cannot have, or is the input.
     /// </exception>
-    /// <exception cref="IOException">The output file exists and may not be replaced.</exception>
+    /// <exception cref="IOException">The output file exists and may not be replaced, or a path holds a link loop.</exception>
     private static void ThrowIfOutputPathIsUnusable(string inputFilePath, string outputFilePath, bool overwriteExisting)
     {
         string fileName = Path.GetFileName(outputFilePath);
@@ -233,7 +233,9 @@ public sealed class FileEncryptionService : IFileEncryptionService
             throw new ArgumentException("The output path must name a file, not a folder.", nameof(outputFilePath));
         }
 
-        if (string.Equals(inputFilePath, outputFilePath, StringComparison.OrdinalIgnoreCase))
+        // Looks through links and case/normalisation aliases: on Linux and macOS the final rename would otherwise
+        // replace the input while it is still being read (backlog C14).
+        if (FileIdentity.AreSameFile(inputFilePath, outputFilePath))
         {
             throw new ArgumentException("The output file must be different from the input file.", nameof(outputFilePath));
         }
