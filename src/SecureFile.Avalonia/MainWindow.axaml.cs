@@ -43,8 +43,7 @@ internal sealed partial class MainWindow : Window
     /// <summary>Connects the events that XAML cannot express: drop zone, About, F1 and the clipboard guard.</summary>
     private void WireEvents()
     {
-        DropZone.AddHandler(DragDrop.DragOverEvent, OnDragOver);
-        DropZone.AddHandler(DragDrop.DropEvent, OnFileDropped);
+        WireDropZone();
         AboutButton.Click += (_, _) => ShowAbout();
         KeyDown += OnWindowKeyDown;
         Opened += (_, _) => BrowseButton.Focus(); // a keyboard user starts on the first action
@@ -53,6 +52,15 @@ internal sealed partial class MainWindow : Window
             box.CopyingToClipboard += BlockClipboard;
             box.CuttingToClipboard += BlockClipboard;
         }
+    }
+
+    /// <summary>Connects the drop zone: cursor and highlight while dragging, the file on drop.</summary>
+    private void WireDropZone()
+    {
+        DropZone.AddHandler(DragDrop.DragEnterEvent, OnDragOver);
+        DropZone.AddHandler(DragDrop.DragOverEvent, OnDragOver);
+        DropZone.AddHandler(DragDrop.DragLeaveEvent, (_, _) => DropZone.Classes.Set("dragover", false));
+        DropZone.AddHandler(DragDrop.DropEvent, OnFileDropped);
     }
 
     /// <summary>Opens the About dialog.</summary>
@@ -73,13 +81,23 @@ internal sealed partial class MainWindow : Window
         }
     }
 
-    /// <summary>Shows the "copy" cursor over the drop zone for files, and "not allowed" for anything else.</summary>
+    /// <summary>Shows the "copy" cursor and highlights the drop zone for files, and "not allowed" for anything else.</summary>
     /// <param name="sender">The drop zone.</param>
     /// <param name="e">The drag information.</param>
     private void OnDragOver(object? sender, DragEventArgs e)
     {
-        e.DragEffects = e.DataTransfer.Contains(DataFormat.File) ? DragDropEffects.Copy : DragDropEffects.None;
+        bool accepted = AcceptsDrop(e);
+        e.DragEffects = accepted ? DragDropEffects.Copy : DragDropEffects.None;
+        DropZone.Classes.Set("dragover", accepted); // accent border (review item 31), styled in MainWindow.axaml
         e.Handled = true;
+    }
+
+    /// <summary>Tells whether a drop would be used: it must carry files.</summary>
+    /// <param name="e">The drag information.</param>
+    /// <returns><see langword="true"/> when the drop zone accepts it.</returns>
+    private static bool AcceptsDrop(DragEventArgs e)
+    {
+        return e.DataTransfer.Contains(DataFormat.File);
     }
 
     /// <summary>Hands the first dropped file to the ViewModel; the ViewModel decides whether it can be used.</summary>
@@ -88,6 +106,7 @@ internal sealed partial class MainWindow : Window
     /// <remarks>Only the first item is used (one file at a time); an item without a local path (a folder in a sandbox) is ignored.</remarks>
     private void OnFileDropped(object? sender, DragEventArgs e)
     {
+        DropZone.Classes.Set("dragover", false);
         string? path = e.DataTransfer.TryGetFiles() is { Length: > 0 } items ? items[0].TryGetLocalPath() : null;
         if (path is not null && _viewModel.OpenFileCommand.CanExecute(path))
         {

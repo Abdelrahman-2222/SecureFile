@@ -55,6 +55,9 @@
         <Style Selector="ProgressBar.success">
             <Setter Property="Foreground" Value="{DynamicResource SuccessBrush}" />
         </Style>
+        <Style Selector="Border#DropZone.dragover">
+            <Setter Property="BorderBrush" Value="{DynamicResource SystemControlHighlightAccentBrush}" />
+        </Style>
         <Style Selector="Border.banner.success">
             <Setter Property="Background" Value="{DynamicResource SuccessBackgroundBrush}" />
         </Style>
@@ -73,12 +76,12 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="24">
 
-            <!-- 1. Drop zone -->
+            <!-- 1. Drop zone: says "drop" so drag-and-drop can be found; highlighted (class dragover) while a file is over it. -->
             <Border x:Name="DropZone" AutomationProperties.AutomationId="DropZone"
                     BorderBrush="{DynamicResource SystemControlForegroundBaseMediumLowBrush}" BorderThickness="2"
                     CornerRadius="8" Padding="24" Background="Transparent" DragDrop.AllowDrop="True">
                 <StackPanel HorizontalAlignment="Center">
-                    <TextBlock Text="Choose a file to encrypt or decrypt" FontSize="18" HorizontalAlignment="Center" />
+                    <TextBlock Text="Drop a file here or" FontSize="18" HorizontalAlignment="Center" />
                     <Button x:Name="BrowseButton" AutomationProperties.AutomationId="BrowseButton"
                             AutomationProperties.Name="Browse for a file"
                             Content="_Browse…" ToolTip.Tip="Browse (Ctrl+O, ⌘O on macOS)" Command="{Binding BrowseCommand}"

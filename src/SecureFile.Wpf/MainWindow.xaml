@@ -32,12 +32,12 @@
     <ScrollViewer VerticalScrollBarVisibility="Auto">
         <StackPanel Margin="24">
 
-            <!-- 1. Drop zone (drag-and-drop itself: Step 3.4) -->
+            <!-- 1. Drop zone: says "drop" so drag-and-drop can be found (plan §11.1); highlighted while a file is dragged over it. -->
             <Border x:Name="DropZone" AutomationProperties.AutomationId="DropZone"
                     BorderBrush="{DynamicResource ControlStrongStrokeColorDefaultBrush}" BorderThickness="2" CornerRadius="8" Padding="24" Background="Transparent"
-                    AllowDrop="True" DragOver="OnDragOver" Drop="OnFileDropped">
+                    AllowDrop="True" DragEnter="OnDragOver" DragOver="OnDragOver" DragLeave="OnDragLeave" Drop="OnFileDropped">
                 <StackPanel HorizontalAlignment="Center">
-                    <TextBlock Text="Choose a file to encrypt or decrypt" FontSize="18" HorizontalAlignment="Center" />
+                    <TextBlock Text="Drop a file here or" FontSize="18" HorizontalAlignment="Center" />
                     <Button x:Name="BrowseButton" AutomationProperties.AutomationId="BrowseButton"
                             AutomationProperties.Name="Browse for a file"
                             Content="_Browse…" ToolTip="Browse (Ctrl+O)" Command="{Binding BrowseCommand}"

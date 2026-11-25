@@ -29,6 +29,12 @@ namespace SecureFile.Presentation.Main;
 /// </remarks>
 public sealed partial class MainViewModel : ObservableObject
 {
+    /// <summary>
+    /// The status line while no file is chosen. It adds what the drop zone ("Drop a file here or Browse…") and the file
+    /// card ("No file selected.") do not say, instead of repeating them a third time (review item 17).
+    /// </summary>
+    internal const string NoFileGuidance = "Any file can be encrypted; a SecureFile file (.enc) is decrypted. The file you choose is never changed.";
+
     /// <summary>The ending added to a decrypted file's name when the encrypted file does not end in <c>.enc</c>.</summary>
     private const string DecryptedFileExtension = ".decrypted";
 
@@ -212,7 +218,7 @@ public sealed partial class MainViewModel : ObservableObject
 
     /// <summary>Gets the message that tells the user what happened and what to do next.</summary>
     [ObservableProperty]
-    public partial string StatusMessage { get; private set; } = "Choose a file to encrypt or decrypt.";
+    public partial string StatusMessage { get; private set; } = NoFileGuidance;
 
     /// <summary>Gets a value indicating whether an operation is running (the window shows a busy indicator).</summary>
     public bool IsBusy => State == MainViewState.Working;
@@ -304,7 +310,7 @@ public sealed partial class MainViewModel : ObservableObject
     {
         if (SelectedFile is null)
         {
-            return "Choose a file to encrypt or decrypt.";
+            return NoFileGuidance;
         }
 
         if (!SelectedFile.IsEncrypted && HasEncryptedName(SelectedFile))

@@ -35,6 +35,10 @@ public sealed class MainViewModelTests
         Assert.True(viewModel.BrowseCommand.CanExecute(null));
         Assert.False(viewModel.EncryptCommand.CanExecute(null));
         Assert.False(viewModel.DecryptCommand.CanExecute(null));
+
+        // The status adds something instead of repeating the drop zone and the file card (review item 17).
+        Assert.Equal(MainViewModel.NoFileGuidance, viewModel.StatusMessage);
+        Assert.DoesNotContain("Choose a file", viewModel.StatusMessage, StringComparison.Ordinal);
     }
 
     [Fact]

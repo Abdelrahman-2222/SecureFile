@@ -40,7 +40,7 @@ list to burn down and links back here for the detail.
 
 | # | Finding | Evidence / detail | Status |
 |---|---|---|---|
-| 17 | Status wording stale after the content-based redesign; the first-run text repeated three times; the drop zone no longer says "drop" so drag-and-drop is undiscoverable (plan §11.1(1): "Drop a file here or Browse…"); no drag-over highlight | VM:260, 334 | **PARTLY**: the status line is now a live next step. Open: the drop wording, the drag highlight, the triple repetition at first run |
+| 17 | Status wording stale after the content-based redesign; the first-run text repeated three times; the drop zone no longer says "drop" so drag-and-drop is undiscoverable (plan §11.1(1): "Drop a file here or Browse…"); no drag-over highlight | VM:260, 334 | **FIXED (Stage 9.0)**: the status line is a live next step; the drop zone says "Drop a file here or Browse…" with an accent border while dragging; the first-run status no longer repeats it (WPF and Avalonia) |
 | 18 | The "8 characters" rule and `MaxLength=1024` count UTF-16 units, not characters | 4 emoji pass the minimum (VM CanEncrypt); NFD counts more than NFC; a pasted password over 1024 is silently truncated and can be cut at a surrogate, giving a lone surrogate | **OPEN** |
 | 19 | Save dialog behaviours | Picking the input file: Windows asks "replace?" and only after Yes says "choose a different name" (VM:577-588); the Decrypt suggestion `x.enc` to `x` gives an extensionless name and an All-files filter; Open dialog dereferences `.lnk`, a drop gives the `.lnk` itself; Open dialog has no filter or remembered folder; replacing a read-only/hidden target says only "Access … denied" without naming the file | **OPEN** |
 | 20 | Stale error banner while the user fixes the problem | After a wrong password or rejected password the red message stayed while retyping; cancelling the Save dialog leaves an old red message | **FIXED**: typing clears an old error (Stage 4); cancelling the Save dialog now returns to the guidance text (Stage 5, step 5.6) |
@@ -59,7 +59,7 @@ list to burn down and links back here for the detail.
 | # | Suggestion | Status |
 |---|---|---|
 | 30 | Initial focus on Browse; Enter in the first password box moves to Confirm | **PARTLY** (initial focus done; Enter-to-Confirm open) |
-| 31 | Drag-over highlight and the text "Drop a file here or Browse…" | OPEN |
+| 31 | Drag-over highlight and the text "Drop a file here or Browse…" | **FIXED (Stage 9.0)** |
 | 32 | A tooltip or inline hint for every disabled button, and an always-visible reason line | **PARTLY** (live guidance line; tooltips only on hover) |
 | 33 | Folder path and last-modified date on the file card, with a tooltip for exact bytes (plan §11.1) | OPEN |
 | 34 | Warn or pre-check free disk space before a large Decrypt or Encrypt | OPEN (see 6) |
