@@ -51,22 +51,24 @@ public sealed class FileErrorLog : IErrorLog
     /// <inheritdoc />
     public void Write(Exception exception)
     {
-        Append(LogEntryFormatter.Format(exception, includeStackTrace: true));
+        Append(exception, includeStackTrace: true);
     }
 
     /// <inheritdoc />
     public void WriteExpected(Exception exception)
     {
-        Append(LogEntryFormatter.Format(exception, includeStackTrace: false));
+        Append(exception, includeStackTrace: false);
     }
 
-    /// <summary>Appends one entry with a time stamp, never throwing.</summary>
-    /// <param name="text">The entry text, already without paths.</param>
-    private void Append(string text)
+    /// <summary>Formats one entry (paths removed) and appends it with a time stamp, never throwing.</summary>
+    /// <param name="exception">The error to record.</param>
+    /// <param name="includeStackTrace">Whether stack traces are written (crashes only).</param>
+    /// <remarks>The formatting is inside the <c>try</c> too, so a failure there is dropped like a failed write (Stage 9.0 review).</remarks>
+    private void Append(Exception exception, bool includeStackTrace)
     {
-        string entry = $"{DateTimeOffset.Now:O} {text}{Environment.NewLine}{Environment.NewLine}";
         try
         {
+            string entry = $"{DateTimeOffset.Now:O} {LogEntryFormatter.Format(exception, includeStackTrace)}{Environment.NewLine}{Environment.NewLine}";
             lock (_lock)
             {
                 Directory.CreateDirectory(Path.GetDirectoryName(_logFilePath)!);

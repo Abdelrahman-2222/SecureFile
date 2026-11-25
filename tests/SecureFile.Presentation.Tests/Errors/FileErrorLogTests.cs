@@ -24,6 +24,11 @@ public sealed class FileErrorLogTests : IDisposable
     [InlineData("   at X.Y() in /_/src/SecureFile.Core/File.cs:line 7", "   at X.Y() in <path>.cs:line 7")]
     [InlineData("The password is wrong, or the file was changed.", "The password is wrong, or the file was changed.")]
     [InlineData("Use either and/or 1/2 of it.", "Use either and/or 1/2 of it.")]
+    [InlineData(@"Could not find file 'C:\Users\O'Brien\Documents\tax.pdf'.", "Could not find file '<path>.pdf'.")] // quote in the path
+    [InlineData(@"Could not find file 'C:\Users\Sara\Sara's taxes 2025.pdf'.", "Could not find file '<path>.pdf'.")]
+    [InlineData("Could not find file 'Sara_TaxReturn2025.pdf'.", "Could not find file '<path>.pdf'.")] // a bare file name
+    [InlineData("See https://aka.ms/x for details.", "See https://aka.ms/x for details.")] // a web address stays
+    [InlineData("Disk full on /dev/sda1 while writing the file", "Disk full on <path> while writing the file")]
     public void RemovePaths_ReplacesEveryPathButKeepsTheRest(string text, string expected)
     {
         Assert.Equal(expected, LogEntryFormatter.RemovePaths(text));

@@ -48,15 +48,26 @@ internal static partial class LogEntryFormatter
     /// <param name="text">A message or stack trace.</param>
     /// <returns>The text without paths; a path's extension (such as <c>.pdf</c>) stays.</returns>
     /// <remarks>
-    /// Three shapes are recognised: a quoted text that holds a separator (how .NET quotes paths in messages), a Windows
-    /// drive or network path, and an absolute Unix path. Each stops at a quote, a line end or <c>:line</c>.
+    /// <para>
+    /// Shapes, in order: a quoted full path (it may itself contain quotes, as in <c>O'Brien</c>, so it ends only at a
+    /// quote followed by punctuation, a space or the line end); a quoted text that holds a separator; a quoted file name
+    /// with an extension (it can name the user's file even without a folder); a bare Windows drive or network path (it
+    /// may contain spaces and ends at a quote, <c>:</c> or "in"/"at"); a bare absolute Unix path (it ends at a space).
+    /// </para>
+    /// <para>
+    /// The Unix shape does not start after <c>:</c>, <c>/</c> or a letter, so a web address such as
+    /// <c>https://aka.ms/x</c> or a phrase like <c>and/or</c> stays readable (review of Stage 9.0).
+    /// </para>
     /// </remarks>
     internal static string RemovePaths(string text)
     {
         try
         {
-            string withoutQuoted = QuotedPath().Replace(text, match => $"{match.Groups["q"].Value}{PathPlaceholder}{match.Groups["ext"].Value}{match.Groups["q"].Value}");
-            return BarePath().Replace(withoutQuoted, match => PathPlaceholder + match.Groups["ext"].Value);
+            string result = QuotedFullPath().Replace(text, Quoted);
+            result = QuotedPath().Replace(result, Quoted);
+            result = QuotedFileName().Replace(result, Quoted);
+            result = BareWindowsPath().Replace(result, Bare);
+            return BareUnixPath().Replace(result, Bare);
         }
         catch (RegexMatchTimeoutException)
         {
@@ -82,11 +93,40 @@ internal static partial class LogEntryFormatter
         }
     }
 
+    /// <summary>Replaces a quoted match by the same quotes around <see cref="PathPlaceholder"/> and the extension.</summary>
+    /// <param name="match">A match with groups <c>q</c> (the quote) and <c>ext</c>.</param>
+    /// <returns>The replacement text.</returns>
+    private static string Quoted(Match match)
+    {
+        string quote = match.Groups["q"].Value;
+        return quote + PathPlaceholder + match.Groups["ext"].Value + quote;
+    }
+
+    /// <summary>Replaces a bare match by <see cref="PathPlaceholder"/> and the extension.</summary>
+    /// <param name="match">A match with group <c>ext</c>.</param>
+    /// <returns>The replacement text.</returns>
+    private static string Bare(Match match)
+    {
+        return PathPlaceholder + match.Groups["ext"].Value;
+    }
+
+    /// <summary>A quoted path from a drive, network or Unix root to a closing quote followed by punctuation, space or the end.</summary>
+    [GeneratedRegex(@"(?<q>['""])(?:[A-Za-z]:[\\/]|\\\\|/)[^\r\n]*?(?<ext>\.[A-Za-z0-9]{1,8})?\k<q>(?=[.,;:)\s]|$)", RegexOptions.CultureInvariant | RegexOptions.Multiline, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex QuotedFullPath();
+
     /// <summary>A quoted text with a <c>\</c> or <c>/</c> in it; group <c>ext</c> is a short extension at its end.</summary>
     [GeneratedRegex(@"(?<q>['""])[^'""\r\n]*[\\/][^'""\r\n]*?(?<ext>\.[A-Za-z0-9]{1,8})?\k<q>", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
     private static partial Regex QuotedPath();
 
-    /// <summary>A bare Windows drive, network or absolute Unix path, up to a quote, a line end, <c>:</c> or the end.</summary>
-    [GeneratedRegex(@"(?:\b[A-Za-z]:[\\/]|\\\\[^\\\s]+\\|(?<![\w.<>])/(?=[^\s/]))[^'""\r\n:<>]*?(?<ext>\.[A-Za-z0-9]{1,8})?(?=['""\r\n:]|\s+(?:in|at)\s|$)", RegexOptions.CultureInvariant | RegexOptions.Multiline, matchTimeoutMilliseconds: 1000)]
-    private static partial Regex BarePath();
+    /// <summary>A quoted file name without a folder that ends in an extension, such as <c>'TaxReturn2025.pdf'</c>.</summary>
+    [GeneratedRegex(@"(?<q>['""])[^'""\r\n\\/]*?(?<ext>\.[A-Za-z0-9]{1,8})\k<q>", RegexOptions.CultureInvariant, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex QuotedFileName();
+
+    /// <summary>A bare Windows drive or network path; it may contain spaces and ends at a quote, <c>:</c>, "in"/"at" or the line end.</summary>
+    [GeneratedRegex(@"(?:\b[A-Za-z]:[\\/]|\\\\[^\\\s]+\\)[^'""\r\n:<>]*?(?<ext>\.[A-Za-z0-9]{1,8})?(?=['""\r\n:]|\s+(?:in|at)\s|$)", RegexOptions.CultureInvariant | RegexOptions.Multiline, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex BareWindowsPath();
+
+    /// <summary>A bare absolute Unix path, not after <c>:</c>, <c>/</c> or a letter; it ends at a space, quote or <c>:</c>.</summary>
+    [GeneratedRegex(@"(?<![:/\w.<>])/(?=[^\s/])[^'""\s:<>]*?(?<ext>\.[A-Za-z0-9]{1,8})?(?=['""\s:]|$)", RegexOptions.CultureInvariant | RegexOptions.Multiline, matchTimeoutMilliseconds: 1000)]
+    private static partial Regex BareUnixPath();
 }
